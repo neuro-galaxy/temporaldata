@@ -1316,7 +1316,22 @@ class RegularTimeSeries(ArrayDict):
 
         mask_array = np.zeros_like(self.timestamps, dtype=bool)
         for start, end in zip(interval.start, interval.end):
-            mask_array |= (self.timestamps >= start) & (self.timestamps < end)
+            if start < self.domain.start[0]:
+                start_id = 0
+            else:
+                start_id = int(
+                    np.round((start - self.domain.start[0]) * self.sampling_rate)
+                )
+
+            if end > self.domain.end[0]:
+                end_id = len(self) + 1
+            else:
+                end_id = int(
+                    np.round((end - self.domain.start[0]) * self.sampling_rate)
+                )
+
+            assert not np.any(mask_array[start_id:end_id])
+            mask_array[start_id:end_id] = True
 
         setattr(self, f"{name}_mask", mask_array)
 
