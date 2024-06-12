@@ -4,6 +4,7 @@ import copy
 from collections.abc import Mapping, Sequence
 from typing import Any, Dict, List, Tuple, Union
 import logging
+import warnings
 
 import h5py
 import numpy as np
@@ -2885,6 +2886,10 @@ class Data(object):
         contained within this Data object.
         """
         for key in self.keys:
+            if key.endswith("_domain"):
+                # domains are not split
+                assert isinstance(getattr(self, key), Interval)
+                continue
             obj = getattr(self, key)
             if isinstance(obj, (RegularTimeSeries, IrregularTimeSeries, Interval)):
                 obj.add_split_mask(name, interval)
@@ -2892,8 +2897,21 @@ class Data(object):
     def _check_for_data_leakage(self, name):
         """Ensure that split masks are all True"""
         for key in self.keys:
-            # TODO fix intervals
+            if key.endswith("_domain"):
+                continue
             if key == "trials":
+                # raise deprecation warning
+                if (
+                    not hasattr(obj, f"{name}_mask")
+                    or not getattr(obj, f"{name}_mask").all()
+                ):
+                    warnings.warn(
+                        "Data leakage was detected in 'trials'. This is a warning, but"
+                        "in the future, this will raise an error. Please update your "
+                        "prepare_data.py script to fix this issue.",
+                        DeprecationWarning,
+                        stacklevel=2,
+                    )
                 continue
             obj = getattr(self, key)
             if isinstance(obj, (IrregularTimeSeries, Interval)):
