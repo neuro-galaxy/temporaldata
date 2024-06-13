@@ -35,7 +35,7 @@ def test_regulartimeseries():
     assert data.valid_mask.sum() == 20
     assert data.test_mask.sum() == 20
 
-    # check what happens when things are skwed
+    # check what happens when things are skewed
     data = RegularTimeSeries(
         lfp=np.random.random((100, 48)), sampling_rate=10, domain="auto"
     )
