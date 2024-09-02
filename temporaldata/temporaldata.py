@@ -354,8 +354,11 @@ class LazyArrayDict(ArrayDict):
         array as well as apply any outstanding masks.
     """
 
-    _lazy_ops = dict()
-    _unicode_keys = []
+    def __init__(self):
+        self._lazy_ops = dict()
+        self._unicode_keys = []
+
+        super(LazyArrayDict, self).__init__()
 
     def _maybe_first_dim(self):
         if len(self.keys) == 0:
@@ -546,21 +549,23 @@ class IrregularTimeSeries(ArrayDict):
         >>> array([0. , 0.1, 0.2])
     """
 
-    _sorted = None
-    _timekeys = None
-    _domain = None
-
     def __init__(
         self,
         timestamps: np.ndarray,
         *,
-        timekeys: List[str] = ["timestamps"],
+        timekeys: List[str] = None,
         domain: Union[Interval, str],
         **kwargs: Dict[str, np.ndarray],
     ):
         super().__init__(timestamps=timestamps, **kwargs)
 
+        self._sorted = None
+        self._timekeys = None
+        self._domain = None
+
         # timekeys
+        if timekeys is None:
+            timekeys = []
         if "timestamps" not in timekeys:
             timekeys.append("timestamps")
 
@@ -905,9 +910,6 @@ class LazyIrregularTimeSeries(IrregularTimeSeries):
         the lazy loading and will automatically convert the h5py dataset to a numpy
         array as well as apply any outstanding masks.
     """
-
-    _lazy_ops = dict()
-    _unicode_keys = []
 
     def _maybe_first_dim(self):
         if len(self.keys) == 0:
@@ -1448,8 +1450,6 @@ class LazyRegularTimeSeries(RegularTimeSeries):
         array as well as apply any outstanding masks.
     """
 
-    _lazy_ops = dict()
-
     def _maybe_first_dim(self):
         if len(self.keys) == 0:
             return None
@@ -1628,18 +1628,18 @@ class Interval(ArrayDict):
 
     """
 
-    _sorted = None
-    _timekeys = None
-    _allow_split_mask_overlap = False
-
     def __init__(
         self,
         start: Union[float, np.ndarray],
         end: Union[float, np.ndarray],
         *,
-        timekeys=["start", "end"],
+        timekeys=None,
         **kwargs,
     ):
+        self._sorted = None
+        self._timekeys = None
+        self._allow_split_mask_overlap = False
+
         # we allow for scalar start and end, since it is common to have a single
         # interval especially when defining a domain
         if isinstance(start, (int, float)):
@@ -1651,19 +1651,31 @@ class Interval(ArrayDict):
         super().__init__(start=start, end=end, **kwargs)
 
         # time keys
+        if timekeys is None:
+            timekeys = []
         if "start" not in timekeys:
             timekeys.append("start")
         if "end" not in timekeys:
             timekeys.append("end")
-        for key in timekeys:
-            assert key in self.keys, f"Time attribute {key} not found in data."
 
         self._timekeys = timekeys
+
+        for key in timekeys:
+            assert (
+                key in self.keys
+            ), f"timekeys={timekeys} includes '{key}' which cannot be found in\n {self}."
 
     @property
     def timekeys(self):
         r"""List of all time-based attributes."""
         return self._timekeys
+
+    def register_timekey(self, timekey: str):
+        r"""Register a new time-based attribute."""
+        if timekey not in self.keys:
+            raise ValueError(f"'{timekey}' cannot be found in \n {self}.")
+        if timekey not in self._timekeys:
+            self._timekeys.append(timekey)
 
     def __setattr__(self, name, value):
         super(Interval, self).__setattr__(name, value)
@@ -2062,7 +2074,9 @@ class Interval(ArrayDict):
         )
 
     @classmethod
-    def from_dataframe(cls, df: pd.DataFrame, unsigned_to_long: bool = True):
+    def from_dataframe(
+        cls, df: pd.DataFrame, unsigned_to_long: bool = True, timekeys=None
+    ):
         r"""Create an :obj:`Interval` object from a pandas DataFrame. The dataframe
         must have a start time and end time columns. The names of these columns need
         to be "start" and "end" (use `pd.Dataframe.rename` if needed).
@@ -2081,6 +2095,7 @@ class Interval(ArrayDict):
         return super().from_dataframe(
             df,
             unsigned_to_long=unsigned_to_long,
+            timekeys=timekeys,
         )
 
     @classmethod
@@ -2307,9 +2322,6 @@ class LazyInterval(Interval):
         the lazy loading and will automatically convert the h5py dataset to a numpy
         array as well as apply any outstanding masks.
     """
-
-    _lazy_ops = dict()
-    _unicode_keys = []
 
     def _maybe_first_dim(self):
         if "unresolved_slice" in self._lazy_ops:
