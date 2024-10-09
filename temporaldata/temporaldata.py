@@ -1267,6 +1267,26 @@ class RegularTimeSeries(ArrayDict):
                 start=np.array([domain_start]),
                 end=np.array([domain_start + (len(self) - 1) / sampling_rate]),
             )
+        elif isinstance(domain, Interval):
+            if not len(domain) == 1:
+                raise ValueError(
+                    f"A RegularTimeSeries timeseries object should be contiguous, and "
+                    f"its domain must be a single interval, got {len(domain)} intervals"
+                    f" in domain."
+                )
+            if domain.end[0] - domain.start[0] != (len(self) - 1) / sampling_rate:
+                raise ValueError(
+                    f"Domain length does not match the length of the time series. "
+                    f"Expected {len(self) / sampling_rate} seconds, got a domain with "
+                    f"{domain.end[0] - domain.start[0]} seconds."
+                    f"For a RegularTimeSeries, it is recommanded to use domain=`auto` "
+                    f"and to specify domain_start."
+                )
+        else:
+            raise ValueError(
+                f"domain must be an Interval object or 'auto', got {type(domain)}."
+            )
+
         self._domain = domain
 
     @property
@@ -2592,6 +2612,304 @@ def sorted_traversal(lintervals, rintervals):
                 rop = True
                 ridx += 1
         yield ptime, pop, pl
+
+
+class RegularInterval(Interval):
+    r"""An interval object is a set of time intervals each defined by a start time and
+    an end time. For :obj:`Interval`, we do not need to define a domain, since the
+    interval itself is its own domain.
+
+    Args:
+        start: an array of start times of shape (N,) or a float.
+        end: an array of end times of shape (N,) or a float.
+        timekeys: a list of strings that specify which attributes are time-based
+            attributes.
+        **kwargs: arrays that shares the same first dimension N.
+
+    .. code-block:: python
+
+        import numpy as np
+        from kirby.data import Interval
+
+        intervals = Interval(
+            start=np.array([0, 1, 2]),
+            end=np.array([1, 2, 3]),
+            go_cue_time=np.array([0.5, 1.5, 2.5]),
+            drifting_gratings_dir=np.array([0, 45, 90]),
+            timekeys=["start", "end", "go_cue_time"],
+        )
+
+        intervals
+        >>> Interval(
+            start=[3],
+            end=[3],
+            go_cue_time=[3],
+            drifting_gratings_dir=[3]
+        )
+
+        intervals.keys
+        >>> ['start', 'end', 'go_cue_time', 'drifting_gratings_dir']
+
+        intervals.is_sorted()
+        >>> True
+
+        intervals.is_disjoint()
+        >>> True
+
+        intervals.slice(0.5, 2.5)
+        >>> Interval(
+            start=[2],
+            end=[2],
+            go_cue_time=[2],
+            drifting_gratings_dir=[2]
+        )
+
+        Interval(0., 1.)
+        >>> Interval(
+            start=[1],
+            end=[1]
+        )
+
+    """
+
+    _sorted = None
+    _timekeys = None
+    _allow_split_mask_overlap = False
+
+    def __init__(
+        self,
+        start: Union[float, np.ndarray],
+        end: Union[float, np.ndarray],
+        *,
+        timekeys=["start", "end"],
+        **kwargs,
+    ):
+        # we allow for scalar start and end, since it is common to have a single
+        # interval especially when defining a domain
+        if isinstance(start, (int, float)):
+            start = np.array([start], dtype=np.float64)
+
+        if isinstance(end, (int, float)):
+            end = np.array([end], dtype=np.float64)
+
+        super().__init__(start=start, end=end, **kwargs)
+
+        # time keys
+        if "start" not in timekeys:
+            timekeys.append("start")
+        if "end" not in timekeys:
+            timekeys.append("end")
+        for key in timekeys:
+            assert key in self.keys, f"Time attribute {key} not found in data."
+
+        self._timekeys = timekeys
+
+    def is_disjoint(self):
+        r"""Returns :obj:`True` if the intervals are disjoint, i.e. if no two intervals
+        overlap."""
+        return True
+
+    def is_sorted(self):
+        r"""Returns :obj:`True` if the intervals are sorted."""
+        return True
+
+    def sort(self):
+        r"""Sorts the intervals, and reorders the other attributes accordingly.
+        This method is done in place.
+
+        .. note:: This method only works if the intervals are disjoint. If the intervals
+            overlap, it is not possible to resolve the order of the intervals, and this
+            method will raise an error.
+        """
+        pass
+
+    def slice(self, start: float, end: float, reset_origin: bool = True):
+        r"""Returns a new :obj:`Interval` object that contains the data between the
+        start and end times. An interval is included if it has any overlap with the
+        slicing window. The end time is exclusive.
+
+        If :obj:`reset_origin` is set to :obj:`True`, all time attributes will be
+        updated to be relative to the new start time.
+
+        .. warning::
+            If the intervals are not sorted, they will be automatically sorted in place.
+
+        Args:
+            start: Start time.
+            end: End time.
+            reset_origin: If :obj:`True`, all time attributes will be updated to be
+                relative to the new start time. Defaults to :obj:`True`.
+        """
+
+        if not self.is_sorted():
+            self.sort()
+
+        # anything that starts before the end of the slicing window
+        idx_l = np.searchsorted(self.end, start, side="right")
+
+        # anything that will end after the start of the slicing window
+        idx_r = np.searchsorted(self.start, end)
+
+        out = self.__class__.__new__(self.__class__)
+        out._timekeys = self._timekeys
+
+        for key in self.keys:
+            out.__dict__[key] = self.__dict__[key][idx_l:idx_r].copy()
+
+        if reset_origin:
+            for key in self._timekeys:
+                out.__dict__[key] = out.__dict__[key] - start
+        return out
+
+    def select_by_mask(self, mask: np.ndarray):
+        r"""Return a new :obj:`Interval` object where all array attributes
+        are indexed using the boolean mask.
+        """
+        out = super().select_by_mask(mask, timekeys=self._timekeys)
+        out._sorted = self._sorted
+        return out
+
+    def select_by_interval(self, interval: Interval):
+        r"""Return a new :obj:`IrregularTimeSeries` object where all timestamps are
+        within the interval.
+
+        Args:
+            interval: Interval object.
+        """
+
+        idx_l = np.searchsorted(self.end, interval.start, side="right")
+        idx_r = np.searchsorted(self.start, interval.end)
+
+        mask = np.zeros(len(self), dtype=bool)
+        for i in range(len(interval)):
+            mask[idx_l[i] : idx_r[i]] = True
+
+        out = self.select_by_mask(mask)
+        return out
+
+    def dilate(self, size: float, max_len=None):
+        r"""Dilates the intervals by a given size. The dilation is performed in both
+        directions. This operation is designed to not create overlapping intervals,
+        meaning for a given interval and a given direction, dilation will stop if
+        another interval is too close. If distance between two intervals is less than
+        :obj:`size`, both of them will dilate until they meet halfway but will never
+        overlap. You can think of dilation as inflating ballons that will never merge,
+        and will stop each other from moving too far.
+
+        Args:
+            size: The size of the dilation.
+            max_len: Dilation will not exceed this maximum length. For intervals that
+                are already longer than :obj:`max_len`, there will be no dilation. By
+                default, there is no maximum length.
+        """
+        out = copy.deepcopy(self)
+
+        dilation_size = size
+        size = np.full_like(out.start, dilation_size)
+        if max_len is not None:
+            interval_len = out.end - out.start
+            size = np.minimum(size, (max_len - interval_len) / 2)
+            size = np.clip(size, 0, None)
+
+        half_way = (self.end[:-1] + self.start[1:]) / 2
+
+        # TODO(mehdi) should check that this does not violate domain
+        out.start[0] = out.start[0] - size[0]
+        out.start[1:] = np.maximum(out.start[1:] - size[1:], half_way)
+
+        # update size
+        size = np.full_like(out.start, dilation_size)
+        if max_len is not None:
+            interval_len = out.end - out.start
+            size = np.minimum(size, (max_len - interval_len))
+            size = np.clip(size, 0, None)
+
+        out.end[:-1] = np.minimum(self.end[:-1] + size[:-1], half_way)
+        out.end[-1] = out.end[-1] + size[-1]
+        return out
+
+    def coalesce(self, eps=1e-6):
+        r"""Coalesces the intervals that are closer than :obj:`eps`. This operation
+        returns a new :obj:`Interval` object, and does not resolve the existing
+        attributes.
+
+        Args:
+            eps: The distance threshold for coalescing the intervals. Defaults to 1e-6.
+        """
+        if not self.is_sorted():
+            self.sort()
+
+        start = []
+        end = []
+
+        current_start = self.start[0]
+        current_end = self.end[0]
+
+        for s, e in zip(self.start[1:], self.end[1:]):
+            if s - current_end < eps:
+                # we have an overlap
+                current_end = e
+            else:
+                start.append(current_start)
+                end.append(current_end)
+                current_start = s
+                current_end = e
+
+        start.append(current_start)
+        end.append(current_end)
+
+        return Interval(start=np.array(start), end=np.array(end))
+
+    @classmethod
+    def linspace(cls, start: float, end: float, steps: int):
+        r"""Create a regular interval with a given number of samples.
+
+        Args:
+            start: Start time.
+            end: End time.
+            steps: Number of samples.
+
+        .. code-block:: python
+
+            from kirby.data import Interval
+
+            interval = Interval.linspace(0., 10., 100)
+
+            interval
+            >>> Interval(
+                start=[100],
+                end=[100]
+                )
+        """
+        timestamps = np.linspace(start, end, steps + 1)
+        return cls(
+            start=timestamps[:-1],
+            end=timestamps[1:],
+        )
+
+    @classmethod
+    def arange(cls, start: float, end: float, step: float, include_end: bool = True):
+        r"""Create a grid of intervals with a given step size. If the last step cannot
+        reach the end time, a smaller interval will be added, it will stop at the end
+        time, and will be shorter than obj:`step`. This behavior can be
+        changed by setting `include_end` to :obj:`False`.
+
+        Args:
+            start: Start time.
+            end: End time.
+            step: Step size.
+            include_end: Whether to include a partial interval at the end.
+        """
+        whole_steps = np.floor((end - start) / step).astype(int)
+        timestamps = np.linspace(start, start + whole_steps * step, whole_steps + 1)
+
+        if include_end and timestamps[-1] < end:
+            timestamps = np.append(timestamps, end)
+
+        return cls(
+            start=timestamps[:-1],
+            end=timestamps[1:],
+        )
 
 
 class Data(object):
