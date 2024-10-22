@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import copy
-from collections.abc import Mapping, Sequence
-from typing import Any, Dict, List, Tuple, Union, Callable, Optional, Type
 import collections
+import copy
 import logging
 import warnings
+from collections.abc import Mapping, Sequence
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 import h5py
 import numpy as np
@@ -2975,7 +2975,8 @@ class Data(object):
         obj = cls(**data)
 
         # restore the absolute start time
-        obj._absolute_start = file.attrs["absolute_start"]
+        if file.attrs.get("absolute_start"):
+            obj._absolute_start = file.attrs["absolute_start"]
 
         return obj
 
