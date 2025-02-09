@@ -12,6 +12,7 @@ as well as :obj:`Data <temporaldata.Data>` objects support time-based slicing th
 
 .. code-block:: python
 
+    import numpy as np
     from temporaldata import Data, Interval, IrregularTimeSeries, RegularTimeSeries
 
     # Create a complex data object
@@ -62,7 +63,7 @@ are reset relative to the new start time. To keep the original timestamps, set `
 
 .. code-block:: python
 
-    sliced_data = data.slice(start=1.0, end=3.0, reset_origin=False)
+    sliced_data = user_session.slice(start=1.0, end=3.0, reset_origin=False)
 
     sliced_user_session = user_session.slice(1, 2.5, reset_origin=False)
 
