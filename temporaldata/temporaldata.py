@@ -1704,8 +1704,9 @@ class Interval(ArrayDict):
         # check if we already know that the sequence is sorted
         # if lazy loading, we'll have to skip this check
         if self._sorted is None:
-            self._sorted = np.all(self.start[1:] >= self.start[:-1]) and np.all(
-                self.end[1:] >= self.end[:-1]
+            self._sorted = bool(
+                np.all(self.start[1:] >= self.start[:-1])
+                and np.all(self.end[1:] >= self.end[:-1])
             )
         return self._sorted
 
