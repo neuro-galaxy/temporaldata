@@ -26,12 +26,12 @@ def concat(objs, sort=True):
         >>> ts1 = IrregularTimeSeries(
         ...     timestamps=np.array([0.0, 1.0]),
         ...     values=np.array([1.0, 2.0]),
-        ...     domain="auto"
+        ...     domain="auto",
         ... )
         >>> ts2 = IrregularTimeSeries(
         ...     timestamps=np.array([2.0, 3.0]),
         ...     values=np.array([3.0, 4.0]),
-        ...     domain="auto"
+        ...     domain="auto",
         ... )
 
         >>> ts_concat = concat([ts1, ts2])

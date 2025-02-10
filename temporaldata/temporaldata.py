@@ -28,7 +28,7 @@ class ArrayDict(object):
         >>> units = ArrayDict(
         ...     unit_id=np.array(["unit01", "unit02"]),
         ...     brain_region=np.array(["M1", "M1"]),
-        ...     waveform_mean=np.random.rand(2, 48)
+        ...     waveform_mean=np.random.rand(2, 48),
         ... )
 
         >>> units
@@ -119,7 +119,7 @@ class ArrayDict(object):
             >>> units = ArrayDict(
             ...     unit_id=np.array(["unit01", "unit02"]),
             ...     brain_region=np.array(["M1", "M1"]),
-            ...     waveform_mean=np.random.rand(2, 48)
+            ...     waveform_mean=np.random.rand(2, 48),
             ... )
 
             >>> units_subset = units.select_by_mask(np.array([True, False]))
