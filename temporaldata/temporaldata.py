@@ -1697,7 +1697,7 @@ class Interval(ArrayDict):
                 # ValueError is returned if intervals are not disjoint
                 return False
             return tmp_copy.is_disjoint()
-        return np.all(self.end[:-1] <= self.start[1:])
+        return bool(np.all(self.end[:-1] <= self.start[1:]))
 
     def is_sorted(self):
         r"""Returns :obj:`True` if the intervals are sorted."""
