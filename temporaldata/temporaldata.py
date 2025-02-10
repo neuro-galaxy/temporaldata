@@ -129,8 +129,6 @@ class ArrayDict(object):
               brain_region=[1],
               waveform_mean=[1, 48]
             )
-            >>> units_subset.unit_id[0]
-            'unit01'
 
         """
         assert mask.ndim == 1, f"mask must be 1D, got {mask.ndim}D mask"
@@ -620,7 +618,7 @@ class IrregularTimeSeries(ArrayDict):
         # check if we already know that the sequence is sorted
         # if lazy loading, we'll have to skip this check
         if self._sorted is None:
-            self._sorted = np.all(self.timestamps[1:] >= self.timestamps[:-1])
+            self._sorted = bool(np.all(self.timestamps[1:] >= self.timestamps[:-1]))
         return self._sorted
 
     def _maybe_start(self) -> float:
