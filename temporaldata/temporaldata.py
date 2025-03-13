@@ -3028,7 +3028,9 @@ class Data(object):
                 assert isinstance(getattr(self, key), Interval)
                 continue
             obj = getattr(self, key)
-            if isinstance(obj, (RegularTimeSeries, IrregularTimeSeries, Interval)):
+            if isinstance(
+                obj, (Data, RegularTimeSeries, IrregularTimeSeries, Interval)
+            ):
                 obj.add_split_mask(name, interval)
 
     def _check_for_data_leakage(self, name):
