@@ -3038,20 +3038,6 @@ class Data(object):
         for key in self.keys():
             if key.endswith("_domain"):
                 continue
-            if key == "trials":
-                # raise deprecation warning
-                if (
-                    not hasattr(obj, f"{name}_mask")
-                    or not getattr(obj, f"{name}_mask").all()
-                ):
-                    warnings.warn(
-                        "Data leakage was detected in 'trials'. This is a warning, but"
-                        "in the future, this will raise an error. Please update your "
-                        "prepare_data.py script to fix this issue.",
-                        DeprecationWarning,
-                        stacklevel=2,
-                    )
-                continue
             obj = getattr(self, key)
             if isinstance(obj, (IrregularTimeSeries, Interval)):
                 assert hasattr(obj, f"{name}_mask"), (
