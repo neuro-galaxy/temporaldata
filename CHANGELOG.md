@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Removed
 - Removed `trials` as a special key that is not checked for data leakage. ([#32](https://github.com/neuro-galaxy/temporaldata/pull/32))
 
+
 ## [0.1.2] - 2025-01-22
 ### Added 
 - Added documentation. ([#24](https://github.com/neuro-galaxy/temporaldata/pull/24), [#25](https://github.com/neuro-galaxy/temporaldata/pull/25), [#26](https://github.com/neuro-galaxy/temporaldata/pull/26))
@@ -36,7 +37,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Fixed a bug where `is_dijoint` calls `sort` incorrectly causing an error when evaluating unsorted intervals. ([#20](https://github.com/neuro-galaxy/temporaldata/pull/20))
 
 
-
 ## [0.1.1] - 2024-06-17
 ### Added
 - Added a `domain_start` attribute to the `RegularTimeSeries` object to simplify the creation of the domain. ([#8](https://github.com/neuro-galaxy/temporaldata/pull/8))
@@ -56,6 +56,7 @@ the domains of its attributes. ([#7](https://github.com/neuro-galaxy/temporaldat
 
 ### Fixed
 - Fixed a bug where `absolute_start` was not saved to hdf5 files. ([#9](https://github.com/neuro-galaxy/temporaldata/pull/9))
+
 
 ## [0.1.0] - 2024-06-11
 ### Added
