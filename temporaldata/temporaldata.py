@@ -2289,11 +2289,7 @@ class Interval(ArrayDict):
                     if not end_still_coming:
                         # Check if this opening time matches the previous closing time
                         # If they match, continue the current interval instead of creating a new one
-                        if ptime == current_end:
-                            # Continue the current interval
-                            end_still_coming = True
-                            current_start_is_from_left = pl
-                        else:
+                        if ptime != current_end:
                             # we have an opening and a closing paranthesis
                             if current_start != current_end:
                                 # we have a non-zero interval
@@ -2301,8 +2297,8 @@ class Interval(ArrayDict):
                                 end = np.append(end, current_end)
                             current_start = ptime
                             current_end = None
-                            end_still_coming = True
-                            current_start_is_from_left = pl
+                        end_still_coming = True
+                        current_start_is_from_left = pl
             else:
                 if pl == current_start_is_from_left:
                     end_still_coming = False
