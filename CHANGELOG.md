@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.1.3] - 2025-03-21
 ### Added
 - Added `__iter__` method to `Interval` to iterate over the intervals. ([#36](https://github.com/neuro-galaxy/temporaldata/pull/36))
 
@@ -12,6 +12,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Fixed a bug where `Data.add_split_mask` does not propagate to nested `Data` objects. ([#32](https://github.com/neuro-galaxy/temporaldata/pull/32))
 - Fixed a bug where `Interval.dilate` fails when the interval is empty. ([#35](https://github.com/neuro-galaxy/temporaldata/pull/35))
 
+### Removed
+- Removed `trials` as a special key that is not checked for data leakage. ([#32](https://github.com/neuro-galaxy/temporaldata/pull/32))
 
 ## [0.1.2] - 2025-01-22
 ### Added 
