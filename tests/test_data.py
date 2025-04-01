@@ -736,6 +736,182 @@ def test_regular_to_irregular_timeseries():
     assert np.allclose(b.lfp, a.lfp)
 
 
+def test_regulartimeseries_resample():
+    # Setup data
+    initial_sampling_rate = 5000.0  # Hz
+    duration = 2.0  # seconds
+    num_samples = int(initial_sampling_rate * duration)
+    original_domain = Interval(0.0, duration)
+
+    data = RegularTimeSeries(
+        signal_float=np.linspace(0, 1, num_samples).reshape(-1, 1),
+        signal_int=np.arange(num_samples).reshape(-1, 1),
+        signal_multi=np.random.rand(num_samples, 5),
+        non_numeric=np.array(["a"] * num_samples),
+        sampling_rate=initial_sampling_rate,
+        domain=original_domain,
+    )
+
+    # 1. Test Upsampling
+    upsample_rate = 7000.0
+    data_upsampled = data.resample(upsample_rate)
+    expected_upsampled_samples = int(
+        num_samples * upsample_rate / initial_sampling_rate
+    )
+
+    assert data_upsampled.sampling_rate == upsample_rate
+    assert len(data_upsampled) == expected_upsampled_samples
+    assert data_upsampled.domain.start == original_domain.start
+    assert data_upsampled.domain.end == original_domain.end
+    assert "signal_float" in data_upsampled.keys()
+    assert "signal_int" in data_upsampled.keys()
+    assert "signal_multi" in data_upsampled.keys()
+    assert "non_numeric" not in data_upsampled.keys()  # Should be skipped
+    assert data_upsampled.signal_float.shape == (expected_upsampled_samples, 1)
+    assert data_upsampled.signal_int.shape == (expected_upsampled_samples, 1)
+    assert data_upsampled.signal_multi.shape == (expected_upsampled_samples, 5)
+
+    # 2. Test Downsampling
+    downsample_rate = 50.0
+    data_downsampled = data.resample(downsample_rate)
+    expected_downsampled_samples = int(
+        num_samples * downsample_rate / initial_sampling_rate
+    )
+
+    assert data_downsampled.sampling_rate == downsample_rate
+    assert len(data_downsampled) == expected_downsampled_samples
+    assert data_downsampled.domain.start == original_domain.start
+    assert data_downsampled.domain.end == original_domain.end
+    assert "signal_float" in data_downsampled.keys()
+    assert "signal_int" in data_downsampled.keys()
+    assert "signal_multi" in data_downsampled.keys()
+    assert "non_numeric" not in data_downsampled.keys()  # Skipped
+    assert data_downsampled.signal_float.shape == (expected_downsampled_samples, 1)
+    assert data_downsampled.signal_int.shape == (expected_downsampled_samples, 1)
+    assert data_downsampled.signal_multi.shape == (expected_downsampled_samples, 5)
+
+    # 3. Test Resampling to Same Rate (Edge Case)
+    with pytest.warns(
+        UserWarning, match="New sampling rate is the same as the original"
+    ):  # Use UserWarning or specific warning if defined
+        data_same_rate = data.resample(initial_sampling_rate)
+    assert data_same_rate.sampling_rate == initial_sampling_rate
+    assert len(data_same_rate) == num_samples
+    assert data_same_rate.domain.start == original_domain.start
+    assert data_same_rate.domain.end == original_domain.end
+    # Should be a deep copy, check if modifying affects original
+    # Note: non_numeric wasn't copied by deepcopy potentially? Let's check numeric
+    assert data_same_rate.signal_float is not data.signal_float
+    assert np.allclose(data_same_rate.signal_float, data.signal_float)
+    # Non-numeric check might be tricky if deepcopy doesn't handle it
+    # assert data_same_rate.non_numeric is not data.non_numeric
+
+    # 4. Test Domain with multiple intervals
+    multi_interval_domain = Interval(
+        start=np.array([0.0, 5.0]), end=np.array([2.0, 7.0])
+    )
+    data_multi_domain = RegularTimeSeries(
+        signal=np.random.rand(500, 1),  # Example length for 2+3 seconds at 100Hz
+        sampling_rate=100.0,
+        domain=multi_interval_domain,
+    )
+    with pytest.raises(
+        ValueError,
+        match="Resampling currently only supported for domains with a single interval.",
+    ):
+        data_multi_domain.resample(50.0)
+
+
+def test_lazy_regular_timeseries_resample(test_filepath):
+    """Tests that resampling a LazyRegularTimeSeries loads data and works correctly."""
+    # Setup data
+    initial_sampling_rate = 100.0
+    duration = 2.0  # Keep duration small for tests
+    num_samples = int(initial_sampling_rate * duration)
+    original_domain = Interval(0.0, duration)
+    signal_data = np.random.rand(num_samples, 2)  # Multi-channel
+
+    data = RegularTimeSeries(
+        signal=signal_data.copy(),
+        sampling_rate=initial_sampling_rate,
+        domain=original_domain,
+    )
+
+    # Save to HDF5
+    with h5py.File(test_filepath, "w") as f:
+        data.to_hdf5(f)
+
+    # --- Test Downsampling ---
+    downsample_rate = 50.0
+    with h5py.File(test_filepath, "r") as f:
+        lazy_data_down = LazyRegularTimeSeries.from_hdf5(f)
+
+        # Check it's lazy initially
+        assert isinstance(lazy_data_down.__dict__["signal"], h5py.Dataset)
+
+        # Perform downsampling on the lazy object
+        # Check if the method is 'downsample' or 'resample'
+        # Let's assume 'downsample' based on previous edits
+        try:
+            resampled_lazy = lazy_data_down.downsample(downsample_rate)
+        except AttributeError:
+            # If 'downsample' doesn't exist, try 'resample'
+            try:
+                resampled_lazy = lazy_data_down.resample(downsample_rate)
+            except AttributeError:
+                pytest.fail(
+                    "Neither 'downsample' nor 'resample' method found on LazyRegularTimeSeries"
+                )
+
+        # Check that accessing the attribute during resampling loaded it in the *original* lazy object
+        assert isinstance(lazy_data_down.__dict__["signal"], np.ndarray)
+
+        # Perform downsampling on the original non-lazy object for comparison
+        resampled_original = (
+            data.downsample(downsample_rate)
+            if hasattr(data, "downsample")
+            else data.resample(downsample_rate)
+        )
+
+        # Compare results
+        assert resampled_lazy.sampling_rate == downsample_rate
+        assert resampled_lazy.domain.start == original_domain.start
+        assert resampled_lazy.domain.end == original_domain.end
+        assert len(resampled_lazy) == len(resampled_original)
+        assert np.allclose(resampled_lazy.signal, resampled_original.signal)
+        assert resampled_lazy.signal.shape == resampled_original.signal.shape
+
+    # --- Test Upsampling (Assuming a 'resample' method exists) ---
+    if not hasattr(data, "resample"):
+        pytest.skip(
+            "Skipping lazy upsampling test as 'resample' method is not available."
+        )
+
+    upsample_rate = 200.0
+    with h5py.File(test_filepath, "r") as f:
+        lazy_data_up = LazyRegularTimeSeries.from_hdf5(f)
+
+        # Check it's lazy initially
+        assert isinstance(lazy_data_up.__dict__["signal"], h5py.Dataset)
+
+        # Perform upsampling on the lazy object
+        resampled_lazy_up = lazy_data_up.resample(upsample_rate)
+
+        # Check that accessing the attribute loaded it
+        assert isinstance(lazy_data_up.__dict__["signal"], np.ndarray)
+
+        # Perform upsampling on the original non-lazy object
+        resampled_original_up = data.resample(upsample_rate)
+
+        # Compare results
+        assert resampled_lazy_up.sampling_rate == upsample_rate
+        assert resampled_lazy_up.domain.start == original_domain.start
+        assert resampled_lazy_up.domain.end == original_domain.end
+        assert len(resampled_lazy_up) == len(resampled_original_up)
+        assert np.allclose(resampled_lazy_up.signal, resampled_original_up.signal)
+        assert resampled_lazy_up.signal.shape == resampled_original_up.signal.shape
+
+
 def test_interval():
     data = Interval(
         start=np.array([0.0, 1, 2]),
