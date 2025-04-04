@@ -1287,22 +1287,29 @@ class RegularTimeSeries(ArrayDict):
         # we allow the start and end to be outside the domain of the time series
         if start < self.domain.start[0]:
             start_id = 0
+            out_start = 0
         else:
             start_id = int(np.ceil((start - self.domain.start[0]) * self.sampling_rate))
+            out_start = start_id * 1.0 / self.sampling_rate
 
         if end > self.domain.end[0]:
             end_id = len(self) + 1
+            out_end = self.domain.end[0]
         else:
             end_id = int(np.floor((end - self.domain.start[0]) * self.sampling_rate))
+            out_end = (end_id - 1) * 1.0 / self.sampling_rate
 
         out = self.__class__.__new__(self.__class__)
         out._sampling_rate = self.sampling_rate
-        out._domain = copy.deepcopy(self._domain)
+
+        out._domain = Interval(
+            start=np.array([out_start]),
+            end=np.array([out_end]),
+        )
+
         if reset_origin:
-            out._domain.start, out._domain.end = (
-                out._domain.start - start,
-                out._domain.end - start,
-            )
+            out._domain.start = out._domain.start - start
+            out._domain.end = out._domain.end - start
 
         for key in self.keys():
             out.__dict__[key] = self.__dict__[key][start_id:end_id].copy()

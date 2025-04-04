@@ -587,16 +587,43 @@ def test_regulartimeseries():
     assert data.domain.start[0] == 0.0
     assert data.domain.end[0] == 9.9
 
-    data_slice = data.slice(2.0, 8.0)
+    data_slice = data.slice(2.0, 8.0, reset_origin=False)
     assert np.allclose(data_slice.lfp, data.lfp[20:80])
+    assert data_slice.domain.start[0] == 2.0
+    assert data_slice.domain.end[0] == 7.9
+    assert np.allclose(data_slice.timestamps, np.arange(2.0, 8.0, 0.1))
+
+    data_slice = data.slice(2.0, 8.0, reset_origin=True)
+    assert np.allclose(data_slice.lfp, data.lfp[20:80])
+    assert data_slice.domain.start[0] == 0.0
+    assert data_slice.domain.end[0] == 5.9
+    assert np.allclose(data_slice.timestamps, np.arange(0.0, 6.0, 0.1))
 
     # try slicing with skewed start and end
     # the sampling frequency is 10
-    data_slice = data.slice(2.03, 8.09)
+    data_slice = data.slice(2.03, 8.09, reset_origin=True)
     assert np.allclose(data_slice.lfp, data.lfp[21:80])
+    assert np.allclose(data_slice.domain.start, np.array([0.07]))
+    assert np.allclose(data_slice.domain.end, np.array([5.87]))
+    assert np.allclose(data_slice.timestamps, np.arange(0.07, 5.88, 0.1))
 
-    data_slice = data.slice(4.051, 12.0)
+    data_slice = data.slice(4.051, 12.0, reset_origin=True)
     assert np.allclose(data_slice.lfp, data.lfp[41:])
+    assert np.allclose(data_slice.domain.start, np.array([0.049]))
+    assert np.allclose(data_slice.domain.end, np.array([5.849]))
+    assert np.allclose(data_slice.timestamps, np.arange(0.049, 5.88, 0.1))
+
+    data_slice = data.slice(4.051, 12.0, reset_origin=False)
+    assert np.allclose(data_slice.lfp, data.lfp[41:])
+    assert np.allclose(data_slice.domain.start, np.array([4.1]))
+    assert np.allclose(data_slice.domain.end, np.array([9.9]))
+    assert np.allclose(data_slice.timestamps, np.arange(4.1, 10.0, 0.1))
+
+    data_slice = data.slice(-10, 20, reset_origin=False)
+    assert np.allclose(data_slice.lfp, data.lfp)
+    assert np.allclose(data_slice.domain.start, data.domain.start)
+    assert np.allclose(data_slice.domain.end, data.domain.end)
+    assert np.allclose(data_slice.timestamps, data.timestamps)
 
     data = RegularTimeSeries(
         lfp=np.random.random((100, 48)),
