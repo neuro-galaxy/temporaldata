@@ -1302,10 +1302,7 @@ class RegularTimeSeries(ArrayDict):
         out = self.__class__.__new__(self.__class__)
         out._sampling_rate = self.sampling_rate
 
-        out._domain = Interval(
-            start=np.array([out_start]),
-            end=np.array([out_end]),
-        )
+        out._domain = Interval(start=out_start, end=out_end)
 
         if reset_origin:
             out._domain.start = out._domain.start - start
@@ -1467,15 +1464,8 @@ class LazyRegularTimeSeries(RegularTimeSeries):
                 # TODO it is always better to resolve another attribute before timestamps
                 # this is because we are dealing with numerical noise
                 # we know the domain and the sampling rate, we can infer the number of pts
-                return (
-                    int(
-                        np.round(
-                            (self.domain.end[-1] - self.domain.start[0])
-                            * self.sampling_rate
-                        )
-                    )
-                    + 1
-                )
+                domain_length = self.domain.end[-1] - self.domain.start[0]
+                return int(np.round(domain_length * self.sampling_rate)) + 1
 
             # otherwise nothing was loaded, return the first dim of the h5py dataset
             return self.__dict__[self.keys()[0]].shape[0]
@@ -1529,10 +1519,7 @@ class LazyRegularTimeSeries(RegularTimeSeries):
         out = self.__class__.__new__(self.__class__)
         out._sampling_rate = self.sampling_rate
 
-        out._domain = Interval(
-            start=np.array([out_start]),
-            end=np.array([out_end]),
-        )
+        out._domain = Interval(start=out_start, end=out_end)
 
         if reset_origin:
             out._domain.start = out._domain.start - start
