@@ -10,6 +10,8 @@ import warnings
 import h5py
 import numpy as np
 import pandas as pd
+import scipy.signal
+from fractions import Fraction
 
 
 class ArrayDict(object):
@@ -1401,6 +1403,132 @@ class RegularTimeSeries(ArrayDict):
 
         file.attrs["object"] = self.__class__.__name__
         file.attrs["sampling_rate"] = self.sampling_rate
+
+    def resample(self, new_sampling_rate: float) -> RegularTimeSeries:
+        """Resamples the time series to a new sampling rate using polyphase filtering.
+
+        This method handles both upsampling and downsampling. It uses
+        `scipy.signal.resample_poly` which is efficient for rational resampling
+        factors and includes an anti-aliasing filter when downsampling.
+
+        Non-numeric arrays will be skipped with a warning.
+
+        Args:
+            new_sampling_rate: The target sampling rate in Hz.
+
+        Returns:
+            A new RegularTimeSeries object with the resampled data.
+
+        Raises:
+            ValueError: If the domain is not a single interval or if the calculated
+                        resampling factors are invalid.
+            ImportError: If scipy or fractions is not installed.
+
+        Example ::
+
+            >>> original_ts = RegularTimeSeries(
+            ...     signal=np.arange(100.0).reshape(-1, 1),
+            ...     sampling_rate=10.0,
+            ...     domain=Interval(0.0, 10.0)
+            ... )
+            >>> original_ts
+            RegularTimeSeries(
+              signal=[100, 1]
+            )
+            >>> downsampled_ts = original_ts.resample(5.0)
+            >>> downsampled_ts
+            RegularTimeSeries(
+              signal=[50, 1]
+            )
+            >>> downsampled_ts.sampling_rate
+            5.0
+            >>> upsampled_ts = original_ts.resample(25.0)
+            >>> upsampled_ts
+            RegularTimeSeries(
+              signal=[250, 1]
+            )
+            >>> upsampled_ts.sampling_rate
+            25.0
+        """
+        if self.sampling_rate == new_sampling_rate:
+            warnings.warn(
+                "New sampling rate is the same as the original. Returning a deep copy."
+            )
+            return copy.deepcopy(self)
+
+        # Resampling assumes a single contiguous domain interval for RegularTimeSeries
+        if len(self.domain) != 1:
+            raise ValueError(
+                "Resampling currently only supported for domains with a single interval."
+            )
+
+        try:
+            import scipy.signal
+            from fractions import Fraction
+        except ImportError:
+            raise ImportError(
+                "scipy and fractions are required for resampling. Please install scipy using 'pip install scipy'."
+            )
+
+        # Calculate rational resampling factors
+        ratio = Fraction(new_sampling_rate / self.sampling_rate).limit_denominator()
+        up = ratio.numerator
+        down = ratio.denominator
+
+        if up == 0 or down == 0:
+            warnings.warn(
+                f"Resampling to {new_sampling_rate}Hz resulted in zero up/down factor. Returning an empty object."
+            )
+            return self.__class__(
+                sampling_rate=new_sampling_rate, domain=copy.deepcopy(self.domain)
+            )
+
+        current_num_samples = len(self)
+
+        resampled_data = {}
+        for key in self.keys():
+            original_array = getattr(self, key)
+            if np.issubdtype(original_array.dtype, np.number):
+                if original_array.shape[0] != current_num_samples:
+                    raise ValueError(
+                        f"Internal Error: Array '{key}' first dimension {original_array.shape[0]} does not match time series length {current_num_samples}."
+                    )
+
+                # Use scipy.signal.resample_poly for efficient rational resampling
+                # It includes an anti-aliasing filter.
+                resampled_array = scipy.signal.resample_poly(
+                    original_array, up, down, axis=0
+                )
+
+                # resample_poly preserves dtype better, but check just in case
+                if resampled_array.dtype != original_array.dtype:
+                    # Cast back if necessary, though often not needed with resample_poly
+                    # Be cautious with float->int conversion (truncation)
+                    if np.issubdtype(original_array.dtype, np.integer):
+                        warnings.warn(
+                            f"Casting resampled array '{key}' back to {original_array.dtype} from {resampled_array.dtype}. Potential precision loss."
+                        )
+                        # Use rounding before casting to int to avoid simple truncation
+                        resampled_array = np.round(resampled_array).astype(
+                            original_array.dtype
+                        )
+                    else:
+                        resampled_array = resampled_array.astype(original_array.dtype)
+
+                resampled_data[key] = resampled_array
+            else:
+                warnings.warn(
+                    f"Skipping non-numeric array '{key}' (dtype: {original_array.dtype}) during resampling."
+                )
+
+        # Construct the new RegularTimeSeries object
+        new_obj = self.__class__(
+            **resampled_data,
+            sampling_rate=new_sampling_rate,
+            domain=copy.deepcopy(self.domain),  # Domain start/end times remain the same
+        )
+
+        return new_obj
 
     @classmethod
     def from_hdf5(cls, file):
