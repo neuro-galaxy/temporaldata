@@ -1372,7 +1372,7 @@ class RegularTimeSeries(ArrayDict):
 
         start_idx = 0
         for start, end in zip(self.domain.start, self.domain.end):
-            end_idx = start_idx + int(np.floor((end - start) * self.sampling_rate))
+            end_idx = start_idx + int(np.ceil((end - start) * self.sampling_rate))
             offset = start - t[start_idx]
             t[start_idx:end_idx] = t[start_idx:end_idx] + offset
             start_idx = end_idx
