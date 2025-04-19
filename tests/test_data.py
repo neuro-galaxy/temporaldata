@@ -814,6 +814,17 @@ def test_regular_non_contiguous_domain():
     )
     assert np.allclose(a.timestamps, expected_timestamps)
 
+    expected_timestamps = np.concatenate(
+        [np.arange(11.3, 15.0, 0.5), np.arange(17.8, 20.0, 0.5)]
+    )
+
+    b = RegularTimeSeries(
+        lfp=np.random.random(len(expected_timestamps)),
+        sampling_rate=2,
+        domain=Interval(start=np.array([11.3, 17.8]), end=np.array([15.0, 20.0])),
+    )
+    assert np.allclose(b.timestamps, expected_timestamps)
+
 
 def test_interval():
     data = Interval(
