@@ -1,21 +1,23 @@
-import pytest
-import os
 import copy
+import logging
+import os
+import tempfile
+
 import h5py
 import numpy as np
 import pandas as pd
-import tempfile
-import logging
+import pytest
+
 from temporaldata import (
     ArrayDict,
-    LazyArrayDict,
-    IrregularTimeSeries,
-    LazyIrregularTimeSeries,
-    RegularTimeSeries,
-    LazyRegularTimeSeries,
-    Interval,
-    LazyInterval,
     Data,
+    Interval,
+    IrregularTimeSeries,
+    LazyArrayDict,
+    LazyInterval,
+    LazyIrregularTimeSeries,
+    LazyRegularTimeSeries,
+    RegularTimeSeries,
 )
 
 
@@ -791,6 +793,33 @@ def test_regular_to_irregular_timeseries():
     b = a.to_irregular()
     assert np.allclose(b.timestamps, np.arange(0, 10, 0.1))
     assert np.allclose(b.lfp, a.lfp)
+
+
+def test_regular_non_contiguous_domain():
+    t_1 = np.arange(0, 10, dtype=np.float32)
+    t_2 = np.arange(20, 25, dtype=np.float32)
+    t_3 = np.arange(30, 70, dtype=np.float32)
+    t_4 = np.arange(75, 80, dtype=np.float32)
+    t_5 = np.arange(90, 100, dtype=np.float32)
+
+    expected_timestamps = np.concatenate([t_1, t_2, t_3, t_4, t_5])
+    a = RegularTimeSeries(
+        lfp=np.random.random((100, 48)),
+        sampling_rate=1,
+        domain=Interval(
+            start=np.array([0.0, 20.0, 30.0, 75.0, 90.0]),
+            end=np.array([10.0, 25.0, 70.0, 80.0, 100.0]),
+        ),
+    )
+
+    assert np.allclose(b.timestamps, np.arange(0, 10, 0.1))
+    assert np.allclose(b.lfp, a.lfp)
+
+    domain = Interval(start, end)
+
+    regular_timseries = RegularTimeSeries(
+        sampling_rate=base_sampling_rate, values=v, domain=domain
+    )
 
 
 def test_interval():
