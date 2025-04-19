@@ -803,23 +803,16 @@ def test_regular_non_contiguous_domain():
     t_5 = np.arange(90, 100, dtype=np.float32)
 
     expected_timestamps = np.concatenate([t_1, t_2, t_3, t_4, t_5])
+
     a = RegularTimeSeries(
-        lfp=np.random.random((100, 48)),
+        lfp=np.random.random(len(expected_timestamps)),
         sampling_rate=1,
         domain=Interval(
             start=np.array([0.0, 20.0, 30.0, 75.0, 90.0]),
             end=np.array([10.0, 25.0, 70.0, 80.0, 100.0]),
         ),
     )
-
-    assert np.allclose(b.timestamps, np.arange(0, 10, 0.1))
-    assert np.allclose(b.lfp, a.lfp)
-
-    domain = Interval(start, end)
-
-    regular_timseries = RegularTimeSeries(
-        sampling_rate=base_sampling_rate, values=v, domain=domain
-    )
+    assert np.allclose(a.timestamps, expected_timestamps)
 
 
 def test_interval():
