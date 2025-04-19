@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import copy
-from collections.abc import Mapping, Sequence
-from typing import Any, Dict, List, Tuple, Union, Callable, Optional, Type
 import collections
+import copy
 import logging
 import warnings
+from collections.abc import Mapping, Sequence
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 import h5py
 import numpy as np
@@ -1366,10 +1366,17 @@ class RegularTimeSeries(ArrayDict):
     @property
     def timestamps(self):
         r"""Returns the timestamps of the time series."""
-        return (
-            self.domain.start[0]
-            + np.arange(len(self), dtype=np.float64) / self.sampling_rate
-        )
+        t = np.arange(len(self), dtype=np.float64) / self.sampling_rate
+        if len(self.domain) == 1:
+            return self.domain.start[0] + t
+
+        start_idx = 0
+        for start, end in zip(self.domain.start, self.domain.end):
+            end_idx = start_idx + int(np.round((end - start) * self.sampling_rate))
+            offset = start - t[start_idx]
+            t[start_idx:end_idx] = t[start_idx:end_idx] + offset
+            start_idx = end_idx
+        return t
 
     def to_hdf5(self, file):
         r"""Saves the data object to an HDF5 file.
