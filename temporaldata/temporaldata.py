@@ -1233,10 +1233,10 @@ class RegularTimeSeries(ArrayDict):
 
         # Example of non continous domain
         >>> lfp = RegularTimeSeries(
-            raw=np.zeros((2000, 128)),
-            sampling_rate=250.0,
-            domain=Interval(start=np.array([0.0, 4.0]), end=np.array([6.0, 10.0])),
-        )
+        ...     raw=np.zeros((2000, 128)),
+        ...     sampling_rate=250.0,
+        ...     domain=Interval(start=np.array([0.0, 4.0]), end=np.array([6.0, 10.0])),
+        ... )
     """
 
     def __init__(
