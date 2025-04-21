@@ -1317,8 +1317,9 @@ class RegularTimeSeries(ArrayDict):
             start_id = 0
             for i_start, i_end in zip(self.domain.start, self.domain.end):
                 if i_end <= start:
+                    d = i_end - i_start
                     start_id += int(
-                        np.floor((i_end - i_start) * self.sampling_rate) + 1
+                        np.floor(_round_if_close(d * self.sampling_rate)) + 1
                     )
                     continue
 
@@ -1346,7 +1347,8 @@ class RegularTimeSeries(ArrayDict):
             out_end = self.domain.start[0]
             for i_start, i_end in zip(self.domain.start, self.domain.end):
                 if i_end <= end:
-                    gain_id = int(np.floor((i_end - i_start) * self.sampling_rate) + 1)
+                    d = i_end - i_start
+                    gain_id = int(np.floor(_round_if_close(d * self.sampling_rate)) + 1)
                     end_id += gain_id
                     out_end = i_start + (gain_id - 1) * 1.0 / self.sampling_rate
                     continue

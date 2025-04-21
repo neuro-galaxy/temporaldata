@@ -796,6 +796,16 @@ def test_regular_to_irregular_timeseries():
 
 
 def test_regular_non_contiguous_domain():
+    expected_timestamps = np.concatenate(
+        [np.arange(11.3, 15.0, 0.5), np.arange(17.8, 20.0, 0.5)]
+    )
+    data = RegularTimeSeries(
+        lfp=np.random.random(len(expected_timestamps)),
+        sampling_rate=2,
+        domain=Interval(start=np.array([11.3, 17.8]), end=np.array([14.8, 19.8])),
+    )
+    assert np.allclose(data.timestamps, expected_timestamps)
+
     v_1 = np.arange(200, 210, 0.5, dtype=np.float32)
     v_2 = np.arange(220, 225, 0.5, dtype=np.float32)
     v_3 = np.arange(230, 270, 0.5, dtype=np.float32)
@@ -986,16 +996,38 @@ def test_regular_non_contiguous_domain():
     assert np.allclose(data_slice.domain.start, np.array([0.47, 7.97]))
     assert np.allclose(data_slice.domain.end, np.array([2.47, 45.97]))
 
-    expected_timestamps = np.concatenate(
-        [np.arange(11.3, 15.0, 0.5), np.arange(17.8, 20.0, 0.5)]
+    # Edge case were you need to deal with some numerical issues
+    v = np.arange(300, dtype=np.float32)
+    data = RegularTimeSeries(
+        values=v,
+        sampling_rate=10,
+        domain=Interval(
+            start=np.array([10.0, 30.0, 50.0]), end=np.array([19.9, 39.9, 59.9])
+        ),
     )
 
-    data_2 = RegularTimeSeries(
-        lfp=np.random.random(len(expected_timestamps)),
-        sampling_rate=2,
-        domain=Interval(start=np.array([11.3, 17.8]), end=np.array([14.8, 19.8])),
-    )
-    assert np.allclose(data_2.timestamps, expected_timestamps)
+    t_1 = np.arange(10.0, 20.0, 0.1)
+    t_2 = np.arange(30.0, 40.0, 0.1)
+    t_3 = np.arange(50.0, 60.0, 0.1)
+    expected_timestamps = np.concatenate([t_1, t_2, t_3])
+
+    data_slice = data.slice(start=15.0, end=34.99, reset_origin=False)
+    assert np.allclose(data_slice.values, v[50:150])
+    assert np.allclose(data_slice.timestamps, expected_timestamps[50:150])
+    assert np.allclose(data_slice.domain.start, np.array([15.0, 30.0]))
+    assert np.allclose(data_slice.domain.end, np.array([19.9, 34.9]))
+
+    data_slice = data.slice(start=38.001, end=55.001, reset_origin=False)
+    assert np.allclose(data_slice.values, v[181:251])
+    assert np.allclose(data_slice.timestamps, expected_timestamps[181:251])
+    assert np.allclose(data_slice.domain.start, np.array([38.1, 50.0]))
+    assert np.allclose(data_slice.domain.end, np.array([39.9, 55.0]))
+
+    data_slice = data.slice(start=55.99, end=58.0, reset_origin=False)
+    assert np.allclose(data_slice.values, v[260:280])
+    assert np.allclose(data_slice.timestamps, expected_timestamps[260:280])
+    assert np.allclose(data_slice.domain.start, np.array([56]))
+    assert np.allclose(data_slice.domain.end, np.array([57.9]))
 
 
 def test_interval():
