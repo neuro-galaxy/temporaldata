@@ -1230,6 +1230,16 @@ class RegularTimeSeries(ArrayDict):
           timestamps=[1000],
           raw=[1000, 128]
         )
+
+        # Example of non continous domain
+        >>> lfp = RegularTimeSeries(
+        ...     raw=np.zeros((2000, 128)),
+        ...     sampling_rate=250.,
+        ...     domain=Interval(
+        ...         start=np.array([0., 4.],
+        ...         end=np.array([6., 10.])
+        ...     ),
+        ... )
     """
 
     def __init__(
@@ -1293,6 +1303,7 @@ class RegularTimeSeries(ArrayDict):
             start_id = 0
             out_start = self.domain.start[0]
         else:
+            # TODO could be removed because not usfull per se or kept if it improves code readability
             # if len(self.domain) == 1:
             #     start_id = int(
             #         np.ceil((start - self.domain.start[0]) * self.sampling_rate)
@@ -1320,6 +1331,7 @@ class RegularTimeSeries(ArrayDict):
             end_id = len(self) + 1
             out_end = self.domain.end[-1]
         else:
+            # TODO could be removed because not usfull per se or kept if it improves code readability
             # if len(self.domain) == 1:
             #     end_id = int(
             #         np.floor((end - self.domain.start[0]) * self.sampling_rate)
@@ -1332,11 +1344,13 @@ class RegularTimeSeries(ArrayDict):
                 if i_end <= end:
                     gain_id = int(np.floor((i_end - i_start) * self.sampling_rate) + 1)
                     end_id += gain_id
-                    out_end = i_end + (gain_id - 1) * 1.0 / self.sampling_rate
+                    out_end = i_start + (gain_id - 1) * 1.0 / self.sampling_rate
                     continue
 
                 if i_start <= end:
-                    gain_id = int(np.floor((end - i_start) * self.sampling_rate))
+                    print((end - i_start) * self.sampling_rate)
+                    gain_id = int(np.ceil((end - i_start) * self.sampling_rate))
+                    print(gain_id)
                     end_id += gain_id
                     out_end = i_start + (gain_id - 1) * 1.0 / self.sampling_rate
 
