@@ -1284,25 +1284,69 @@ class RegularTimeSeries(ArrayDict):
             reset_origin: If :obj:`True`, all time attributes will be updated to be
                 relative to the new start time. Defaults to :obj:`True`.
         """
+        if len(self.domain & Interval(start, end)) == 0:
+            raise ValueError(
+                f"Interval {self.domain} does not intersect with [{start}, {end}]"
+            )
         # we allow the start and end to be outside the domain of the time series
         if start < self.domain.start[0]:
             start_id = 0
             out_start = self.domain.start[0]
         else:
-            start_id = int(np.ceil((start - self.domain.start[0]) * self.sampling_rate))
-            out_start = self.domain.start[0] + start_id * 1.0 / self.sampling_rate
+            # if len(self.domain) == 1:
+            #     start_id = int(
+            #         np.ceil((start - self.domain.start[0]) * self.sampling_rate)
+            #     )
+            #     out_start = self.domain.start[0] + start_id * 1.0 / self.sampling_rate
+            # else:
+            start_id = 0
+            for i_start, i_end in zip(self.domain.start, self.domain.end):
+                if i_end <= start:
+                    start_id += int(
+                        np.floor((i_end - i_start) * self.sampling_rate) + 1
+                    )
+                    continue
 
-        if end > self.domain.end[0]:
+                if i_start < start:
+                    gain_id = int(np.ceil((start - i_start) * self.sampling_rate))
+                    start_id += gain_id
+                    out_start = i_start + gain_id * 1.0 / self.sampling_rate
+                else:
+                    start_id += 1
+                    out_start = i_start
+
+                break
+
+        if end > self.domain.end[-1]:
             end_id = len(self) + 1
-            out_end = self.domain.end[0]
+            out_end = self.domain.end[-1]
         else:
-            end_id = int(np.floor((end - self.domain.start[0]) * self.sampling_rate))
-            out_end = self.domain.start[0] + (end_id - 1) * 1.0 / self.sampling_rate
+            # if len(self.domain) == 1:
+            #     end_id = int(
+            #         np.floor((end - self.domain.start[0]) * self.sampling_rate)
+            #     )
+            #     out_end = self.domain.start[0] + (end_id - 1) * 1.0 / self.sampling_rate
+            # else:
+            end_id = 0
+            out_end = self.domain.start[0]
+            for i_start, i_end in zip(self.domain.start, self.domain.end):
+                if i_end <= end:
+                    gain_id = int(np.floor((i_end - i_start) * self.sampling_rate) + 1)
+                    end_id += gain_id
+                    out_end = i_end + (gain_id - 1) * 1.0 / self.sampling_rate
+                    continue
+
+                if i_start <= end:
+                    gain_id = int(np.floor((end - i_start) * self.sampling_rate))
+                    end_id += gain_id
+                    out_end = i_start + (gain_id - 1) * 1.0 / self.sampling_rate
+
+                break
 
         out = self.__class__.__new__(self.__class__)
         out._sampling_rate = self.sampling_rate
 
-        out._domain = Interval(start=out_start, end=out_end)
+        out._domain = self.domain & Interval(start=out_start, end=out_end)
 
         if reset_origin:
             out._domain.start = out._domain.start - start
@@ -1368,13 +1412,15 @@ class RegularTimeSeries(ArrayDict):
         r"""Returns the timestamps of the time series."""
         t = np.arange(len(self), dtype=np.float64) / self.sampling_rate
         if len(self.domain) == 1:
-            return self.domain.start[0] + t
+            return t + self.domain.start[0]
 
+        # Open to improve this if better ideads
+        # Could be stacking several arange but not sure it is faster
         start_idx = 0
         for start, end in zip(self.domain.start, self.domain.end):
-            end_idx = start_idx + int(np.ceil((end - start) * self.sampling_rate))
+            end_idx = start_idx + int(np.ceil((end - start) * self.sampling_rate) + 1)
             offset = start - t[start_idx]
-            t[start_idx:end_idx] = t[start_idx:end_idx] + offset
+            t[start_idx:end_idx] += offset
             start_idx = end_idx
         return t
 
