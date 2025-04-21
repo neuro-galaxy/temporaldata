@@ -1193,6 +1193,13 @@ class LazyIrregularTimeSeries(IrregularTimeSeries):
         return obj
 
 
+def _round_if_close(x, tol=1e-10):
+    r"""Round x to the nearest integer if it is close to an integer."""
+    if np.abs(x - np.round(x)) < tol:
+        return np.round(x)
+    return x
+
+
 class RegularTimeSeries(ArrayDict):
     """A regular time series is the same as an irregular time series, but it has a
     regular sampling rate. This allows for faster indexing, possibility of patching data
@@ -1410,9 +1417,11 @@ class RegularTimeSeries(ArrayDict):
                 start_id = 0
                 for i_start, i_end in zip(self.domain.start, self.domain.end):
                     if i_end <= start:
+                        d = i_end - i_start
                         start_id += int(
-                            np.floor((i_end - i_start) * self.sampling_rate) + 1
+                            np.floor(_round_if_close(d * self.sampling_rate)) + 1
                         )
+
                         continue
 
                     if i_start < start:
@@ -1429,13 +1438,14 @@ class RegularTimeSeries(ArrayDict):
                 end_id = 0
                 for i_start, i_end in zip(self.domain.start, self.domain.end):
                     if i_end <= end:
+                        d = i_end - i_start
                         end_id += int(
-                            np.floor((i_end - i_start) * self.sampling_rate) + 1
+                            np.floor(_round_if_close(d * self.sampling_rate) + 1)
                         )
                         continue
 
                     if i_start <= end:
-                        end_id += int(np.floor((end - i_start) * self.sampling_rate))
+                        end_id += int(np.ceil((end - i_start) * self.sampling_rate))
 
                     break
 
