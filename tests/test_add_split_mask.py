@@ -17,11 +17,11 @@ def test_regulartimeseries():
     data.add_split_mask("test", test_domain)
 
     m = data.train_mask
-    assert m.sum() == m[:60].sum() == 60
+    assert m.sum() == m[:60].sum() == len(m[:60]) == 60
     m = data.valid_mask
-    assert m.sum() == m[60:80].sum() == 20
+    assert m.sum() == m[60:80].sum() == len(m[60:80]) == 20
     m = data.test_mask
-    assert m.sum() == m[80:].sum() == 20
+    assert m.sum() == m[80:].sum() == len(m[80:]) == 20
 
     # check what happens when things are skewed
     data = RegularTimeSeries(
@@ -132,12 +132,16 @@ def test_set_split_domain():
     data.set_valid_domain(Interval(6.0, 8.0))
     data.set_test_domain(Interval(8.0, 10.0))
 
-    regular = data.regular
-    assert regular.train_mask.sum() == regular.train_mask[:60].sum() == 60
-    assert regular.valid_mask.sum() == regular.valid_mask[60:80].sum() == 20
-    assert regular.test_mask.sum() == regular.test_mask[80:].sum() == 20
+    m = data.regular.train_mask
+    assert m.sum() == m[:60].sum() == len(m[:60]) == 60
+    m = data.regular.valid_mask
+    assert m.sum() == m[60:80].sum() == len(m[60:80]) == 20
+    m = data.regular.test_mask
+    assert m.sum() == m[80:].sum() == len(m[80:]) == 20
 
-    irregular = data.irregular
-    assert irregular.train_mask.sum() == irregular.train_mask[:60].sum() == 60
-    assert irregular.valid_mask.sum() == irregular.valid_mask[60:80].sum() == 20
-    assert irregular.test_mask.sum() == irregular.test_mask[80:].sum() == 20
+    m = data.irregular.train_mask
+    assert m.sum() == m[:60].sum() == len(m[:60]) == 60
+    m = data.irregular.valid_mask
+    assert m.sum() == m[60:80].sum() == len(m[60:80]) == 20
+    m = data.irregular.test_mask
+    assert m.sum() == m[80:].sum() == len(m[80:]) == 20
