@@ -47,8 +47,7 @@ def test_regulartimeseries():
         lfp=np.random.random((300, 48)),
         sampling_rate=10,
         domain=Interval(
-            start=np.array([10.0, 30.0, 50.0], dtype=np.float64),
-            end=np.array([19.9, 39.9, 59.9], dtype=np.float64),
+            start=np.array([10.0, 30.0, 50.0]), end=np.array([19.9, 39.9, 59.9])
         ),
     )
 
