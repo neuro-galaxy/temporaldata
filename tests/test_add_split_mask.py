@@ -1,23 +1,6 @@
-import copy
-import os
-import tempfile
-
-import h5py
 import numpy as np
-import pandas as pd
-import pytest
 
-from temporaldata import (
-    ArrayDict,
-    Data,
-    Interval,
-    IrregularTimeSeries,
-    LazyArrayDict,
-    LazyInterval,
-    LazyIrregularTimeSeries,
-    LazyRegularTimeSeries,
-    RegularTimeSeries,
-)
+from temporaldata import Data, Interval, IrregularTimeSeries, RegularTimeSeries
 
 
 def test_regulartimeseries():
@@ -53,6 +36,9 @@ def test_regulartimeseries():
     assert data.train_mask.sum() == data.train_mask[:60].sum() == 60
     assert data.valid_mask.sum() == data.valid_mask[61:79].sum() == 18
     assert data.test_mask.sum() == data.test_mask[80:].sum() == 20
+
+
+# TODO add tests for Interval and IrregularTimeSeries
 
 
 def test_set_split_domain():
