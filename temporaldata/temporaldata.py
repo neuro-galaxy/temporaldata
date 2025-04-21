@@ -1348,9 +1348,7 @@ class RegularTimeSeries(ArrayDict):
                     continue
 
                 if i_start <= end:
-                    print((end - i_start) * self.sampling_rate)
                     gain_id = int(np.ceil((end - i_start) * self.sampling_rate))
-                    print(gain_id)
                     end_id += gain_id
                     out_end = i_start + (gain_id - 1) * 1.0 / self.sampling_rate
 
