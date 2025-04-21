@@ -796,22 +796,29 @@ def test_regular_to_irregular_timeseries():
 
 
 def test_regular_non_contiguous_domain():
+    v_1 = np.arange(100, 110, dtype=np.float32)
+    v_2 = np.arange(120, 125, dtype=np.float32)
+    v_3 = np.arange(130, 170, dtype=np.float32)
+    v_4 = np.arange(175, 180, dtype=np.float32)
+    v_5 = np.arange(190, 200, dtype=np.float32)
+    v = np.concatenate([v_1, v_2, v_3, v_4, v_5])
+
+    a = RegularTimeSeries(
+        values=v,
+        sampling_rate=1,
+        domain=Interval(
+            start=np.array([0.0, 20.0, 30.0, 75.0, 90.0]),
+            end=np.array([9.0, 24.0, 69.0, 79.0, 99.0]),
+        ),
+    )
+
     t_1 = np.arange(0, 10, dtype=np.float32)
     t_2 = np.arange(20, 25, dtype=np.float32)
     t_3 = np.arange(30, 70, dtype=np.float32)
     t_4 = np.arange(75, 80, dtype=np.float32)
     t_5 = np.arange(90, 100, dtype=np.float32)
-
     expected_timestamps = np.concatenate([t_1, t_2, t_3, t_4, t_5])
 
-    a = RegularTimeSeries(
-        lfp=np.random.random(len(expected_timestamps)),
-        sampling_rate=1,
-        domain=Interval(
-            start=np.array([0.0, 20.0, 30.0, 75.0, 90.0]),
-            end=np.array([10.0, 25.0, 70.0, 80.0, 100.0]),
-        ),
-    )
     assert np.allclose(a.timestamps, expected_timestamps)
 
     expected_timestamps = np.concatenate(
@@ -821,9 +828,15 @@ def test_regular_non_contiguous_domain():
     b = RegularTimeSeries(
         lfp=np.random.random(len(expected_timestamps)),
         sampling_rate=2,
-        domain=Interval(start=np.array([11.3, 17.8]), end=np.array([15.0, 20.0])),
+        domain=Interval(start=np.array([11.3, 17.8]), end=np.array([14.8, 19.8])),
     )
     assert np.allclose(b.timestamps, expected_timestamps)
+
+    a_sliced = a.slice(start=40, end=60, reset_origin=False)
+    assert np.allclose(a_sliced.values, np.arange(140, 160, dtype=np.float32))
+    assert np.allclose(a_sliced.timestamps, np.arange(40, 60, dtype=np.float32))
+    assert np.allclose(a_sliced.domain.start, np.array([40.0]))
+    assert np.allclose(a_sliced.domain.end, np.array([59.0]))
 
 
 def test_interval():
