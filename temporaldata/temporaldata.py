@@ -1312,7 +1312,6 @@ class RegularTimeSeries(ArrayDict):
                     start_id += gain_id
                     out_start = i_start + gain_id * 1.0 / self.sampling_rate
                 else:
-                    start_id += 1
                     out_start = i_start
 
                 break
@@ -1373,26 +1372,63 @@ class RegularTimeSeries(ArrayDict):
             name: name of the split, e.g. "train", "valid", "test".
             interval: a set of intervals defining the split domain.
         """
-        assert not hasattr(self, f"{name}_mask"), (
-            f"Attribute {name}_mask already exists. Use another mask name, or rename "
-            f"the existing attribute."
-        )
+        if hasattr(self, f"{name}_mask"):
+            raise ValueError(
+                f"Attribute {name}_mask already exists. Use another mask name, or rename "
+                f"the existing attribute."
+            )
+
+        if len(self.domain & interval) == 0:
+            raise ValueError(
+                f"Interval {self.domain} does not intersect with {interval}"
+            )
+
+        if len(interval) != 1:
+            raise NotImplementedError(
+                f"Intervals with more than one dimension are not supported (current dimension: {len(interval)})."
+            )
 
         mask_array = np.zeros_like(self.timestamps, dtype=bool)
+
+        # we allow the start and end to be outside the domain of the time series
         for start, end in zip(interval.start, interval.end):
             if start < self.domain.start[0]:
                 start_id = 0
             else:
-                start_id = int(
-                    np.ceil((start - self.domain.start[0]) * self.sampling_rate)
-                )
+                # start_id = int(
+                #     np.ceil((start - self.domain.start[0]) * self.sampling_rate)
+                # )
+                start_id = 0
+                for i_start, i_end in zip(self.domain.start, self.domain.end):
+                    if i_end <= start:
+                        start_id += int(
+                            np.floor((i_end - i_start) * self.sampling_rate) + 1
+                        )
+                        continue
 
-            if end > self.domain.end[0]:
+                    if i_start < start:
+                        start_id += int(np.ceil((start - i_start) * self.sampling_rate))
+
+                    break
+
+            if end > self.domain.end[-1]:
                 end_id = len(self) + 1
             else:
-                end_id = int(
-                    np.floor((end - self.domain.start[0]) * self.sampling_rate)
-                )
+                # end_id = int(
+                #     np.floor((end - self.domain.start[0]) * self.sampling_rate)
+                # )
+                end_id = 0
+                for i_start, i_end in zip(self.domain.start, self.domain.end):
+                    if i_end <= end:
+                        end_id += int(
+                            np.floor((i_end - i_start) * self.sampling_rate) + 1
+                        )
+                        continue
+
+                    if i_start <= end:
+                        end_id += int(np.floor((end - i_start) * self.sampling_rate))
+
+                    break
 
             assert not np.any(mask_array[start_id:end_id])
             mask_array[start_id:end_id] = True
