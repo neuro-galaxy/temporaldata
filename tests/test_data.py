@@ -856,7 +856,7 @@ def test_regular_non_contiguous_domain():
         data_slice.domain.end, np.array([109.5, 124.5, 169.5, 179.5, 199.5])
     )
 
-    # Silce inside a middle interval
+    # Slice inside a middle interval
     data_slice = data.slice(start=140, end=160, reset_origin=False)
     assert np.allclose(data_slice.values, np.arange(240, 260, 0.5, dtype=np.float32))
     assert np.allclose(
@@ -865,7 +865,7 @@ def test_regular_non_contiguous_domain():
     assert np.allclose(data_slice.domain.start, np.array([140.0]))
     assert np.allclose(data_slice.domain.end, np.array([159.5]))
 
-    # Silce inside a middle interval and skew
+    # Slice inside a middle interval and skew
     data_slice = data.slice(start=140.01, end=160.01, reset_origin=False)
     assert np.allclose(
         data_slice.values, np.arange(240.5, 260.01, 0.5, dtype=np.float32)
@@ -996,7 +996,7 @@ def test_regular_non_contiguous_domain():
     assert np.allclose(data_slice.domain.start, np.array([0.47, 7.97]))
     assert np.allclose(data_slice.domain.end, np.array([2.47, 45.97]))
 
-    # Edge case were you need to deal with some numerical issues
+    # Edge case where you need to deal with some numerical issues
     v = np.arange(300, dtype=np.float32)
     data = RegularTimeSeries(
         values=v,
