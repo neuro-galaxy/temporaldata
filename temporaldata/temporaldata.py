@@ -1561,24 +1561,30 @@ class LazyRegularTimeSeries(RegularTimeSeries):
     def _maybe_first_dim(self):
         if len(self.keys()) == 0:
             return None
-        else:
-            # todo check _lazy_ops
-            for key in self.keys():
-                value = self.__dict__[key]
-                if isinstance(value, np.ndarray):
-                    return value.shape[0]
 
-            if "slice" in self._lazy_ops:
-                # TODO add more constraints to the domain in RegularTimeSeries
+        # todo check _lazy_ops
+        for key in self.keys():
+            value = self.__dict__[key]
+            if isinstance(value, np.ndarray):
+                return value.shape[0]
 
-                # TODO it is always better to resolve another attribute before timestamps
-                # this is because we are dealing with numerical noise
-                # we know the domain and the sampling rate, we can infer the number of pts
-                domain_length = self.domain.end[-1] - self.domain.start[0]
+        if "slice" in self._lazy_ops:
+            # TODO add more constraints to the domain in RegularTimeSeries
+
+            # TODO it is always better to resolve another attribute before timestamps
+            # this is because we are dealing with numerical noise
+            # we know the domain and the sampling rate, we can infer the number of pts
+            if len(self.domain):
+                domain_length = self.domain.end[0] - self.domain.start[0]
                 return int(np.round(domain_length * self.sampling_rate)) + 1
 
-            # otherwise nothing was loaded, return the first dim of the h5py dataset
-            return self.__dict__[self.keys()[0]].shape[0]
+            nb_points = 0
+            for start, end in zip(self.domain.start, self.domain.end):
+                nb_points += int(np.ceil((end - start) * self.sampling_rate) + 1)
+            return nb_points
+
+        # otherwise nothing was loaded, return the first dim of the h5py dataset
+        return self.__dict__[self.keys()[0]].shape[0]
 
     def __getattribute__(self, name):
         if not name in ["__dict__", "keys"]:
@@ -1612,24 +1618,59 @@ class LazyRegularTimeSeries(RegularTimeSeries):
         r"""Returns a new :obj:`RegularTimeSeries` object that contains the data between
         the start and end times.
         """
+        if len(self.domain & Interval(start, end)) == 0:
+            raise ValueError(
+                f"Interval {self.domain} does not intersect with [{start}, {end}]"
+            )
+
+        # we allow the start and end to be outside the domain of the time series
         if start < self.domain.start[0]:
             start_id = 0
             out_start = self.domain.start[0]
         else:
-            start_id = int(np.ceil((start - self.domain.start[0]) * self.sampling_rate))
-            out_start = self.domain.start[0] + start_id * 1.0 / self.sampling_rate
+            start_id = 0
+            for i_start, i_end in zip(self.domain.start, self.domain.end):
+                if i_end <= start:
+                    d = i_end - i_start
+                    start_id += int(
+                        np.floor(_round_if_close(d * self.sampling_rate)) + 1
+                    )
+                    continue
 
-        if end > self.domain.end[0]:
+                if i_start < start:
+                    gain_id = int(np.ceil((start - i_start) * self.sampling_rate))
+                    start_id += gain_id
+                    out_start = i_start + gain_id * 1.0 / self.sampling_rate
+                else:
+                    out_start = i_start
+
+                break
+
+        if end > self.domain.end[-1]:
             end_id = len(self) + 1
-            out_end = self.domain.end[0]
+            out_end = self.domain.end[-1]
         else:
-            end_id = int(np.floor((end - self.domain.start[0]) * self.sampling_rate))
-            out_end = self.domain.start[0] + (end_id - 1) * 1.0 / self.sampling_rate
+            end_id = 0
+            out_end = self.domain.start[0]
+            for i_start, i_end in zip(self.domain.start, self.domain.end):
+                if i_end <= end:
+                    d = i_end - i_start
+                    gain_id = int(np.floor(_round_if_close(d * self.sampling_rate)) + 1)
+                    end_id += gain_id
+                    out_end = i_start + (gain_id - 1) * 1.0 / self.sampling_rate
+                    continue
+
+                if i_start <= end:
+                    gain_id = int(np.ceil((end - i_start) * self.sampling_rate))
+                    end_id += gain_id
+                    out_end = i_start + (gain_id - 1) * 1.0 / self.sampling_rate
+
+                break
 
         out = self.__class__.__new__(self.__class__)
         out._sampling_rate = self.sampling_rate
 
-        out._domain = Interval(start=out_start, end=out_end)
+        out._domain = self.domain & Interval(start=out_start, end=out_end)
 
         if reset_origin:
             out._domain.start = out._domain.start - start
@@ -1646,10 +1687,8 @@ class LazyRegularTimeSeries(RegularTimeSeries):
         if "slice" not in self._lazy_ops:
             out._lazy_ops["slice"] = (start_id, end_id)
         else:
-            out._lazy_ops["slice"] = (
-                self._lazy_ops["slice"][0] + start_id,
-                self._lazy_ops["slice"][0] + end_id,
-            )
+            prev_start_id = self._lazy_ops["slice"][0]
+            out._lazy_ops["slice"] = (prev_start_id + start_id, prev_start_id + end_id)
 
         return out
 
