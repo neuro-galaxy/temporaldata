@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import copy
-from collections.abc import Mapping, Sequence
-from typing import Any, Dict, List, Tuple, Union, Callable, Optional, Type
 import collections
+import copy
 import logging
 import warnings
+from collections.abc import Mapping, Sequence
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 import h5py
 import numpy as np
@@ -1193,6 +1193,13 @@ class LazyIrregularTimeSeries(IrregularTimeSeries):
         return obj
 
 
+def _round_if_close(x, tol=1e-10):
+    r"""Round x to the nearest integer if it is close to an integer."""
+    if np.abs(x - np.round(x)) < tol:
+        return np.round(x)
+    return x
+
+
 class RegularTimeSeries(ArrayDict):
     """A regular time series is the same as an irregular time series, but it has a
     regular sampling rate. This allows for faster indexing, possibility of patching data
@@ -1230,6 +1237,13 @@ class RegularTimeSeries(ArrayDict):
           timestamps=[1000],
           raw=[1000, 128]
         )
+
+        # Example of non continous domain
+        >>> lfp = RegularTimeSeries(
+        ...     raw=np.zeros((2000, 128)),
+        ...     sampling_rate=250.0,
+        ...     domain=Interval(start=np.array([0.0, 4.0]), end=np.array([6.0, 10.0])),
+        ... )
     """
 
     def __init__(
@@ -1284,25 +1298,72 @@ class RegularTimeSeries(ArrayDict):
             reset_origin: If :obj:`True`, all time attributes will be updated to be
                 relative to the new start time. Defaults to :obj:`True`.
         """
+        if len(self.domain & Interval(start, end)) == 0:
+            raise ValueError(
+                f"Interval {self.domain} does not intersect with [{start}, {end}]"
+            )
         # we allow the start and end to be outside the domain of the time series
         if start < self.domain.start[0]:
             start_id = 0
             out_start = self.domain.start[0]
         else:
-            start_id = int(np.ceil((start - self.domain.start[0]) * self.sampling_rate))
-            out_start = self.domain.start[0] + start_id * 1.0 / self.sampling_rate
+            # TODO could be removed because not usfull per se or kept if it improves code readability
+            # if len(self.domain) == 1:
+            #     start_id = int(
+            #         np.ceil((start - self.domain.start[0]) * self.sampling_rate)
+            #     )
+            #     out_start = self.domain.start[0] + start_id * 1.0 / self.sampling_rate
+            # else:
+            start_id = 0
+            for i_start, i_end in zip(self.domain.start, self.domain.end):
+                if i_end <= start:
+                    d = i_end - i_start
+                    start_id += int(
+                        np.floor(_round_if_close(d * self.sampling_rate)) + 1
+                    )
+                    continue
 
-        if end > self.domain.end[0]:
+                if i_start < start:
+                    gain_id = int(np.ceil((start - i_start) * self.sampling_rate))
+                    start_id += gain_id
+                    out_start = i_start + gain_id * 1.0 / self.sampling_rate
+                else:
+                    out_start = i_start
+
+                break
+
+        if end > self.domain.end[-1]:
             end_id = len(self) + 1
-            out_end = self.domain.end[0]
+            out_end = self.domain.end[-1]
         else:
-            end_id = int(np.floor((end - self.domain.start[0]) * self.sampling_rate))
-            out_end = self.domain.start[0] + (end_id - 1) * 1.0 / self.sampling_rate
+            # TODO could be removed because not usfull per se or kept if it improves code readability
+            # if len(self.domain) == 1:
+            #     end_id = int(
+            #         np.floor((end - self.domain.start[0]) * self.sampling_rate)
+            #     )
+            #     out_end = self.domain.start[0] + (end_id - 1) * 1.0 / self.sampling_rate
+            # else:
+            end_id = 0
+            out_end = self.domain.start[0]
+            for i_start, i_end in zip(self.domain.start, self.domain.end):
+                if i_end <= end:
+                    d = i_end - i_start
+                    gain_id = int(np.floor(_round_if_close(d * self.sampling_rate)) + 1)
+                    end_id += gain_id
+                    out_end = i_start + (gain_id - 1) * 1.0 / self.sampling_rate
+                    continue
+
+                if i_start <= end:
+                    gain_id = int(np.ceil((end - i_start) * self.sampling_rate))
+                    end_id += gain_id
+                    out_end = i_start + (gain_id - 1) * 1.0 / self.sampling_rate
+
+                break
 
         out = self.__class__.__new__(self.__class__)
         out._sampling_rate = self.sampling_rate
 
-        out._domain = Interval(start=out_start, end=out_end)
+        out._domain = self.domain & Interval(start=out_start, end=out_end)
 
         if reset_origin:
             out._domain.start = out._domain.start - start
@@ -1329,26 +1390,66 @@ class RegularTimeSeries(ArrayDict):
             name: name of the split, e.g. "train", "valid", "test".
             interval: a set of intervals defining the split domain.
         """
-        assert not hasattr(self, f"{name}_mask"), (
-            f"Attribute {name}_mask already exists. Use another mask name, or rename "
-            f"the existing attribute."
-        )
+        if hasattr(self, f"{name}_mask"):
+            raise ValueError(
+                f"Attribute {name}_mask already exists. Use another mask name, or rename "
+                f"the existing attribute."
+            )
+
+        if len(self.domain & interval) == 0:
+            raise ValueError(
+                f"Interval {self.domain} does not intersect with {interval}"
+            )
+
+        if len(interval) != 1:
+            raise NotImplementedError(
+                f"Intervals with more than one dimension are not supported (current dimension: {len(interval)})."
+            )
 
         mask_array = np.zeros_like(self.timestamps, dtype=bool)
+
+        # we allow the start and end to be outside the domain of the time series
         for start, end in zip(interval.start, interval.end):
             if start < self.domain.start[0]:
                 start_id = 0
             else:
-                start_id = int(
-                    np.ceil((start - self.domain.start[0]) * self.sampling_rate)
-                )
+                # start_id = int(
+                #     np.ceil((start - self.domain.start[0]) * self.sampling_rate)
+                # )
+                start_id = 0
+                for i_start, i_end in zip(self.domain.start, self.domain.end):
+                    if i_end <= start:
+                        d = i_end - i_start
+                        start_id += int(
+                            np.floor(_round_if_close(d * self.sampling_rate)) + 1
+                        )
 
-            if end > self.domain.end[0]:
+                        continue
+
+                    if i_start < start:
+                        start_id += int(np.ceil((start - i_start) * self.sampling_rate))
+
+                    break
+
+            if end > self.domain.end[-1]:
                 end_id = len(self) + 1
             else:
-                end_id = int(
-                    np.floor((end - self.domain.start[0]) * self.sampling_rate)
-                )
+                # end_id = int(
+                #     np.floor((end - self.domain.start[0]) * self.sampling_rate)
+                # )
+                end_id = 0
+                for i_start, i_end in zip(self.domain.start, self.domain.end):
+                    if i_end <= end:
+                        d = i_end - i_start
+                        end_id += int(
+                            np.floor(_round_if_close(d * self.sampling_rate) + 1)
+                        )
+                        continue
+
+                    if i_start <= end:
+                        end_id += int(np.ceil((end - i_start) * self.sampling_rate))
+
+                    break
 
             assert not np.any(mask_array[start_id:end_id])
             mask_array[start_id:end_id] = True
@@ -1366,10 +1467,19 @@ class RegularTimeSeries(ArrayDict):
     @property
     def timestamps(self):
         r"""Returns the timestamps of the time series."""
-        return (
-            self.domain.start[0]
-            + np.arange(len(self), dtype=np.float64) / self.sampling_rate
-        )
+        t = np.arange(len(self), dtype=np.float64) / self.sampling_rate
+        if len(self.domain) == 1:
+            return t + self.domain.start[0]
+
+        # Open to improve this if better ideads
+        # Could be stacking several arange but not sure it is faster
+        start_idx = 0
+        for start, end in zip(self.domain.start, self.domain.end):
+            end_idx = start_idx + int(np.ceil((end - start) * self.sampling_rate) + 1)
+            offset = start - t[start_idx]
+            t[start_idx:end_idx] += offset
+            start_idx = end_idx
+        return t
 
     def to_hdf5(self, file):
         r"""Saves the data object to an HDF5 file.
@@ -1451,24 +1561,30 @@ class LazyRegularTimeSeries(RegularTimeSeries):
     def _maybe_first_dim(self):
         if len(self.keys()) == 0:
             return None
-        else:
-            # todo check _lazy_ops
-            for key in self.keys():
-                value = self.__dict__[key]
-                if isinstance(value, np.ndarray):
-                    return value.shape[0]
 
-            if "slice" in self._lazy_ops:
-                # TODO add more constraints to the domain in RegularTimeSeries
+        # todo check _lazy_ops
+        for key in self.keys():
+            value = self.__dict__[key]
+            if isinstance(value, np.ndarray):
+                return value.shape[0]
 
-                # TODO it is always better to resolve another attribute before timestamps
-                # this is because we are dealing with numerical noise
-                # we know the domain and the sampling rate, we can infer the number of pts
-                domain_length = self.domain.end[-1] - self.domain.start[0]
+        if "slice" in self._lazy_ops:
+            # TODO add more constraints to the domain in RegularTimeSeries
+
+            # TODO it is always better to resolve another attribute before timestamps
+            # this is because we are dealing with numerical noise
+            # we know the domain and the sampling rate, we can infer the number of pts
+            if len(self.domain):
+                domain_length = self.domain.end[0] - self.domain.start[0]
                 return int(np.round(domain_length * self.sampling_rate)) + 1
 
-            # otherwise nothing was loaded, return the first dim of the h5py dataset
-            return self.__dict__[self.keys()[0]].shape[0]
+            nb_points = 0
+            for start, end in zip(self.domain.start, self.domain.end):
+                nb_points += int(np.ceil((end - start) * self.sampling_rate) + 1)
+            return nb_points
+
+        # otherwise nothing was loaded, return the first dim of the h5py dataset
+        return self.__dict__[self.keys()[0]].shape[0]
 
     def __getattribute__(self, name):
         if not name in ["__dict__", "keys"]:
@@ -1502,24 +1618,59 @@ class LazyRegularTimeSeries(RegularTimeSeries):
         r"""Returns a new :obj:`RegularTimeSeries` object that contains the data between
         the start and end times.
         """
+        if len(self.domain & Interval(start, end)) == 0:
+            raise ValueError(
+                f"Interval {self.domain} does not intersect with [{start}, {end}]"
+            )
+
+        # we allow the start and end to be outside the domain of the time series
         if start < self.domain.start[0]:
             start_id = 0
             out_start = self.domain.start[0]
         else:
-            start_id = int(np.ceil((start - self.domain.start[0]) * self.sampling_rate))
-            out_start = self.domain.start[0] + start_id * 1.0 / self.sampling_rate
+            start_id = 0
+            for i_start, i_end in zip(self.domain.start, self.domain.end):
+                if i_end <= start:
+                    d = i_end - i_start
+                    start_id += int(
+                        np.floor(_round_if_close(d * self.sampling_rate)) + 1
+                    )
+                    continue
 
-        if end > self.domain.end[0]:
+                if i_start < start:
+                    gain_id = int(np.ceil((start - i_start) * self.sampling_rate))
+                    start_id += gain_id
+                    out_start = i_start + gain_id * 1.0 / self.sampling_rate
+                else:
+                    out_start = i_start
+
+                break
+
+        if end > self.domain.end[-1]:
             end_id = len(self) + 1
-            out_end = self.domain.end[0]
+            out_end = self.domain.end[-1]
         else:
-            end_id = int(np.floor((end - self.domain.start[0]) * self.sampling_rate))
-            out_end = self.domain.start[0] + (end_id - 1) * 1.0 / self.sampling_rate
+            end_id = 0
+            out_end = self.domain.start[0]
+            for i_start, i_end in zip(self.domain.start, self.domain.end):
+                if i_end <= end:
+                    d = i_end - i_start
+                    gain_id = int(np.floor(_round_if_close(d * self.sampling_rate)) + 1)
+                    end_id += gain_id
+                    out_end = i_start + (gain_id - 1) * 1.0 / self.sampling_rate
+                    continue
+
+                if i_start <= end:
+                    gain_id = int(np.ceil((end - i_start) * self.sampling_rate))
+                    end_id += gain_id
+                    out_end = i_start + (gain_id - 1) * 1.0 / self.sampling_rate
+
+                break
 
         out = self.__class__.__new__(self.__class__)
         out._sampling_rate = self.sampling_rate
 
-        out._domain = Interval(start=out_start, end=out_end)
+        out._domain = self.domain & Interval(start=out_start, end=out_end)
 
         if reset_origin:
             out._domain.start = out._domain.start - start
@@ -1536,10 +1687,8 @@ class LazyRegularTimeSeries(RegularTimeSeries):
         if "slice" not in self._lazy_ops:
             out._lazy_ops["slice"] = (start_id, end_id)
         else:
-            out._lazy_ops["slice"] = (
-                self._lazy_ops["slice"][0] + start_id,
-                self._lazy_ops["slice"][0] + end_id,
-            )
+            prev_start_id = self._lazy_ops["slice"][0]
+            out._lazy_ops["slice"] = (prev_start_id + start_id, prev_start_id + end_id)
 
         return out
 
