@@ -1336,3 +1336,41 @@ def test_precision(caplog):
         domain="auto",
     )
     assert lfp.timestamps.dtype == np.float64
+
+
+def test_nested_attributes():
+    data = Data(
+        session_id="session_0",
+        domain=Interval.from_list([(0, 3)]),
+        spikes=IrregularTimeSeries(
+            timestamps=np.array([0.1, 0.2, 0.3, 2.1, 2.2, 2.3]),
+            waveforms=np.zeros((6, 48)),
+            domain="auto",
+        ),
+        units=ArrayDict(
+            id=np.array(["unit_0", "unit_1", "unit_2"]),
+            brain_region=np.array(["M1", "M1", "PMd"]),
+        ),
+    )
+
+    # test get_nested_attribute
+    out = data.get_nested_attribute("spikes.timestamps")
+    assert np.allclose(out, data.spikes.timestamps)
+
+    out = data.get_nested_attribute("units.id")
+    for i, id in enumerate(out):
+        assert id == data.units.id[i]
+
+    # test has_nested_attribute
+    assert data.has_nested_attribute("spikes.timestamps")
+    assert data.has_nested_attribute("units.id")
+    assert not data.has_nested_attribute("spikes.unit_index")
+
+    # test that an error is raised if the attribute does not exist
+    with pytest.raises(AttributeError):
+        data.get_nested_attribute("spikes.unit_index")
+
+    # test that it is possible to access attributes that are not nested
+    assert data.get_nested_attribute("session_id") == "session_0"
+    assert data.has_nested_attribute("session_id")
+    assert data.has_nested_attribute("domain")

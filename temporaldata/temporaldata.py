@@ -3119,7 +3119,7 @@ class Data(object):
                 )
         return out
 
-    def is_nested_attribute(self, path: str) -> bool:
+    def has_nested_attribute(self, path: str) -> bool:
         """Check if the attribute specified by the path exists in the Data object."""
         try:
             self.get_nested_attribute(path)
