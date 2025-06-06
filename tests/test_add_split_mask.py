@@ -37,6 +37,8 @@ def test_regulartimeseries():
     data.add_split_mask("test", test_domain)
 
     m = data.train_mask
+    print(m.sum(), m[:61].sum(), len(m[:61]))
+
     assert m.sum() == m[:61].sum() == len(m[:61]) == 61
     m = data.valid_mask
     assert m.sum() == m[61:80].sum() == len(m[61:80]) == 19
@@ -47,7 +49,7 @@ def test_regulartimeseries():
         lfp=np.random.random((300, 48)),
         sampling_rate=10,
         domain=Interval(
-            start=np.array([10.0, 30.0, 50.0]), end=np.array([19.9, 39.9, 59.9])
+            start=np.array([10.0, 30.0, 50.0]), end=np.array([20.0, 40.0, 60.0])
         ),
     )
 
