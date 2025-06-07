@@ -1242,7 +1242,7 @@ class RegularTimeSeries(ArrayDict):
         >>> lfp = RegularTimeSeries(
         ...     raw=np.zeros((2000, 128)),
         ...     sampling_rate=250.0,
-        ...     domain=Interval(start=np.array([0.0, 6.0]), end=np.array([4.0, 10.0])),
+        ...     domain=Interval(start=np.array([0.0, 6.0]), end=np.array([3.9, 9.9])),
         ... )
     """
 
