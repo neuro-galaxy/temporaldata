@@ -1337,7 +1337,7 @@ class RegularTimeSeries(ArrayDict):
         start_id = 0
         out_start = None
 
-        for i_start, i_end in zip(self.domain.start, self.domain.end):
+        for i_start, i_end in self.domain:
             # Entire sub‐domain is before `start`
             if i_end <= start:
                 sub_domain_length = (i_end - i_start) * self.sampling_rate
@@ -1358,9 +1358,7 @@ class RegularTimeSeries(ArrayDict):
         end_id = len(self)
         out_end = None
 
-        for i_start, i_end in zip(
-            reversed(self.domain.start), reversed(self.domain.end)
-        ):
+        for i_start, i_end in reversed(self.domain):
             # Entire sub‐domain is after `end`
             if end <= i_start:
                 sub_domain_length = (i_end - i_start) * self.sampling_rate
@@ -1415,7 +1413,7 @@ class RegularTimeSeries(ArrayDict):
 
         mask_array = np.zeros_like(self.timestamps, dtype=bool)
 
-        for start, end in zip(interval.start, interval.end):
+        for start, end in interval:
             start_id, end_id, _, _ = self.compute_index_range(start, end)
 
             assert not np.any(mask_array[start_id:end_id])
@@ -1437,7 +1435,7 @@ class RegularTimeSeries(ArrayDict):
         t = np.arange(len(self), dtype=np.float64) / self.sampling_rate
 
         start_idx = 0
-        for start, end in zip(self.domain.start, self.domain.end):
+        for start, end in self.domain:
             sub_domain_length = (end - start) * self.sampling_rate
             end_idx = start_idx + int(np.floor(_round_if_close(sub_domain_length)) + 1)
             offset = start - t[start_idx]
@@ -1539,7 +1537,7 @@ class LazyRegularTimeSeries(RegularTimeSeries):
             # this is because we are dealing with numerical noise
             # we know the domain and the sampling rate, we can infer the number of pts
             nb_points = 0
-            for start, end in zip(self.domain.start, self.domain.end):
+            for start, end in self.domain:
                 # TODO check could have some edge cases with numerical instability
                 nb_points += int(np.ceil((end - start) * self.sampling_rate) + 1)
             return nb_points
@@ -1790,6 +1788,31 @@ class Interval(ArrayDict):
             2.0 3.0
         """
         for s, e in zip(self.start, self.end):
+            yield (s, e)
+
+    def __reversed__(self):
+        r"""Iterates over the intervals in reverse order. Will return a tuple of (start, end).
+        This iterator will not include other optional attributes.
+
+        .. Example ::
+
+            >>> import numpy as np
+            >>> from temporaldata import Interval
+
+            >>> intervals = Interval(
+            ...     start=np.array([0., 1., 2.]),
+            ...     end=np.array([1., 2., 3.]),
+            ...     some_other_attribute=np.array([0, 1, 2]),
+            ... )
+
+            >>> for start, end in reversed(intervals):
+            ...     print(start, end)
+            2.0 3.0
+            1.0 2.0
+            0.0 1.0
+        """
+        # If start/end are sequences (e.g. numpy arrays), you can slice them:
+        for s, e in zip(self.start[::-1], self.end[::-1]):
             yield (s, e)
 
     def is_disjoint(self):
