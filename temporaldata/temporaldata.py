@@ -1811,7 +1811,6 @@ class Interval(ArrayDict):
             1.0 2.0
             0.0 1.0
         """
-        # If start/end are sequences (e.g. numpy arrays), you can slice them:
         for s, e in zip(self.start[::-1], self.end[::-1]):
             yield (s, e)
 
