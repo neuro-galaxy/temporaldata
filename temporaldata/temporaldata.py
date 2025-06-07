@@ -1306,9 +1306,7 @@ class RegularTimeSeries(ArrayDict):
                 f"Interval {self.domain} does not intersect with [{start}, {end}]"
             )
 
-        start_id, end_id, out_start, out_end = self.compute_index_range(
-            start, end, len(self)
-        )
+        start_id, end_id, out_start, out_end = self.compute_index_range(start, end)
 
         out = self.__class__.__new__(self.__class__)
         out._sampling_rate = self.sampling_rate
@@ -1324,12 +1322,11 @@ class RegularTimeSeries(ArrayDict):
 
         return out
 
-    def compute_index_range(self, start: float, end: float, nb_points: int = None):
+    def compute_index_range(self, start: float, end: float):
         """
         Compute the integer index range [start_id, end_id) and the adjusted
         domain endpoints (out_start, out_end) for a given continuous interval
         [start, end] within self.domain, accounting for sampling_rate.
-        Nb_points is used to determine the end_id if the time series is lazy loaded.
 
         Returns:
             start_id (int): The starting index corresponding to `start`.
@@ -1359,7 +1356,7 @@ class RegularTimeSeries(ArrayDict):
 
             break
 
-        end_id = nb_points
+        end_id = len(self)
         out_end = None
 
         for i_start, i_end in zip(
@@ -1420,7 +1417,7 @@ class RegularTimeSeries(ArrayDict):
         mask_array = np.zeros_like(self.timestamps, dtype=bool)
 
         for start, end in zip(interval.start, interval.end):
-            start_id, end_id, _, _ = self.compute_index_range(start, end, len(self))
+            start_id, end_id, _, _ = self.compute_index_range(start, end)
 
             assert not np.any(mask_array[start_id:end_id])
             mask_array[start_id:end_id] = True
@@ -1588,9 +1585,7 @@ class LazyRegularTimeSeries(RegularTimeSeries):
                 f"Interval {self.domain} does not intersect with [{start}, {end}]"
             )
 
-        start_id, end_id, out_start, out_end = self.compute_index_range(
-            start, end, self._maybe_first_dim()
-        )
+        start_id, end_id, out_start, out_end = self.compute_index_range(start, end)
 
         out = self.__class__.__new__(self.__class__)
         out._sampling_rate = self.sampling_rate
