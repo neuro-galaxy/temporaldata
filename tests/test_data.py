@@ -795,7 +795,13 @@ def test_regular_to_irregular_timeseries():
     assert np.allclose(b.lfp, a.lfp)
 
 
-def test_regular_non_contiguous_domain():
+def test_regular_non_contiguous_domain(test_filepath):
+
+    def _test_regular_non_contiguous_domain_1(data, expected_timestamps):
+        assert np.allclose(data.timestamps, expected_timestamps)
+        assert np.allclose(data.domain.start, np.array([11.3, 17.8]))
+        assert np.allclose(data.domain.end, np.array([14.3, 19.3]))
+
     expected_timestamps = np.concatenate(
         [np.arange(11.3, 14.8, 0.5), np.arange(17.8, 19.8, 0.5)]
     )
@@ -804,9 +810,201 @@ def test_regular_non_contiguous_domain():
         sampling_rate=2,
         domain=Interval(start=np.array([11.3, 17.8]), end=np.array([14.3, 19.3])),
     )
-    assert np.allclose(data.timestamps, expected_timestamps)
-    assert np.allclose(data.domain.start, np.array([11.3, 17.8]))
-    assert np.allclose(data.domain.end, np.array([14.3, 19.3]))
+
+    _test_regular_non_contiguous_domain_1(data, expected_timestamps)
+
+    with h5py.File(test_filepath, "w") as f:
+        data.to_hdf5(f)
+
+    del data
+
+    with h5py.File(test_filepath, "r") as f:
+        data = LazyRegularTimeSeries.from_hdf5(f)
+        _test_regular_non_contiguous_domain_1(data, expected_timestamps)
+
+    def _test_regular_non_contiguous_domain_2(data, expected_timestamps):
+        # Slice before the first interval
+        data_slice = data.slice(start=80, end=160, reset_origin=False)
+        assert np.allclose(data_slice.values, v[:90])
+        assert np.allclose(data_slice.timestamps, expected_timestamps[:90])
+        assert np.allclose(data_slice.domain.start, np.array([100.0, 120.0, 130.0]))
+        assert np.allclose(data_slice.domain.end, np.array([109.5, 124.5, 159.5]))
+
+        # Slice after the last interval
+        data_slice = data.slice(start=140, end=220, reset_origin=False)
+        assert np.allclose(data_slice.values, v[-90:])
+        assert np.allclose(data_slice.timestamps, expected_timestamps[-90:])
+        assert np.allclose(data_slice.domain.start, np.array([140.0, 175.0, 190.0]))
+        assert np.allclose(data_slice.domain.end, np.array([169.5, 179.5, 199.5]))
+
+        # Slice before the first interval and after the last one
+        data_slice = data.slice(start=80, end=220, reset_origin=False)
+        assert np.allclose(data_slice.values, v)
+        assert np.allclose(data_slice.timestamps, expected_timestamps)
+        assert np.allclose(
+            data_slice.domain.start, np.array([100.0, 120.0, 130.0, 175.0, 190.0])
+        )
+        assert np.allclose(
+            data_slice.domain.end, np.array([109.5, 124.5, 169.5, 179.5, 199.5])
+        )
+
+        # Slice inside a middle interval
+        data_slice = data.slice(start=140, end=160, reset_origin=False)
+        assert np.allclose(
+            data_slice.values, np.arange(240, 260, 0.5, dtype=np.float32)
+        )
+        assert np.allclose(
+            data_slice.timestamps, np.arange(140, 160, 0.5, dtype=np.float32)
+        )
+        assert np.allclose(data_slice.domain.start, np.array([140.0]))
+        assert np.allclose(data_slice.domain.end, np.array([159.5]))
+
+        # Slice inside a middle interval and skew
+        data_slice = data.slice(start=140.01, end=160.01, reset_origin=False)
+        assert np.allclose(
+            data_slice.values, np.arange(240.5, 260.01, 0.5, dtype=np.float32)
+        )
+        assert np.allclose(
+            data_slice.timestamps, np.arange(140.5, 160.5, 0.5, dtype=np.float32)
+        )
+        assert np.allclose(data_slice.domain.start, np.array([140.5]))
+        assert np.allclose(data_slice.domain.end, np.array([160.0]))
+
+        # Slice inside a middle interval with start before the interval
+        data_slice = data.slice(start=128, end=160, reset_origin=False)
+        assert np.allclose(
+            data_slice.values, np.arange(230, 260, 0.5, dtype=np.float32)
+        )
+        assert np.allclose(
+            data_slice.timestamps, np.arange(130, 160, 0.5, dtype=np.float32)
+        )
+        assert np.allclose(data_slice.domain.start, np.array([130.0]))
+        assert np.allclose(data_slice.domain.end, np.array([159.5]))
+
+        # Slice inside a middle interval with end after the interval
+        data_slice = data.slice(start=140, end=172, reset_origin=False)
+        assert np.allclose(
+            data_slice.values, np.arange(240, 270, 0.5, dtype=np.float32)
+        )
+        assert np.allclose(
+            data_slice.timestamps, np.arange(140, 170, 0.5, dtype=np.float32)
+        )
+        assert np.allclose(data_slice.domain.start, np.array([140.0]))
+        assert np.allclose(data_slice.domain.end, np.array([169.5]))
+
+        # Slice inside the first interval
+        data_slice = data.slice(start=100, end=105, reset_origin=False)
+        assert np.allclose(
+            data_slice.values, np.arange(200, 205, 0.5, dtype=np.float32)
+        )
+        assert np.allclose(
+            data_slice.timestamps, np.arange(100, 105, 0.5, dtype=np.float32)
+        )
+        assert np.allclose(data_slice.domain.start, np.array([100.0]))
+        assert np.allclose(data_slice.domain.end, np.array([104.5]))
+
+        # Slice inside the first interval and skew
+        data_slice = data.slice(start=100.01, end=105.01, reset_origin=False)
+        assert np.allclose(
+            data_slice.values, np.arange(200.5, 205.01, 0.5, dtype=np.float32)
+        )
+        assert np.allclose(
+            data_slice.timestamps, np.arange(100.5, 105.01, 0.5, dtype=np.float32)
+        )
+        assert np.allclose(data_slice.domain.start, np.array([100.5]))
+        assert np.allclose(data_slice.domain.end, np.array([105.0]))
+
+        # Slice inside the first interval with start before the interval and end after the interval
+        data_slice = data.slice(start=102, end=108, reset_origin=False)
+        assert np.allclose(
+            data_slice.values, np.arange(202, 208, 0.5, dtype=np.float32)
+        )
+        assert np.allclose(
+            data_slice.timestamps, np.arange(102, 108, 0.5, dtype=np.float32)
+        )
+        assert np.allclose(data_slice.domain.start, np.array([102.0]))
+        assert np.allclose(data_slice.domain.end, np.array([107.5]))
+
+        # Slice inside the first interval with start before the interval and end after the interval
+        data_slice = data.slice(start=98, end=112, reset_origin=False)
+        assert np.allclose(
+            data_slice.values, np.arange(200, 210, 0.5, dtype=np.float32)
+        )
+        assert np.allclose(
+            data_slice.timestamps, np.arange(100, 110, 0.5, dtype=np.float32)
+        )
+        assert np.allclose(data_slice.domain.start, np.array([100.0]))
+        assert np.allclose(data_slice.domain.end, np.array([109.5]))
+
+        # Slice inside the last interval
+        data_slice = data.slice(start=190, end=195, reset_origin=False)
+        assert np.allclose(
+            data_slice.values, np.arange(290, 295, 0.5, dtype=np.float32)
+        )
+        assert np.allclose(
+            data_slice.timestamps, np.arange(190, 195, 0.5, dtype=np.float32)
+        )
+        assert np.allclose(data_slice.domain.start, np.array([190.0]))
+        assert np.allclose(data_slice.domain.end, np.array([194.5]))
+
+        # Slice inside the last interval and skew
+        data_slice = data.slice(start=190.01, end=195.01, reset_origin=False)
+        assert np.allclose(
+            data_slice.values, np.arange(290.5, 295.01, 0.5, dtype=np.float32)
+        )
+        assert np.allclose(
+            data_slice.timestamps, np.arange(190.5, 195.01, 0.5, dtype=np.float32)
+        )
+        assert np.allclose(data_slice.domain.start, np.array([190.5]))
+        assert np.allclose(data_slice.domain.end, np.array([195.0]))
+
+        # Slice inside the last interval with start before the interval and end after the interval
+        data_slice = data.slice(start=188, end=202, reset_origin=False)
+        assert np.allclose(
+            data_slice.values, np.arange(290, 300, 0.5, dtype=np.float32)
+        )
+        assert np.allclose(
+            data_slice.timestamps, np.arange(190, 200, 0.5, dtype=np.float32)
+        )
+        assert np.allclose(data_slice.domain.start, np.array([190.0]))
+        assert np.allclose(data_slice.domain.end, np.array([199.5]))
+
+        # Slice inside two intervals
+        data_slice = data.slice(start=122, end=168, reset_origin=False)
+        assert np.allclose(data_slice.values, v[24:106])
+        assert np.allclose(data_slice.timestamps, expected_timestamps[24:106])
+        assert np.allclose(data_slice.domain.start, np.array([122.0, 130.0]))
+        assert np.allclose(data_slice.domain.end, np.array([124.5, 167.5]))
+
+        # Slice inside two intervals and skewed
+        data_slice = data.slice(start=122.01, end=168.01, reset_origin=False)
+        assert np.allclose(data_slice.values, v[25:107])
+        assert np.allclose(data_slice.timestamps, expected_timestamps[25:107])
+        assert np.allclose(data_slice.domain.start, np.array([122.5, 130.0]))
+        assert np.allclose(data_slice.domain.end, np.array([124.5, 168.0]))
+
+        # Slice outside two intervals
+        data_slice = data.slice(start=118, end=172, reset_origin=False)
+        assert np.allclose(data_slice.values, v[20:110])
+        assert np.allclose(data_slice.timestamps, expected_timestamps[20:110])
+        assert np.allclose(data_slice.domain.start, np.array([120.0, 130.0]))
+        assert np.allclose(data_slice.domain.end, np.array([124.5, 169.5]))
+
+        # Slice inside two intervals and reset origin
+        data_slice = data.slice(start=122, end=168, reset_origin=True)
+        assert np.allclose(data_slice.values, v[24:106])
+        assert np.allclose(data_slice.timestamps, expected_timestamps[24:106] - 122)
+        assert np.allclose(data_slice.domain.start, np.array([0.0, 8.0]))
+        assert np.allclose(data_slice.domain.end, np.array([2.5, 45.5]))
+
+        # Slice inside two intervals, skew, and reset origin
+        data_slice = data.slice(start=122.03, end=168.01, reset_origin=True)
+        assert np.allclose(data_slice.values, v[25:107])
+        assert np.allclose(data_slice.timestamps, expected_timestamps[25:107] - 122.03)
+        assert np.allclose(data_slice.domain.start, np.array([0.47, 7.97]))
+        assert np.allclose(data_slice.domain.end, np.array([2.47, 45.97]))
+
+        assert np.allclose(data.timestamps, expected_timestamps)
 
     v_1 = np.arange(200, 210, 0.5, dtype=np.float32)
     v_2 = np.arange(220, 225, 0.5, dtype=np.float32)
@@ -831,174 +1029,39 @@ def test_regular_non_contiguous_domain():
         ),
     )
 
-    assert np.allclose(data.timestamps, expected_timestamps)
+    _test_regular_non_contiguous_domain_2(data, expected_timestamps)
 
-    # Slice before the first interval
-    data_slice = data.slice(start=80, end=160, reset_origin=False)
-    assert np.allclose(data_slice.values, v[:90])
-    assert np.allclose(data_slice.timestamps, expected_timestamps[:90])
-    assert np.allclose(data_slice.domain.start, np.array([100.0, 120.0, 130.0]))
-    assert np.allclose(data_slice.domain.end, np.array([109.5, 124.5, 159.5]))
+    with h5py.File(test_filepath, "w") as f:
+        data.to_hdf5(f)
 
-    # Slice after the last interval
-    data_slice = data.slice(start=140, end=220, reset_origin=False)
-    assert np.allclose(data_slice.values, v[-90:])
-    assert np.allclose(data_slice.timestamps, expected_timestamps[-90:])
-    assert np.allclose(data_slice.domain.start, np.array([140.0, 175.0, 190.0]))
-    assert np.allclose(data_slice.domain.end, np.array([169.5, 179.5, 199.5]))
+    del data
 
-    # Slice before the first interval and after the last one
-    data_slice = data.slice(start=80, end=220, reset_origin=False)
-    assert np.allclose(data_slice.values, v)
-    assert np.allclose(data_slice.timestamps, expected_timestamps)
-    assert np.allclose(
-        data_slice.domain.start, np.array([100.0, 120.0, 130.0, 175.0, 190.0])
-    )
-    assert np.allclose(
-        data_slice.domain.end, np.array([109.5, 124.5, 169.5, 179.5, 199.5])
-    )
-
-    # Slice inside a middle interval
-    data_slice = data.slice(start=140, end=160, reset_origin=False)
-    assert np.allclose(data_slice.values, np.arange(240, 260, 0.5, dtype=np.float32))
-    assert np.allclose(
-        data_slice.timestamps, np.arange(140, 160, 0.5, dtype=np.float32)
-    )
-    assert np.allclose(data_slice.domain.start, np.array([140.0]))
-    assert np.allclose(data_slice.domain.end, np.array([159.5]))
-
-    # Slice inside a middle interval and skew
-    data_slice = data.slice(start=140.01, end=160.01, reset_origin=False)
-    assert np.allclose(
-        data_slice.values, np.arange(240.5, 260.01, 0.5, dtype=np.float32)
-    )
-    assert np.allclose(
-        data_slice.timestamps, np.arange(140.5, 160.5, 0.5, dtype=np.float32)
-    )
-    assert np.allclose(data_slice.domain.start, np.array([140.5]))
-    assert np.allclose(data_slice.domain.end, np.array([160.0]))
-
-    # Slice inside a middle interval with start before the interval
-    data_slice = data.slice(start=128, end=160, reset_origin=False)
-    assert np.allclose(data_slice.values, np.arange(230, 260, 0.5, dtype=np.float32))
-    assert np.allclose(
-        data_slice.timestamps, np.arange(130, 160, 0.5, dtype=np.float32)
-    )
-    assert np.allclose(data_slice.domain.start, np.array([130.0]))
-    assert np.allclose(data_slice.domain.end, np.array([159.5]))
-
-    # Slice inside a middle interval with end after the interval
-    data_slice = data.slice(start=140, end=172, reset_origin=False)
-    assert np.allclose(data_slice.values, np.arange(240, 270, 0.5, dtype=np.float32))
-    assert np.allclose(
-        data_slice.timestamps, np.arange(140, 170, 0.5, dtype=np.float32)
-    )
-    assert np.allclose(data_slice.domain.start, np.array([140.0]))
-    assert np.allclose(data_slice.domain.end, np.array([169.5]))
-
-    # Slice inside the first interval
-    data_slice = data.slice(start=100, end=105, reset_origin=False)
-    assert np.allclose(data_slice.values, np.arange(200, 205, 0.5, dtype=np.float32))
-    assert np.allclose(
-        data_slice.timestamps, np.arange(100, 105, 0.5, dtype=np.float32)
-    )
-    assert np.allclose(data_slice.domain.start, np.array([100.0]))
-    assert np.allclose(data_slice.domain.end, np.array([104.5]))
-
-    # Slice inside the first interval and skew
-    data_slice = data.slice(start=100.01, end=105.01, reset_origin=False)
-    assert np.allclose(
-        data_slice.values, np.arange(200.5, 205.01, 0.5, dtype=np.float32)
-    )
-    assert np.allclose(
-        data_slice.timestamps, np.arange(100.5, 105.01, 0.5, dtype=np.float32)
-    )
-    assert np.allclose(data_slice.domain.start, np.array([100.5]))
-    assert np.allclose(data_slice.domain.end, np.array([105.0]))
-
-    # Slice inside the first interval with start before the interval and end after the interval
-    data_slice = data.slice(start=102, end=108, reset_origin=False)
-    assert np.allclose(data_slice.values, np.arange(202, 208, 0.5, dtype=np.float32))
-    assert np.allclose(
-        data_slice.timestamps, np.arange(102, 108, 0.5, dtype=np.float32)
-    )
-    assert np.allclose(data_slice.domain.start, np.array([102.0]))
-    assert np.allclose(data_slice.domain.end, np.array([107.5]))
-
-    # Slice inside the first interval with start before the interval and end after the interval
-    data_slice = data.slice(start=98, end=112, reset_origin=False)
-    assert np.allclose(data_slice.values, np.arange(200, 210, 0.5, dtype=np.float32))
-    assert np.allclose(
-        data_slice.timestamps, np.arange(100, 110, 0.5, dtype=np.float32)
-    )
-    assert np.allclose(data_slice.domain.start, np.array([100.0]))
-    assert np.allclose(data_slice.domain.end, np.array([109.5]))
-
-    # Slice inside the last interval
-    data_slice = data.slice(start=190, end=195, reset_origin=False)
-    assert np.allclose(data_slice.values, np.arange(290, 295, 0.5, dtype=np.float32))
-    assert np.allclose(
-        data_slice.timestamps, np.arange(190, 195, 0.5, dtype=np.float32)
-    )
-    assert np.allclose(data_slice.domain.start, np.array([190.0]))
-    assert np.allclose(data_slice.domain.end, np.array([194.5]))
-
-    # Slice inside the last interval and skew
-    data_slice = data.slice(start=190.01, end=195.01, reset_origin=False)
-    assert np.allclose(
-        data_slice.values, np.arange(290.5, 295.01, 0.5, dtype=np.float32)
-    )
-    assert np.allclose(
-        data_slice.timestamps, np.arange(190.5, 195.01, 0.5, dtype=np.float32)
-    )
-    assert np.allclose(data_slice.domain.start, np.array([190.5]))
-    assert np.allclose(data_slice.domain.end, np.array([195.0]))
-
-    # Slice inside the last interval with start before the interval and end after the interval
-    data_slice = data.slice(start=188, end=202, reset_origin=False)
-    assert np.allclose(data_slice.values, np.arange(290, 300, 0.5, dtype=np.float32))
-    assert np.allclose(
-        data_slice.timestamps, np.arange(190, 200, 0.5, dtype=np.float32)
-    )
-    assert np.allclose(data_slice.domain.start, np.array([190.0]))
-    assert np.allclose(data_slice.domain.end, np.array([199.5]))
-
-    # Slice inside two intervals
-    data_slice = data.slice(start=122, end=168, reset_origin=False)
-    assert np.allclose(data_slice.values, v[24:106])
-    assert np.allclose(data_slice.timestamps, expected_timestamps[24:106])
-    assert np.allclose(data_slice.domain.start, np.array([122.0, 130.0]))
-    assert np.allclose(data_slice.domain.end, np.array([124.5, 167.5]))
-
-    # Slice inside two intervals and skewed
-    data_slice = data.slice(start=122.01, end=168.01, reset_origin=False)
-    assert np.allclose(data_slice.values, v[25:107])
-    assert np.allclose(data_slice.timestamps, expected_timestamps[25:107])
-    assert np.allclose(data_slice.domain.start, np.array([122.5, 130.0]))
-    assert np.allclose(data_slice.domain.end, np.array([124.5, 168.0]))
-
-    # Slice outside two intervals
-    data_slice = data.slice(start=118, end=172, reset_origin=False)
-    assert np.allclose(data_slice.values, v[20:110])
-    assert np.allclose(data_slice.timestamps, expected_timestamps[20:110])
-    assert np.allclose(data_slice.domain.start, np.array([120.0, 130.0]))
-    assert np.allclose(data_slice.domain.end, np.array([124.5, 169.5]))
-
-    # Slice inside two intervals and reset origin
-    data_slice = data.slice(start=122, end=168, reset_origin=True)
-    assert np.allclose(data_slice.values, v[24:106])
-    assert np.allclose(data_slice.timestamps, expected_timestamps[24:106] - 122)
-    assert np.allclose(data_slice.domain.start, np.array([0.0, 8.0]))
-    assert np.allclose(data_slice.domain.end, np.array([2.5, 45.5]))
-
-    # Slice inside two intervals, skew, and reset origin
-    data_slice = data.slice(start=122.03, end=168.01, reset_origin=True)
-    assert np.allclose(data_slice.values, v[25:107])
-    assert np.allclose(data_slice.timestamps, expected_timestamps[25:107] - 122.03)
-    assert np.allclose(data_slice.domain.start, np.array([0.47, 7.97]))
-    assert np.allclose(data_slice.domain.end, np.array([2.47, 45.97]))
+    with h5py.File(test_filepath, "r") as f:
+        data = LazyRegularTimeSeries.from_hdf5(f)
+        _test_regular_non_contiguous_domain_2(data, expected_timestamps)
 
     # Edge case where you need to deal with some numerical issues
+    def _test_regular_non_contiguous_domain_3(data, expected_timestamps):
+        data_slice = data.slice(start=15.0, end=34.99, reset_origin=False)
+        assert np.allclose(data_slice.values, v[50:150])
+        assert np.allclose(data_slice.timestamps, expected_timestamps[50:150])
+        assert np.allclose(data_slice.domain.start, np.array([15.0, 30.0]))
+        assert np.allclose(data_slice.domain.end, np.array([19.9, 34.9]))
+
+        data_slice = data.slice(start=38.001, end=55.001, reset_origin=False)
+        assert np.allclose(data_slice.values, v[181:251])
+        assert np.allclose(data_slice.timestamps, expected_timestamps[181:251])
+        assert np.allclose(data_slice.domain.start, np.array([38.1, 50.0]))
+        assert np.allclose(data_slice.domain.end, np.array([39.9, 55.0]))
+
+        data_slice = data.slice(start=55.99, end=58.0, reset_origin=False)
+        assert np.allclose(data_slice.values, v[260:280])
+        assert np.allclose(data_slice.timestamps, expected_timestamps[260:280])
+        assert np.allclose(data_slice.domain.start, np.array([56.0]))
+        assert np.allclose(data_slice.domain.end, np.array([57.9]))
+
+        assert np.allclose(data.timestamps, expected_timestamps)
+
     v = np.arange(300, dtype=np.float32)
     t_1 = np.arange(10.0, 20.0, 0.1)
     t_2 = np.arange(30.0, 40.0, 0.1)
@@ -1013,23 +1076,16 @@ def test_regular_non_contiguous_domain():
         ),
     )
 
-    data_slice = data.slice(start=15.0, end=34.99, reset_origin=False)
-    assert np.allclose(data_slice.values, v[50:150])
-    assert np.allclose(data_slice.timestamps, expected_timestamps[50:150])
-    assert np.allclose(data_slice.domain.start, np.array([15.0, 30.0]))
-    assert np.allclose(data_slice.domain.end, np.array([19.9, 34.9]))
+    _test_regular_non_contiguous_domain_3(data, expected_timestamps)
 
-    data_slice = data.slice(start=38.001, end=55.001, reset_origin=False)
-    assert np.allclose(data_slice.values, v[181:251])
-    assert np.allclose(data_slice.timestamps, expected_timestamps[181:251])
-    assert np.allclose(data_slice.domain.start, np.array([38.1, 50.0]))
-    assert np.allclose(data_slice.domain.end, np.array([39.9, 55.0]))
+    with h5py.File(test_filepath, "w") as f:
+        data.to_hdf5(f)
 
-    data_slice = data.slice(start=55.99, end=58.0, reset_origin=False)
-    # assert np.allclose(data_slice.values, v[260:280])
-    # assert np.allclose(data_slice.timestamps, expected_timestamps[260:280])
-    assert np.allclose(data_slice.domain.start, np.array([56.0]))
-    assert np.allclose(data_slice.domain.end, np.array([57.9]))
+    del data
+
+    with h5py.File(test_filepath, "r") as f:
+        data = LazyRegularTimeSeries.from_hdf5(f)
+        _test_regular_non_contiguous_domain_3(data, expected_timestamps)
 
 
 def test_interval():

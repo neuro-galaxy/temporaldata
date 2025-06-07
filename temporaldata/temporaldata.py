@@ -1356,7 +1356,11 @@ class RegularTimeSeries(ArrayDict):
 
             break
 
-        end_id = len(self)
+        # TODO probably more elegant solutin exists
+        if isinstance(self, LazyRegularTimeSeries):
+            end_id = self._maybe_first_dim()
+        else:
+            end_id = len(self)
         out_end = None
 
         for i_start, i_end in zip(
