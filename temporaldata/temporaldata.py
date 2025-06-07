@@ -1266,7 +1266,7 @@ class RegularTimeSeries(ArrayDict):
             # major change make the domain end a bit after the last timestamp
             domain = Interval(
                 start=np.array([domain_start]),
-                end=np.array([domain_start + len(self) / sampling_rate]),
+                end=np.array([domain_start + (len(self) - 1) / sampling_rate]),
             )
         self._domain = domain
 
@@ -1342,7 +1342,7 @@ class RegularTimeSeries(ArrayDict):
             # Entire sub‐domain is before `start`
             if i_end <= start:
                 sub_domain_length = (i_end - i_start) * self.sampling_rate
-                start_id += int(np.floor(_round_if_close(sub_domain_length)))
+                start_id += int(np.floor(_round_if_close(sub_domain_length)) + 1)
                 continue
 
             # `start` lies inside this sub‐domain
@@ -1365,12 +1365,13 @@ class RegularTimeSeries(ArrayDict):
             # Entire sub‐domain is after `end`
             if end <= i_start:
                 sub_domain_length = (i_end - i_start) * self.sampling_rate
-                end_id -= int(np.floor(_round_if_close(sub_domain_length)))
+                end_id -= int(np.floor(_round_if_close(sub_domain_length)) + 1)
                 continue
 
             # `end` lies inside this sub‐domain
             if end < i_end:
-                gain_id = int(np.floor((i_end - end) * self.sampling_rate))
+                inter_length = (i_end - end) * self.sampling_rate
+                gain_id = int(np.floor(_round_if_close(inter_length)) + 1)
                 end_id -= gain_id
                 out_end = i_end - gain_id / self.sampling_rate
             else:
@@ -1439,7 +1440,7 @@ class RegularTimeSeries(ArrayDict):
         start_idx = 0
         for start, end in zip(self.domain.start, self.domain.end):
             sub_domain_length = (end - start) * self.sampling_rate
-            end_idx = start_idx + int(np.floor(_round_if_close(sub_domain_length)))
+            end_idx = start_idx + int(np.floor(_round_if_close(sub_domain_length)) + 1)
             offset = start - t[start_idx]
             t[start_idx:end_idx] += offset
             start_idx = end_idx
@@ -1540,7 +1541,8 @@ class LazyRegularTimeSeries(RegularTimeSeries):
             # we know the domain and the sampling rate, we can infer the number of pts
             nb_points = 0
             for start, end in zip(self.domain.start, self.domain.end):
-                nb_points += int(np.ceil((end - start) * self.sampling_rate))
+                # TODO check could have some edge cases with numerical instability
+                nb_points += int(np.ceil((end - start) * self.sampling_rate) + 1)
             return nb_points
 
         # otherwise nothing was loaded, return the first dim of the h5py dataset

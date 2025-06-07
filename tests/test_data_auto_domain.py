@@ -38,4 +38,4 @@ def test_data():
     )
 
     assert np.allclose(data.domain.start, np.array([0, 5]))
-    assert np.allclose(data.domain.end, np.array([4.0, 6.0]))
+    assert np.allclose(data.domain.end, np.array([3.996, 6.0]))
