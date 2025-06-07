@@ -1263,7 +1263,6 @@ class RegularTimeSeries(ArrayDict):
                 raise ValueError(
                     f"domain_start must be a number, got {type(domain_start)}."
                 )
-            # major change make the domain end a bit after the last timestamp
             domain = Interval(
                 start=np.array([domain_start]),
                 end=np.array([domain_start + (len(self) - 1) / sampling_rate]),
@@ -1611,6 +1610,9 @@ class LazyRegularTimeSeries(RegularTimeSeries):
             out._lazy_ops["slice"] = (prev_start_id + start_id, prev_start_id + end_id)
 
         return out
+
+    def to_irregular(self):
+        raise NotImplementedError("Not implemented for LazyRegularTimeSeries.")
 
     def to_hdf5(self, file):
         raise NotImplementedError("Cannot save a lazy array dict to hdf5.")
