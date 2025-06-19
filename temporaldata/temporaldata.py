@@ -43,15 +43,16 @@ class ArrayDict(object):
 
     def keys(self) -> List[str]:
         r"""Returns a list of all array attribute names."""
-        return [x for x in self.__dict__.keys() if not x.startswith("_")]
+        return list(filter(lambda x: not x.startswith("_"), self.__dict__))
 
     def _maybe_first_dim(self):
         # If self has at least one attribute, returns the first dimension of
         # the first attribute. Otherwise, returns :obj:`None`.
-        if len(self.keys()) == 0:
+        keys = self.keys()
+        if len(keys) == 0:
             return None
         else:
-            return self.__dict__[self.keys()[0]].shape[0]
+            return self.__dict__[keys[0]].shape[0]
 
     def __len__(self):
         r"""Returns the first dimension shared by all attributes."""
@@ -2589,9 +2590,12 @@ def sorted_traversal(lintervals, rintervals):
     # or a "closing paranthesis" (lop=False)
     lop, rop = True, True
 
-    while (lidx < len(lintervals)) or (ridx < len(rintervals)):
+    len_lintervals = len(lintervals)
+    len_rintervals = len(rintervals)
+
+    while (lidx < len_lintervals) or (ridx < len_rintervals):
         # retrieve the time of the pointer in the left object
-        if lidx < len(lintervals):
+        if lidx < len_lintervals:
             # retrieve the time of the next interval in left object
             ltime = lintervals.start[lidx] if lop else lintervals.end[lidx]
         else:
@@ -2599,7 +2603,7 @@ def sorted_traversal(lintervals, rintervals):
             ltime = np.inf
 
         # retrieve the time of the pointer in the right object
-        if ridx < len(rintervals):
+        if ridx < len_rintervals:
             # retrieve the time of the next interval in right object
             rtime = rintervals.start[ridx] if rop else rintervals.end[ridx]
         else:
@@ -3092,7 +3096,7 @@ class Data(object):
 
     def keys(self) -> List[str]:
         r"""Returns a list of all attribute names."""
-        return [x for x in self.__dict__.keys() if not x.startswith("_")]
+        return list(filter(lambda x: not x.startswith("_"), self.__dict__))
 
     def __contains__(self, key: str) -> bool:
         r"""Returns :obj:`True` if the attribute :obj:`key` is present in the
