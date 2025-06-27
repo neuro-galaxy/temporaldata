@@ -1997,7 +1997,7 @@ class Interval(ArrayDict):
             sizes = [round(x * len(self)) for x in sizes]
             # there might be rounding errors
             # make sure that the sum of sizes is still equal to the number of intervals
-            largest = sizes.argmax()
+            largest = np.argmax(sizes)
             sizes[largest] = len(self) - (sum(sizes) - sizes[largest])
         elif all(isinstance(x, int) for x in sizes):
             assert sum(sizes) == len(self), "sizes must sum to the number of intervals"
