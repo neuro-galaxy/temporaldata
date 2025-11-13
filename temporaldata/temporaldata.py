@@ -4,6 +4,7 @@ import copy
 from collections.abc import Mapping, Sequence
 from typing import Any, Dict, List, Tuple, Union, Callable, Optional, Type
 import logging
+import warnings
 
 import h5py
 import numpy as np
@@ -91,11 +92,9 @@ class ArrayDict(object):
 
     def __repr__(self) -> str:
         cls = self.__class__.__name__
-        hidden_keys = ["train_mask", "valid_mask", "test_mask"]
         info = [
             size_repr(k, self.__dict__[k], indent=2)
             for k in self.keys()
-            if k not in hidden_keys
         ]
         info = ",\n".join(info)
         return f"{cls}(\n{info}\n)"
@@ -720,29 +719,6 @@ class IrregularTimeSeries(ArrayDict):
         out._domain = out._domain & interval
         return out
 
-    def add_split_mask(self, name: str, interval: Interval):
-        """Adds a boolean mask as an array attribute, which is defined for each
-        timestamp, and is set to :obj:`True` for all timestamps that are within
-        :obj:`interval`. The mask attribute will be called :obj:`<name>_mask`.
-
-        This is used to mark points in the time series, as part of train, validation,
-        or test sets, and is useful to ensure that there is no data leakage.
-
-        Args:
-            name: name of the split, e.g. "train", "valid", "test".
-            interval: a set of intervals defining the split domain.
-        """
-        assert not hasattr(self, f"{name}_mask"), (
-            f"Attribute {name}_mask already exists. Use another mask name, or rename "
-            f"the existing attribute."
-        )
-
-        mask_array = np.zeros(len(self), dtype=bool)
-        for start, end in zip(interval.start, interval.end):
-            mask_array |= (self.timestamps >= start) & (self.timestamps < end)
-
-        setattr(self, f"{name}_mask", mask_array)
-
     @classmethod
     def from_dataframe(
         cls,
@@ -1312,48 +1288,6 @@ class RegularTimeSeries(ArrayDict):
 
         return out
 
-    def add_split_mask(
-        self,
-        name: str,
-        interval: Interval,
-    ):
-        """Adds a boolean mask as an array attribute, which is defined for each
-        timestamp, and is set to :obj:`True` for all timestamps that are within
-        :obj:`interval`. The mask attribute will be called :obj:`<name>_mask`.
-
-        This is used to mark points in the time series, as part of train, validation,
-        or test sets, and is useful to ensure that there is no data leakage.
-
-        Args:
-            name: name of the split, e.g. "train", "valid", "test".
-            interval: a set of intervals defining the split domain.
-        """
-        assert not hasattr(self, f"{name}_mask"), (
-            f"Attribute {name}_mask already exists. Use another mask name, or rename "
-            f"the existing attribute."
-        )
-
-        mask_array = np.zeros_like(self.timestamps, dtype=bool)
-        for start, end in zip(interval.start, interval.end):
-            if start < self.domain.start[0]:
-                start_id = 0
-            else:
-                start_id = int(
-                    np.ceil((start - self.domain.start[0]) * self.sampling_rate)
-                )
-
-            if end > self.domain.end[0]:
-                end_id = len(self) + 1
-            else:
-                end_id = int(
-                    np.floor((end - self.domain.start[0]) * self.sampling_rate)
-                )
-
-            assert not mask_array[start_id:end_id].any()
-            mask_array[start_id:end_id] = True
-
-        setattr(self, f"{name}_mask", mask_array)
-
     def to_irregular(self):
         r"""Converts the time series to an irregular time series."""
         return IrregularTimeSeries(
@@ -1641,7 +1575,6 @@ class Interval(ArrayDict):
 
     _sorted = None
     _timekeys = None
-    _allow_split_mask_overlap = False
 
     def __init__(
         self,
@@ -2022,49 +1955,6 @@ class Interval(ArrayDict):
 
         return splits
 
-    def add_split_mask(
-        self,
-        name: str,
-        interval: Interval,
-    ):
-        """Adds a boolean mask as an array attribute, which is defined for each
-        interval in the object, and is set to :obj:`True` if the interval intersects
-        with the provided :obj:`Interval` object. The mask attribute will be called
-        :obj:`<name>_mask`.
-
-        This is used to mark intervals as part of train, validation,
-        or test sets, and is useful to ensure that there is no data leakage.
-
-        If an interval belongs to multiple splits, an error will be raised, unless this
-        is expected, in which case the method :meth:`allow_split_mask_overlap` should be
-        called.
-
-        Args:
-            name: name of the split, e.g. "train", "valid", "test".
-            interval: a set of intervals defining the split domain.
-        """
-        assert f"{name}_mask" not in self.keys(), (
-            f"Attribute {name}_mask already exists. Use another mask name, or rename "
-            f"the existing attribute."
-        )
-
-        mask_array = np.zeros_like(self.start, dtype=bool)
-        for start, end in zip(interval.start, interval.end):
-            mask_array |= (self.start < end) & (self.end > start)
-
-        setattr(self, f"{name}_mask", mask_array)
-
-    def allow_split_mask_overlap(self):
-        r"""Disables the check for split mask overlap. This means there could be an
-        overlap between the intervals across different splits. This is useful when
-        an interval is allowed to belong to multiple splits."""
-        logging.warning(
-            f"You are disabling the check for split mask overlap. "
-            f"This means there could be an overlap between the intervals "
-            f"across different splits. "
-        )
-        self._allow_split_mask_overlap = True
-
     @classmethod
     def linspace(cls, start: float, end: float, steps: int):
         r"""Create a regular interval with a given number of samples.
@@ -2206,7 +2096,6 @@ class Interval(ArrayDict):
 
         file.attrs["_unicode_keys"] = np.array(_unicode_keys, dtype="S")
         file.attrs["timekeys"] = np.array(self._timekeys, dtype="S")
-        file.attrs["allow_split_mask_overlap"] = self._allow_split_mask_overlap
         file.attrs["object"] = self.__class__.__name__
 
     @classmethod
@@ -2238,9 +2127,6 @@ class Interval(ArrayDict):
                 data[key] = data[key].astype("U")
         timekeys = file.attrs["timekeys"].astype(str).tolist()
         obj = cls(**data, timekeys=timekeys)
-
-        if file.attrs["allow_split_mask_overlap"]:
-            obj.allow_split_mask_overlap()
 
         return obj
 
@@ -3043,56 +2929,23 @@ class Data(object):
     def set_train_domain(self, interval: Interval):
         """Set the train domain for all attributes."""
         self.train_domain = interval
-        self.add_split_mask("train", interval)
 
     def set_valid_domain(self, interval: Interval):
         """Set the valid domain for all attributes."""
         self.valid_domain = interval
-        self.add_split_mask("valid", interval)
 
     def set_test_domain(self, interval: Interval):
         """Set the test domain for all attributes."""
         self.test_domain = interval
-        self.add_split_mask("test", interval)
 
-    def add_split_mask(
-        self,
-        name: str,
-        interval: Interval,
-    ):
-        """Create split masks for all Data, Interval & IrregularTimeSeries objects
-        contained within this Data object.
-        """
-        for key in self.keys():
-            if key.endswith("_domain"):
-                # domains are not split
-                assert isinstance(getattr(self, key), Interval)
-                continue
-            obj = getattr(self, key)
-            if isinstance(
-                obj, (Data, RegularTimeSeries, IrregularTimeSeries, Interval)
-            ):
-                obj.add_split_mask(name, interval)
-
-    def _check_for_data_leakage(self, name):
+    def _check_for_data_leakage(self, *args, **kwargs):
         """Ensure that split masks are all True"""
-        for key in self.keys():
-            if key.endswith("_domain"):
-                continue
-            obj = getattr(self, key)
-            if isinstance(obj, (IrregularTimeSeries, Interval)):
-                assert hasattr(obj, f"{name}_mask"), (
-                    f"Split mask for '{name}' not found in Data object. "
-                    f"Please register this split in prepare_data.py using "
-                    f"the session.register_split(...) method. In Data object: \n"
-                    f"{self}"
-                )
-                assert getattr(obj, f"{name}_mask").all(), (
-                    f"Data leakage detected split mask for '{name}' is not all True "
-                    f"in self.{key}."
-                )
-            if isinstance(obj, Data):
-                obj._check_for_data_leakage(name)
+        warnings.warn(
+            "_check_for_data_leakage() is deprecated. Data leakage should be handled by the sampler.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return True
 
     def keys(self) -> List[str]:
         r"""Returns a list of all attribute names."""
