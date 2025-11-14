@@ -237,7 +237,7 @@ def epochs_to_temporaldata_lazy(
     epochs: mne.Epochs,
     *,
     mmap_path: Union[str, Path] = None,
-    data_key: str = "sig",
+    data_key: str = "eeg",
     trials_key: str = "trials",
     batch_size: int = 8,
     dtype: Union[str, np.dtype] = np.float32,
@@ -261,10 +261,10 @@ def epochs_to_temporaldata_lazy(
         ``overwrite=True``).
     data_key
         Attribute name for the RegularTimeSeries inside the returned
-        Data object. Default: ``"sig"``.
+        Data object. Default: "eeg".
     trials_key
         Attribute name for the Interval describing trial boundaries and
-        event metadata. Default: ``"trials"``.
+        event metadata. Default: "trials".
     batch_size
         Number of epochs to load from MNE at once. Controls peak RAM
         usage during conversion. Default: 8.
