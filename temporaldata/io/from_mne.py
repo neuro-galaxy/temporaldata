@@ -16,7 +16,36 @@ def raw_to_temporaldata(
     data_key: str = "eeg",
 ) -> Data:
     """
-    Convert an MNE-Python raw object to a temporaldata object
+    Convert an MNE-Python raw object to a temporaldata.Data container (eager).
+
+    This version calls `raw.get_data()` and materializes the full
+    array in memory. It is simple and fast for small/mid-sized datasets, but
+    can be memory-hungry for large recordings.
+
+    Parameters
+    ----------
+    raw : mne.io.Raw
+        The continuous MNE-Python Raw object to convert. It must contain
+        the data and metadata in `raw.get_data()`, `raw.info`, and
+        `raw.annotations`.
+    data_key : str, optional
+        Key under which the continuous RegularTimeSeries will be stored
+        in the returned Data object (default is "eeg").
+
+    Returns
+    -------
+    temporal_data : temporaldata.Data
+        A Data object containing:
+          - `data_key` : RegularTimeSeries of continuous data.
+          - `meas_date` : Measurement start datetime from `raw.info["meas_date"]`.
+          - `sfreq` : Sampling frequency in Hz.
+          - `channel_names` : Array of channel name strings.
+          - `n_channels` : Number of channels.
+          - `n_times`: Number of time points.
+          - `domain` : Domain specifier (typically "auto").
+          - `events` (optional): IrregularTimeSeries of events (if events could be parsed from annotations).
+          - `event_id` (optional): dict mapping event labels to integer codes (if events are present).
+          - `annotations` (optional): Interval of annotation segments (if annotations are present).
     """
 
     # Continuous data -> RegularTimeSeries
