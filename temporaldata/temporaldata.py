@@ -5,7 +5,6 @@ from collections.abc import Mapping, Sequence
 from typing import Any, Dict, List, Tuple, Union, Callable, Optional, Type
 import logging
 
-import cv2
 import h5py
 import numpy as np
 import pandas as pd
@@ -2604,6 +2603,15 @@ class LazyVideo(object):
         channel_format: str = "NCHW",
     ):
 
+        try:
+            import cv2
+            self.cv2 = cv2  # Store for use in other methods
+        except ImportError:
+            raise ImportError(
+                'OpenCV not installed, you must install temporaldata using '
+                '`pip install -e .[video]`'
+            )
+
         self.timestamps = timestamps
         self.video_file = video_file
 
@@ -2707,14 +2715,14 @@ class LazyVideo(object):
 
                 # modify frame data
                 if self.resize is not None:
-                    frame = cv2.resize(frame, self.resize)
+                    frame = self.cv2.resize(frame, self.resize)
 
                 if self.colorspace == "RGB":
-                    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    frame = self.cv2.cvtColor(frame, self.cv2.COLOR_BGR2RGB)
                 elif self.colorspace == "G":
                     # keep color channel
                     frame = np.expand_dims(
-                        cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), axis=-1
+                        self.cv2.cvtColor(frame, self.cv2.COLOR_BGR2GRAY), axis=-1
                     )
 
                 if self.channel_format == "NCHW":
