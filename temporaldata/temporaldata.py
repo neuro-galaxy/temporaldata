@@ -2923,18 +2923,6 @@ class Data(object):
 
         return obj
 
-    def set_train_domain(self, interval: Interval):
-        """Set the train domain for all attributes."""
-        self.train_domain = interval
-
-    def set_valid_domain(self, interval: Interval):
-        """Set the valid domain for all attributes."""
-        self.valid_domain = interval
-
-    def set_test_domain(self, interval: Interval):
-        """Set the test domain for all attributes."""
-        self.test_domain = interval
-
     def _check_for_data_leakage(self, *args, **kwargs):
         """Ensure that split masks are all True"""
         warnings.warn(
