@@ -2605,11 +2605,12 @@ class LazyVideo(object):
 
         try:
             import cv2
+
             self.cv2 = cv2  # Store for use in other methods
         except ImportError:
             raise ImportError(
-                'OpenCV not installed, you must install temporaldata using '
-                '`pip install -e .[video]`'
+                "OpenCV not installed, you must install temporaldata using "
+                "`pip install -e .[video]`"
             )
 
         self.timestamps = timestamps
