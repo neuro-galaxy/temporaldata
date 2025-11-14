@@ -4,6 +4,7 @@ import copy
 from collections.abc import Mapping, Sequence
 from typing import Any, Dict, List, Tuple, Union, Callable, Optional, Type
 import logging
+import warnings
 
 import h5py
 import numpy as np
@@ -3042,18 +3043,146 @@ class Data(object):
 
     def set_train_domain(self, interval: Interval):
         """Set the train domain for all attributes."""
+        warnings.warn(
+            "set_train_domain is deprecated. Use add_splits instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.train_domain = interval
         self.add_split_mask("train", interval)
 
     def set_valid_domain(self, interval: Interval):
         """Set the valid domain for all attributes."""
+        warnings.warn(
+            "set_valid_domain is deprecated. Use add_splits instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.valid_domain = interval
         self.add_split_mask("valid", interval)
 
     def set_test_domain(self, interval: Interval):
         """Set the test domain for all attributes."""
+        warnings.warn(
+            "set_test_domain is deprecated. Use add_splits instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.test_domain = interval
         self.add_split_mask("test", interval)
+
+    def _add_single_split(
+        self,
+        name: str,
+        train: Interval,
+        test: Interval,
+        valid: Optional[Interval] = None,
+    ):
+        """Helper function to add a single split.
+
+        Args:
+            name: Name of the split
+            train: Training interval
+            test: Test interval
+            valid: Optional validation interval
+        """
+        # Validate the split
+        self._validate_split_intervals(train, test, valid)
+
+        # Initialize splits object if it doesn't exist
+        if not hasattr(self, "splits"):
+            self.splits = Data()
+            self.splits._is_split_info = True
+
+        # Check if split name already exists
+        if hasattr(self.splits, name):
+            raise ValueError(f"Split '{name}' already exists.")
+
+        # Create ArrayDict for the split
+        # Use object.__setattr__ to bypass ArrayDict's validation since Intervals aren't numpy arrays
+        split_dict_obj = ArrayDict()
+        object.__setattr__(split_dict_obj, "train", train)
+        object.__setattr__(split_dict_obj, "test", test)
+        if valid is not None:
+            object.__setattr__(split_dict_obj, "valid", valid)
+
+        # Store the split
+        setattr(self.splits, name, split_dict_obj)
+
+    def add_splits(
+        self,
+        name: Optional[str] = None,
+        train: Optional[Interval] = None,
+        test: Optional[Interval] = None,
+        valid: Optional[Interval] = None,
+        splits: Optional[List[Dict[str, Any]]] = None,
+    ):
+        """Add one or more splits to the data object.
+
+        Each split contains train, test, and optionally valid intervals. Splits are stored
+        in a split information object (data.splits) where each split is an ArrayDict containing
+        the train, test, and valid intervals.
+
+        Args:
+            name: Name of the split (required if adding a single split).
+            train: Training interval (required if adding a single split).
+            test: Test interval (required if adding a single split).
+            valid: Optional validation interval.
+            splits: List of split dictionaries, each containing 'name', 'train', 'test', and optionally 'valid'.
+                    Use this to add multiple splits at once.
+
+        Raises:
+            ValueError: If called on a split information object, if intervals are invalid,
+                       or if a split name already exists.
+        """
+        # Prevent calling add_splits on split information objects
+        if hasattr(self, "_is_split_info") and self._is_split_info:
+            raise ValueError(
+                "Cannot call add_splits on a split information object. "
+                "Split information objects are created automatically and should not be modified directly."
+            )
+
+        # Handle multiple splits
+        if splits is not None:
+            if (
+                name is not None
+                or train is not None
+                or test is not None
+                or valid is not None
+            ):
+                raise ValueError(
+                    "Cannot specify both 'splits' parameter and individual split parameters. "
+                    "Use either 'splits' for multiple splits or 'name', 'train', 'test', 'valid' for a single split."
+                )
+
+            for split_dict in splits:
+                split_name = split_dict.get("name")
+                split_train = split_dict.get("train")
+                split_test = split_dict.get("test")
+                split_valid = split_dict.get("valid")
+
+                if split_name is None:
+                    raise ValueError("Each split dictionary must have a 'name' key.")
+                if split_train is None:
+                    raise ValueError("Each split dictionary must have a 'train' key.")
+                if split_test is None:
+                    raise ValueError("Each split dictionary must have a 'test' key.")
+
+                self._add_single_split(split_name, split_train, split_test, split_valid)
+
+            return
+
+        # Handle single split
+        if name is None:
+            raise ValueError("'name' parameter is required when adding a single split.")
+        if train is None:
+            raise ValueError(
+                "'train' parameter is required when adding a single split."
+            )
+        if test is None:
+            raise ValueError("'test' parameter is required when adding a single split.")
+
+        self._add_single_split(name, train, test, valid)
 
     def add_split_mask(
         self,
@@ -3068,11 +3197,56 @@ class Data(object):
                 # domains are not split
                 assert isinstance(getattr(self, key), Interval)
                 continue
+            if key == "splits":
+                # Skip splits object
+                continue
             obj = getattr(self, key)
             if isinstance(
                 obj, (Data, RegularTimeSeries, IrregularTimeSeries, Interval)
             ):
                 obj.add_split_mask(name, interval)
+
+    def _validate_split_intervals(
+        self, train: Interval, test: Interval, valid: Optional[Interval] = None
+    ):
+        """Validate that split intervals are sorted, disjoint, and non-overlapping.
+
+        Args:
+            train: Training interval
+            test: Test interval
+            valid: Optional validation interval
+
+        Raises:
+            ValueError: If intervals are not sorted, not disjoint, or overlap with each other.
+        """
+        # Check that intervals are sorted
+        if not train.is_sorted():
+            raise ValueError("Train interval must be sorted.")
+        if not test.is_sorted():
+            raise ValueError("Test interval must be sorted.")
+        if valid is not None and not valid.is_sorted():
+            raise ValueError("Valid interval must be sorted.")
+
+        # Check that intervals are disjoint within themselves
+        if not train.is_disjoint():
+            raise ValueError("Train interval must be disjoint.")
+        if not test.is_disjoint():
+            raise ValueError("Test interval must be disjoint.")
+        if valid is not None and not valid.is_disjoint():
+            raise ValueError("Valid interval must be disjoint.")
+
+        # Check for overlaps between train, test, and valid using intersection
+        # If intervals don't overlap, their intersection should be empty
+        intersection = train & test
+        if len(intersection) > 0:
+            raise ValueError("Train and test intervals must not overlap.")
+        if valid is not None:
+            intersection = train & valid
+            if len(intersection) > 0:
+                raise ValueError("Train and valid intervals must not overlap.")
+            intersection = test & valid
+            if len(intersection) > 0:
+                raise ValueError("Test and valid intervals must not overlap.")
 
     def _check_for_data_leakage(self, name):
         """Ensure that split masks are all True"""
