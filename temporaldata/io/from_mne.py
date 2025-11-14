@@ -11,36 +11,76 @@ import os
 from uuid import uuid4
 
 
-def raw_to_temporaldata(raw: mne.io.Raw):
+def raw_to_temporaldata(
+    raw: mne.io.Raw,
+    data_key: str = "eeg",
+) -> Data:
     """
     Convert an MNE-Python raw object to a temporaldata object
     """
 
     # Continuous data -> RegularTimeSeries
-    raw_data, times = raw.get_data(return_times=True)
-    raw_data = raw_data.T
-    td_raw = RegularTimeSeries(
+    raw_data, times = raw.get_data(return_times=True)  # (n_channels, n_times)
+    raw_data = raw_data.T  # (n_times, n_channels)
+
+    sfreq = float(raw.info["sfreq"])
+
+    signal = RegularTimeSeries(
         raw=raw_data,
-        sampling_rate=raw.info["sfreq"],
+        sampling_rate=sfreq,
         domain_start=times[0],
         domain="auto",
     )
 
     # Events -> IrregularTimeSeries
+    td_events = None
+    event_id = None
     try:
         events, event_id = mne.events_from_annotations(raw)
 
         td_events = IrregularTimeSeries(
-            timestamps=events[:, 0],
-            event_code=events[:, -1],
+            timestamps=events[:, 0] / sfreq,
+            event_code=events[:, -1].astype("int64"),
             event_id=event_id,
         )
     except Exception:
         td_events = None
 
-    temporal_data = Data(
-        raw=td_raw,
-    )
+    # Annotations -> Interval
+    td_ann = None
+    ann = raw.annotations
+    if ann is not None and len(ann) > 0:
+        starts = np.asarray(ann.onset, dtype=float)  # shape: (n_ann,)
+        ends = starts + np.asarray(ann.duration, dtype=float)  # shape: (n_ann,)
+        labels = np.asarray(ann.description, dtype=object)  # shape: (n_ann,)
+
+        interval_kwargs = {
+            "start": starts,
+            "end": ends,
+            "label": labels,
+            "timekeys": ["start", "end"],
+        }
+
+        td_ann = Interval(**interval_kwargs)
+
+    data_kwargs = {
+        data_key: signal,
+        "meas_date": raw.info["meas_date"],
+        "sfreq": sfreq,
+        "channel_names": np.array(raw.ch_names, dtype=object),
+        "n_channels": raw.info["nchan"],
+        "n_times": raw.n_times,
+        "domain": "auto",
+    }
+
+    if td_events is not None:
+        data_kwargs["events"] = td_events
+    if event_id is not None:
+        data_kwargs["event_id"] = event_id
+    if td_ann is not None:
+        data_kwargs["annotations"] = td_ann
+
+    temporal_data = Data(**data_kwargs)
 
     return temporal_data
 
