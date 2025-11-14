@@ -2595,7 +2595,11 @@ class LazyVideo(object):
 
     Example ::
 
+        >>> import numpy as np
         >>> from temporaldata import LazyVideo
+
+        >>> # timestamps can be stored in any format, they just need to be passed as a numpy array
+        >>> timestamps = np.load('/path/to/timestamps.npy')
 
         >>> video = LazyVideo(
         ...     timestamps=timestamps,
