@@ -10,6 +10,7 @@ from .temporaldata import (
     LazyIrregularTimeSeries,
     LazyRegularTimeSeries,
     LazyInterval,
+    LazyVideo,
 )
 from .concat import concat
 
