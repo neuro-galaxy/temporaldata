@@ -9,6 +9,7 @@ from temporaldata import Data, RegularTimeSeries, IrregularTimeSeries, Interval
 
 from temporaldata.io.from_mne import (
     raw_to_temporaldata,
+    raw_to_temporaldata_lazy,
     epochs_to_temporaldata,
     epochs_to_temporaldata_lazy,
 )
@@ -131,6 +132,136 @@ def test_raw_to_temporaldata_eager_with_annotations():
     assert np.allclose(intervals.start, starts_expected)
     assert np.allclose(intervals.end, ends_expected)
     assert np.array_equal(intervals.label, labels_expected)
+
+
+def test_raw_to_temporaldata_lazy_basic(tmp_path):
+    # Synthetic Raw without annotations/events
+    raw = _make_synthetic_raw(with_annotations=False)
+
+    mmap_path = tmp_path / "raw_lazy.mm"
+
+    td = raw_to_temporaldata_lazy(
+        raw,
+        mmap_path=mmap_path,
+        data_key="eeg",
+        batch_size=200,
+        dtype=np.float32,
+        overwrite=True,
+    )
+
+    # Container type
+    assert isinstance(td, Data)
+
+    # Signal attribute and type
+    assert hasattr(td, "eeg")
+    signal = td.eeg
+    assert isinstance(signal, RegularTimeSeries)
+
+    # Backing storage is a memmap, time × channels
+    assert isinstance(signal.raw, np.memmap)
+    n_channels = raw.info["nchan"]
+    n_times = raw.n_times
+    assert signal.raw.shape == (n_times, n_channels)
+    assert signal.raw.dtype == np.float32
+
+    # Domain matches Raw time span
+    sfreq = float(raw.info["sfreq"])
+    t_start = float(raw.first_samp) / sfreq
+    t_end = t_start + n_times / sfreq
+    assert isinstance(signal.domain, Interval)
+    assert signal.domain.start == pytest.approx(t_start)
+    assert signal.domain.end == pytest.approx(t_end)
+
+    # Metadata on Data
+    assert td.sfreq == pytest.approx(sfreq)
+    assert td.n_channels == n_channels
+    assert td.n_times == n_times
+    np.testing.assert_array_equal(
+        td.channel_names,
+        np.array(raw.ch_names, dtype=object),
+    )
+    assert td.raw_mmap_path == str(mmap_path)
+
+    # No events / annotations when Raw has none
+    assert not hasattr(td, "events")
+    assert not hasattr(td, "event_id")
+    assert not hasattr(td, "annotations")
+
+
+def test_raw_to_temporal_lazy_with_annotations(tmp_path):
+    raw = _make_synthetic_raw(with_annotations=True)
+
+    mmap_path = tmp_path / "raw_lazy_events.mm"
+
+    td = raw_to_temporaldata_lazy(
+        raw,
+        mmap_path=mmap_path,
+        data_key="eeg",
+        batch_size=10,
+        dtype=np.float32,
+        overwrite=True,
+    )
+
+    # Events and event_id
+    events, event_id = mne.events_from_annotations(raw)
+    sfreq = float(raw.info["sfreq"])
+
+    assert hasattr(td, "events")
+    assert hasattr(td, "event_id")
+    assert td.event_id == event_id
+
+    ev = td.events
+    assert isinstance(ev, IrregularTimeSeries)
+    expected_timestamps = events[:, 0] / sfreq
+    expected_codes = events[:, -1].astype("int64")
+
+    assert np.allclose(ev.timestamps, expected_timestamps)
+    assert np.array_equal(ev.event_code, expected_codes)
+
+    # Annotations Interval
+    ann = raw.annotations
+    assert hasattr(td, "annotations")
+    intervals = td.annotations
+    assert isinstance(intervals, Interval)
+
+    starts_expected = np.asarray(ann.onset, dtype=float)
+    ends_expected = starts_expected + np.asarray(ann.duration, dtype=float)
+    labels_expected = np.asarray(ann.description, dtype=object)
+
+    assert np.allclose(intervals.start, starts_expected)
+    assert np.allclose(intervals.end, ends_expected)
+    assert np.array_equal(intervals.label, labels_expected)
+
+
+def test_raw_to_temporaldata_lazy_overwrite_flag(tmp_path):
+    raw = _make_synthetic_raw(with_annotations=False)
+
+    mmap_path = tmp_path / "eeg_raw.mm"
+    mmap_path.write_bytes(b"dummy")  # pre-create file
+
+    # overwrite=False should raise
+    with pytest.raises(FileExistsError):
+        _ = raw_to_temporaldata_lazy(
+            raw,
+            mmap_path=mmap_path,
+            data_key="eeg",
+            overwrite=False,
+        )
+
+    # overwrite=True should succeed
+    td = raw_to_temporaldata_lazy(
+        raw,
+        mmap_path=mmap_path,
+        data_key="eeg",
+        overwrite=True,
+    )
+
+    assert mmap_path.exists()
+    assert isinstance(td, Data)
+    assert hasattr(td, "eeg")
+    signal = td.eeg
+    assert isinstance(signal, RegularTimeSeries)
+    assert isinstance(signal.raw, np.memmap)
 
 
 def _make_synthetic_epochs(

@@ -113,6 +113,139 @@ def raw_to_temporaldata(
     return temporal_data
 
 
+def raw_to_temporaldata_lazy(
+    raw: mne.io.Raw,
+    *,
+    mmap_path: Union[str, Path] = None,
+    data_key: str = "eeg",
+    batch_size: int = 8,
+    dtype: Union[str, np.dtype] = np.float32,
+    overwrite: bool = False,
+) -> Data:
+    """
+    Convert an MNE-Python raw object to a temporaldata.Data container (lazy).
+    """
+
+    if mmap_path is None:
+        base = Path.home() / ".temporaldata" / "memmap"
+        base.mkdir(parents=True, exist_ok=True)
+        mmap_path = base / f"mne_raw_{uuid4().hex}.mm"
+
+    mmap_path = Path(mmap_path)
+
+    if mmap_path.exists() and not overwrite:
+        raise FileExistsError(
+            f"{mmap_path} already exists. Set overwrite=True to overwrite."
+        )
+
+    sfreq = float(raw.info["sfreq"])
+    n_channels = raw.info["nchan"]
+    n_times = raw.n_times
+
+    t_start = float(raw.first_samp) / sfreq
+    t_end = t_start + n_times / sfreq
+
+    channel_names = np.array(raw.ch_names, dtype=object)
+    meas_date = raw.info["meas_date"]
+
+    # ------------------------------------------------------------------
+    # Create memmap on disk and stream epochs into it in small batches
+    # ------------------------------------------------------------------
+    mmap = np.memmap(
+        mmap_path,
+        mode="w+",
+        dtype=dtype,
+        shape=(n_times, n_channels),
+    )
+
+    write_offset = 0
+    batch_size = max(1, int(batch_size))  # safety
+
+    for start in range(0, n_times, batch_size):
+        stop = min(start + batch_size, n_times)
+
+        # raw.get_data returns (n_channels, n_times_chunk)
+        chunk = raw.get_data(start=start, stop=stop)
+
+        # -> (chunk_len, n_channels)
+        chunk_t = chunk.T
+        if chunk_t.dtype != dtype:
+            chunk_t = chunk_t.astype(dtype, copy=False)
+
+        chunk_len = chunk_t.shape[0]
+        mmap[write_offset : write_offset + chunk_len, :] = chunk_t
+        write_offset += chunk_len
+
+    mmap.flush()
+
+    # ------------------------------------------------------------------
+    # Build RegularTimeSeries over continuous time axis
+    # ------------------------------------------------------------------
+    domain = Interval(start=t_start, end=t_end)
+
+    signal = RegularTimeSeries(
+        raw=mmap,
+        sampling_rate=sfreq,
+        domain=domain,
+    )
+
+    # ------------------------------------------------------------------
+    # Events from annotations (optional, small → eager)
+    # ------------------------------------------------------------------
+    td_events = None
+    event_id = None
+
+    events, event_id = mne.events_from_annotations(raw)
+
+    if events is not None and len(events) > 0:
+        td_events = IrregularTimeSeries(
+            timestamps=events[:, 0] / sfreq,
+            event_code=events[:, -1].astype("int64"),
+            domain="auto",
+        )
+
+    # ------------------------------------------------------------------
+    # Annotations → Interval (optional, small)
+    # ------------------------------------------------------------------
+    td_ann = None
+    ann = raw.annotations
+    if ann is not None and len(ann) > 0:
+        starts = np.asarray(ann.onset, dtype=float)
+        ends = starts + np.asarray(ann.duration, dtype=float)
+        labels = np.asarray(ann.description, dtype=object)
+        td_ann = Interval(
+            start=starts,
+            end=ends,
+            label=labels,
+            timekeys=["start", "end"],
+        )
+
+    # ------------------------------------------------------------------
+    # Assemble Data container
+    # ------------------------------------------------------------------
+    data_kwargs = {
+        data_key: signal,
+        "meas_date": meas_date,
+        "sfreq": sfreq,
+        "channel_names": channel_names,
+        "n_channels": n_channels,
+        "n_times": n_times,
+        "domain": domain,
+        "raw_mmap_path": str(mmap_path),
+    }
+
+    if td_events is not None:
+        data_kwargs["events"] = td_events
+    if event_id:
+        data_kwargs["event_id"] = event_id
+    if td_ann is not None:
+        data_kwargs["annotations"] = td_ann
+
+    temporal_data = Data(**data_kwargs)
+
+    return temporal_data
+
+
 def epochs_to_temporaldata(
     epochs: mne.Epochs,
     *,
