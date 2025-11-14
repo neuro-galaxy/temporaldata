@@ -1,1 +1,1 @@
-from .mne import epochs_to_temporaldata_lazy
+from .mne import epochs_to_temporaldata_lazy, epochs_to_temporaldata
