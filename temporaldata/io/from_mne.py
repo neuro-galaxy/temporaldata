@@ -131,7 +131,6 @@ def epochs_to_temporaldata(
     return temporal_data
 
 
-
 def epochs_to_temporaldata_lazy(
     epochs: mne.Epochs,
     *,
@@ -225,8 +224,8 @@ def epochs_to_temporaldata_lazy(
     n_channels = len(epochs.ch_names)
     n_times = len(epochs.times)  # samples per epoch
 
-    epoch_duration = n_times / sfreq          # seconds per epoch
-    total_T = n_epochs * n_times             # total time samples after concat
+    epoch_duration = n_times / sfreq  # seconds per epoch
+    total_T = n_epochs * n_times  # total time samples after concat
 
     # ------------------------------------------------------------------
     # Create memmap on disk and stream epochs into it in small batches
