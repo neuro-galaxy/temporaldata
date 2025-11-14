@@ -2584,36 +2584,14 @@ class LazyInterval(Interval):
 
 
 class LazyVideo(object):
-    r"""A object that lazily loads batches of video data using OpenCV.
+    r"""An object that lazily loads batches of video data using OpenCV.
 
     Args:
         timestamps: array of camera timestamps
-        video_file: absolute path to video file)
-        resize: (height, width) to resize the frames to
-        colorspace: RGB | G
-        channel_format: NCHW | NHWC
-
-    Example ::
-
-        >>> import numpy as np
-        >>> from temporaldata import LazyVideo
-
-        >>> # timestamps can be stored in any format, they just need to be passed as a numpy array
-        >>> timestamps = np.load('/path/to/timestamps.npy')
-
-        >>> video = LazyVideo(
-        ...     timestamps=timestamps,
-        ...     video_file="/path/to/video.mp4",
-        ...     resize=None,
-        ...     colorspace='RGB',
-        ...     channel_format='NCHW',
-        ... )
-
-        >>> video
-        LazyVideo(
-          timestamps=[10000],
-          frames=[10000],
-        )
+        video_file: absolute path to video file
+        resize: (height, width) to resize the frames to (or None to keep original size)
+        colorspace: "RGB" | "G"
+        channel_format: "NCHW" | "NHWC"
 
     """
 
