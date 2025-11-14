@@ -5,12 +5,132 @@ import numpy as np
 import pytest
 import mne
 
-from temporaldata import Data, RegularTimeSeries, Interval
+from temporaldata import Data, RegularTimeSeries, IrregularTimeSeries, Interval
 
 from temporaldata.io.from_mne import (
+    raw_to_temporaldata,
     epochs_to_temporaldata,
     epochs_to_temporaldata_lazy,
 )
+
+
+def _make_synthetic_raw(with_annotations: bool = False) -> mne.io.Raw:
+    """Create a small synthetic Raw object for testing."""
+    sfreq = 100.0
+    n_channels = 4
+    n_times = 1000
+    data = np.random.randn(n_channels, n_times)
+    ch_names = [f"EEG{i}" for i in range(n_channels)]
+    info = mne.create_info(ch_names=ch_names, sfreq=sfreq, ch_types="eeg")
+    raw = mne.io.RawArray(data, info)
+
+    if with_annotations:
+        onset = np.array([0.5, 2.0])
+        duration = np.array([0.2, 0.3])
+        description = np.array(["A", "B"], dtype=object)
+        ann = mne.Annotations(onset=onset, duration=duration, description=description)
+        raw.set_annotations(ann)
+
+    return raw
+
+
+def test_raw_to_temporaldata_eager_basic():
+    raw = _make_synthetic_raw(with_annotations=False)
+
+    td = raw_to_temporaldata(raw, data_key="eeg")
+    sfreq = float(raw.info["sfreq"])
+
+    # Container type
+    assert isinstance(td, Data)
+
+    # Continuous signal
+    # Attribute-based access
+    assert hasattr(td, "eeg")
+    signal = td.eeg
+    assert isinstance(signal, RegularTimeSeries)
+
+    # Shape: (n_times, n_channels)
+    n_channels = raw.info["nchan"]
+    n_times = raw.n_times
+    assert signal.raw.shape == (n_times, n_channels)
+
+    # Recompute times from Raw
+    _, times = raw.get_data(return_times=True)
+    start = float(times[0])
+    end = float(times[-1])
+
+    # Sampling rate and domain
+    # assert np.isclose(signal.sampling_rate, sfreq)
+    assert pytest.approx(signal.sampling_rate) == sfreq
+    assert pytest.approx(signal.domain.start) == start
+    assert pytest.approx(signal.domain.end) == end
+
+    # Metadata keys
+    assert td.sfreq == pytest.approx(float(sfreq))
+    assert td.n_channels == raw.info["nchan"]
+    assert td.n_times == raw.n_times
+    assert td.meas_date == raw.info["meas_date"]
+    np.testing.assert_array_equal(
+        td.channel_names, np.array(raw.ch_names, dtype=object)
+    )
+
+
+def test_raw_to_temporaldata_eager_with_events():
+    raw = _make_synthetic_raw(with_annotations=True)
+    sfreq = float(raw.info["sfreq"])
+
+    # Ground truth events from MNE
+    events_from_ann, event_id = mne.events_from_annotations(raw)
+    assert events_from_ann.shape[0] > 0  # sanity
+
+    td = raw_to_temporaldata(raw, data_key="eeg")
+
+    # events and event_id should be present as attributes
+    assert hasattr(td, "events")
+    assert hasattr(td, "event_id")
+
+    ev = td.events
+    assert isinstance(ev, IrregularTimeSeries)
+
+    # Timestamps in seconds
+    expected_timestamps = events_from_ann[:, 0] / sfreq
+    assert ev.timestamps.shape == expected_timestamps.shape
+    assert np.allclose(ev.timestamps, expected_timestamps)
+
+    # Event codes: last column
+    expected_codes = events_from_ann[:, -1].astype("int64")
+    assert ev.event_code.shape == expected_codes.shape
+    assert np.array_equal(ev.event_code, expected_codes)
+
+    # event_id dict should match
+    assert td.event_id == event_id
+
+
+def test_raw_to_temporaldata_eager_with_annotations():
+    # Raw with two annotations A and B
+    raw = _make_synthetic_raw(with_annotations=True)
+    ann = raw.annotations
+    assert len(ann) > 0  # sanity
+
+    td = raw_to_temporaldata(raw, data_key="eeg")
+
+    # Data container
+    assert isinstance(td, Data)
+
+    # annotations attribute should exist
+    assert hasattr(td, "annotations")
+    intervals = td.annotations
+    assert isinstance(intervals, Interval)
+
+    # Expected start/end/labels from the Raw annotations
+    starts_expected = np.asarray(ann.onset, dtype=float)
+    ends_expected = starts_expected + np.asarray(ann.duration, dtype=float)
+    labels_expected = np.asarray(ann.description, dtype=object)
+
+    # Compare Interval contents
+    assert np.allclose(intervals.start, starts_expected)
+    assert np.allclose(intervals.end, ends_expected)
+    assert np.array_equal(intervals.label, labels_expected)
 
 
 def _make_synthetic_epochs(

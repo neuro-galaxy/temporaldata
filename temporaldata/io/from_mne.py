@@ -64,16 +64,15 @@ def raw_to_temporaldata(
     # Events -> IrregularTimeSeries
     td_events = None
     event_id = None
-    try:
-        events, event_id = mne.events_from_annotations(raw)
 
+    events, event_id = mne.events_from_annotations(raw)
+
+    if events is not None and len(events) > 0:
         td_events = IrregularTimeSeries(
             timestamps=events[:, 0] / sfreq,
             event_code=events[:, -1].astype("int64"),
-            event_id=event_id,
+            domain="auto",
         )
-    except Exception:
-        td_events = None
 
     # Annotations -> Interval
     td_ann = None
