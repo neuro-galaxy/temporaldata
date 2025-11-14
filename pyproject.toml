@@ -20,6 +20,7 @@ dependencies = [
     "numpy>=1.14.0",
     "pandas>=1.0.0",
     "h5py>=3.0.0",
+    "opencv-python-headless",
 ]
 
 [project.optional-dependencies]
