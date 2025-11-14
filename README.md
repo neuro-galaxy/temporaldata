@@ -24,6 +24,11 @@ To install the package, run the following command:
 pip install temporaldata
 ```
 
+If you want to include video loading capabilities, run the following command instead:
+```bash
+pip install temporaldata[video]
+```
+
 ## Contributing
 If you are planning to contribute to the package, you can install the package in
 development mode by running the following command:
