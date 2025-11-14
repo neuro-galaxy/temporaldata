@@ -2618,8 +2618,8 @@ class LazyVideo(object):
         timestamps: np.ndarray,
         video_file: str,
         resize: tuple | None = None,
-        colorspace: str = 'RGB',
-        channel_format: str = 'NCHW',
+        colorspace: str = "RGB",
+        channel_format: str = "NCHW",
     ):
 
         self.timestamps = timestamps
@@ -2630,12 +2630,12 @@ class LazyVideo(object):
         else:
             raise ValueError('"resize" arg must be None or a tuple (height, width)')
 
-        if colorspace == 'RGB' or colorspace == 'G':
+        if colorspace == "RGB" or colorspace == "G":
             self.colorspace = colorspace
         else:
             raise ValueError('"colorspace" arg must be "RGB" or "G"')
 
-        if channel_format == 'NCHW' or channel_format == 'NHWC':
+        if channel_format == "NCHW" or channel_format == "NHWC":
             self.channel_format = channel_format
         else:
             raise ValueError('"channel_format" arg must be "NCHW" or "NHWC"')
@@ -2643,12 +2643,12 @@ class LazyVideo(object):
         self.video_capture = cv2.VideoCapture(video_file)
 
         if not self.video_capture.isOpened():
-            raise IOError(f'Error opening video file {video_file}')
+            raise IOError(f"Error opening video file {video_file}")
 
         frame_count = int(self.video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
         if frame_count != self.timestamps.shape[0]:
             raise RuntimeError(
-                f'Video frames ({frame_count}) do not match timestamps ({self.timestamps.shape[0]})'
+                f"Video frames ({frame_count}) do not match timestamps ({self.timestamps.shape[0]})"
             )
         self.frame_count = frame_count
 
@@ -2664,8 +2664,10 @@ class LazyVideo(object):
 
     def __repr__(self):
         cls = self.__class__.__name__
-        info = ",\n".join([f'timestamps=[{self.frame_count}]', f'frames=[{self.frame_count}]'])
-        return f'{cls}(\n{info}\n)'
+        info = ",\n".join(
+            [f"timestamps=[{self.frame_count}]", f"frames=[{self.frame_count}]"]
+        )
+        return f"{cls}(\n{info}\n)"
 
     def slice(self, start: float, end: float):
         r"""Returns a new :obj:`IrregularTimeSeries` object that contains the data
@@ -2681,7 +2683,7 @@ class LazyVideo(object):
         timestamps = IrregularTimeSeries(
             timestamps=self.timestamps,
             frame_indices=self.frame_indices,
-            domain='auto',
+            domain="auto",
         )
         timestamps_sliced = timestamps.slice(start=start, end=end)
         frames_sliced = self._load_frames(timestamps_sliced.frame_indices)
@@ -2707,27 +2709,33 @@ class LazyVideo(object):
                     else:
                         height, width = self.resize
 
-                    if self.colorspace == 'RGB':
+                    if self.colorspace == "RGB":
                         n_channels = 3
-                    elif self.colorspace == 'G':
+                    elif self.colorspace == "G":
                         n_channels = 1
 
-                    if self.channel_format == 'NCHW':
-                        frames = np.zeros((n_frames, n_channels, height, width), dtype='uint8')
-                    elif self.channel_format == 'NHWC':
-                        frames = np.zeros((n_frames, height, width, n_channels), dtype='uint8')
+                    if self.channel_format == "NCHW":
+                        frames = np.zeros(
+                            (n_frames, n_channels, height, width), dtype="uint8"
+                        )
+                    elif self.channel_format == "NHWC":
+                        frames = np.zeros(
+                            (n_frames, height, width, n_channels), dtype="uint8"
+                        )
 
                 # modify frame data
                 if self.resize is not None:
                     frame = cv2.resize(frame, self.resize)
 
-                if self.colorspace == 'RGB':
+                if self.colorspace == "RGB":
                     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                elif self.colorspace == 'G':
+                elif self.colorspace == "G":
                     # keep color channel
-                    frame = np.expand_dims(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), axis=-1)
+                    frame = np.expand_dims(
+                        cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), axis=-1
+                    )
 
-                if self.channel_format == 'NCHW':
+                if self.channel_format == "NCHW":
                     frame = np.transpose(frame, (2, 0, 1))
 
                 # save frame data into array
@@ -2735,8 +2743,8 @@ class LazyVideo(object):
 
             else:
                 print(
-                    'warning! reached end of video; ' +
-                    'returning blank frames for remainder of requested indices'
+                    "warning! reached end of video; "
+                    + "returning blank frames for remainder of requested indices"
                 )
                 break
 
