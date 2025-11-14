@@ -12,5 +12,6 @@ from .temporaldata import (
     LazyInterval,
 )
 from .concat import concat
+from .io import load_nwb
 
 __version__ = "0.1.1"
