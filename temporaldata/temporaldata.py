@@ -15,7 +15,7 @@ from .specs import (
     IrregularTimeSeriesSpec,
     RegularTimeSeriesSpec,
     IntervalSpec,
-    DataSpec, 
+    DataSpec,
     ScalarSpec,
 )
 
@@ -341,25 +341,19 @@ class ArrayDict(object):
 
     def generate_spec(self):
         r"""Generate a specification describing the structure of this ArrayDict.
-        
+
         Returns:
             ArrayDictSpec
-        """        
+        """
         attributes = {}
         for key in self.keys():
             arr = getattr(self, key)
-            attributes[key] = AttributeSpec(
-                dtype=str(arr.dtype),
-                shape=list(arr.shape)
-            )
-        
+            attributes[key] = AttributeSpec(dtype=str(arr.dtype), shape=list(arr.shape))
+
         first_dim = self._maybe_first_dim()
         length = first_dim if first_dim is not None else 0
-        
-        return ArrayDictSpec(
-            length=length,
-            attributes=attributes
-        )
+
+        return ArrayDictSpec(length=length, attributes=attributes)
 
 
 class LazyArrayDict(ArrayDict):
@@ -923,24 +917,21 @@ class IrregularTimeSeries(ArrayDict):
 
     def generate_spec(self):
         r"""Generate a specification describing the structure of this IrregularTimeSeries.
-        
+
         Returns:
             IrregularTimeSeriesSpec
-        """        
+        """
         attributes = {}
         for key in self.keys():
             arr = getattr(self, key)
-            attributes[key] = AttributeSpec(
-                dtype=str(arr.dtype),
-                shape=list(arr.shape)
-            )
-        
+            attributes[key] = AttributeSpec(dtype=str(arr.dtype), shape=list(arr.shape))
+
         return IrregularTimeSeriesSpec(
             length=len(self),
             domain_start=float(self.domain.start[0]),
             domain_end=float(self.domain.end[-1]),
             timekeys=list(self._timekeys),
-            attributes=attributes
+            attributes=attributes,
         )
 
 
@@ -1488,24 +1479,21 @@ class RegularTimeSeries(ArrayDict):
 
     def generate_spec(self):
         r"""Generate a specification describing the structure of this RegularTimeSeries.
-        
+
         Returns:
             RegularTimeSeriesSpec
-        """        
+        """
         attributes = {}
         for key in self.keys():
             arr = getattr(self, key)
-            attributes[key] = AttributeSpec(
-                dtype=str(arr.dtype),
-                shape=list(arr.shape)
-            )
-        
+            attributes[key] = AttributeSpec(dtype=str(arr.dtype), shape=list(arr.shape))
+
         return RegularTimeSeriesSpec(
             length=len(self),
             sampling_rate=float(self.sampling_rate),
             domain_start=float(self.domain.start[0]),
             domain_end=float(self.domain.end[-1]),
-            attributes=attributes
+            attributes=attributes,
         )
 
 
@@ -2435,22 +2423,17 @@ class Interval(ArrayDict):
 
     def generate_spec(self):
         r"""Generate a specification describing the structure of this Interval.
-        
+
         Returns:
             IntervalSpec
-        """        
+        """
         attributes = {}
         for key in self.keys():
             arr = getattr(self, key)
-            attributes[key] = AttributeSpec(
-                dtype=str(arr.dtype),
-                shape=list(arr.shape)
-            )
-        
+            attributes[key] = AttributeSpec(dtype=str(arr.dtype), shape=list(arr.shape))
+
         return IntervalSpec(
-            length=len(self),
-            timekeys=list(self._timekeys),
-            attributes=attributes
+            length=len(self), timekeys=list(self._timekeys), attributes=attributes
         )
 
 
@@ -3279,39 +3262,33 @@ class Data(object):
 
     def generate_spec(self):
         r"""Generate a specification describing the structure of this Data object.
-        
+
         Returns:
             DataSpec
-        """        
+        """
         attributes = {}
         for key in self.keys():
             value = getattr(self, key)
-            
+
             if isinstance(value, (Data, ArrayDict)):
                 # Recursively generate spec for nested objects
                 attributes[key] = value.generate_spec()
             elif isinstance(value, np.ndarray):
                 attributes[key] = AttributeSpec(
-                    dtype=str(value.dtype),
-                    shape=list(value.shape)
+                    dtype=str(value.dtype), shape=list(value.shape)
                 )
             else:
                 # Scalar values - store type name
-                attributes[key] = ScalarSpec(
-                    type=type(value).__name__,
-                    value=value
-                )
-        
+                attributes[key] = ScalarSpec(type=type(value).__name__, value=value)
+
         domain_start = None
         domain_end = None
         if self.domain is not None:
             domain_start = float(self.domain.start[0])
             domain_end = float(self.domain.end[-1])
-        
+
         return DataSpec(
-            domain_start=domain_start,
-            domain_end=domain_end,
-            attributes=attributes
+            domain_start=domain_start, domain_end=domain_end, attributes=attributes
         )
 
 
