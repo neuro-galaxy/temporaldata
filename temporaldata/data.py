@@ -347,10 +347,6 @@ class Data(object):
         Args:
             file (h5py.File): HDF5 file.
 
-        .. note::
-            This method will load all data in memory, if you would like to use lazy
-            loading, call :meth:`LazyData.from_hdf5` instead.
-
 
         .. code-block:: python
 
