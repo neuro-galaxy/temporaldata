@@ -3,8 +3,13 @@ import os
 import h5py
 import numpy as np
 import tempfile
-from temporaldata import RegularTimeSeries, IrregularTimeSeries, Interval, Data
-from temporaldata.temporaldata import LazyInterval
+from temporaldata import (
+    RegularTimeSeries,
+    IrregularTimeSeries,
+    Interval,
+    Data,
+    LazyInterval,
+)
 
 
 @pytest.fixture
