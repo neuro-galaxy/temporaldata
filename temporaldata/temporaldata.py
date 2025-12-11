@@ -2023,6 +2023,87 @@ class Interval(ArrayDict):
 
         return splits
 
+    def chunk(
+        self,
+        duration: float,
+        remove_short: bool = False,
+        check_no_overlap: bool = False,
+    ) -> Interval:
+        r"""Subdivides each interval into fixed-duration chunks while preserving metadata.
+
+        Args:
+            duration: The duration of each chunk.
+            remove_short: If :obj:`True`, removes chunks shorter than the specified
+                duration. Defaults to :obj:`False`.
+            check_no_overlap: If :obj:`True`, validates that the resulting chunks do not
+                overlap and raises a :obj:`ValueError` if they do. Defaults to :obj:`False`.
+
+        Returns:
+            A new :obj:`Interval` object with the subdivided chunks.
+
+        Example ::
+
+            >>> from temporaldata import Interval
+            >>> import numpy as np
+
+            >>> interval = Interval(
+            ...     start=np.array([0.0, 20.0]),
+            ...     end=np.array([10.0, 30.0]),
+            ...     trial_id=np.array([1, 2])
+            ... )
+            >>> chunked = interval.chunk(2.5)
+            >>> chunked
+            Interval(
+              start=[8],
+              end=[8],
+              trial_id=[8]
+            )
+            >>> chunked.trial_id
+            array([1, 1, 1, 1, 2, 2, 2, 2])
+        """
+        if len(self) == 0:
+            return Interval(
+                start=np.array([]), end=np.array([]), timekeys=self.timekeys()
+            )
+
+        chopped_intervals = []
+        original_indices = []
+
+        for i, (start, end) in enumerate(zip(self.start, self.end)):
+            chopped = Interval.arange(start, end, step=duration, include_end=True)
+            chopped_intervals.append(chopped)
+            original_indices.extend([i] * len(chopped))
+
+        all_starts = np.concatenate([c.start for c in chopped_intervals])
+        all_ends = np.concatenate([c.end for c in chopped_intervals])
+
+        kwargs = {}
+        for key in self.keys():
+            if key in ["start", "end"]:
+                continue
+            val = getattr(self, key)
+            kwargs[key] = val[original_indices]
+
+        result = Interval(
+            start=all_starts, end=all_ends, timekeys=self.timekeys(), **kwargs
+        )
+
+        if remove_short:
+            durations = result.end - result.start
+            mask = durations >= duration
+            result_dict_filtered = {}
+            for key in result.keys():
+                result_dict_filtered[key] = getattr(result, key)[mask]
+            result = Interval(**result_dict_filtered, timekeys=self.timekeys())
+
+        if check_no_overlap:
+            if not result.is_disjoint():
+                raise ValueError(
+                    "The resulting chunks overlap. Cannot chunk with overlapping intervals."
+                )
+
+        return result
+
     def add_split_mask(
         self,
         name: str,
