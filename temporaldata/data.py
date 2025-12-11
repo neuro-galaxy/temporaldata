@@ -12,7 +12,7 @@ from .arraydict import ArrayDict, LazyArrayDict
 from .irregular_ts import IrregularTimeSeries, LazyIrregularTimeSeries
 from .regular_ts import RegularTimeSeries, LazyRegularTimeSeries
 from .interval import Interval, LazyInterval
-from ._utils import size_repr
+from .utils import _size_repr
 
 
 class Data(object):
@@ -285,7 +285,7 @@ class Data(object):
             if isinstance(value, ArrayDict):
                 info = info + key + "=" + repr(value) + ",\n"
             elif value is not None:
-                info = info + size_repr(key, value) + ",\n"
+                info = info + _size_repr(key, value) + ",\n"
         info = info.rstrip()
         return f"{cls}(\n{info}\n)"
 

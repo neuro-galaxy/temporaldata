@@ -8,7 +8,7 @@ import h5py
 import numpy as np
 import pandas as pd
 
-from temporaldata._utils import size_repr
+from .utils import _size_repr
 
 
 class ArrayDict(object):
@@ -94,7 +94,7 @@ class ArrayDict(object):
         cls = self.__class__.__name__
         hidden_keys = ["train_mask", "valid_mask", "test_mask"]
         info = [
-            size_repr(k, self.__dict__[k], indent=2)
+            _size_repr(k, self.__dict__[k], indent=2)
             for k in self.keys()
             if k not in hidden_keys
         ]
