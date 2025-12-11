@@ -11,7 +11,7 @@ from .irregular_ts import IrregularTimeSeries
 
 
 class RegularTimeSeries(ArrayDict):
-    """A regular time series is the same as an irregular time series, but it has a
+    r"""A regular time series is the same as an irregular time series, but it has a
     regular sampling rate. This allows for faster indexing, possibility of patching data
     and meaningful Fourier operations. The first dimension of all attributes must be
     the time dimension.
