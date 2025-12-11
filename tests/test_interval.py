@@ -4,39 +4,6 @@ import h5py
 from temporaldata import Interval, LazyInterval
 
 
-# def test_indexing():
-#     # same code but with numpy arrays
-#     interval = Interval(start=np.array([0, 1, 2]), end=np.array([1, 2, 3]))
-
-#     # Test single index
-#     result = interval[0]
-#     expected = Interval(np.array([0]), np.array([1]))
-#     assert np.allclose(result.start, expected.start) and np.allclose(
-#         result.end, expected.end
-#     )
-
-#     # Test slice indexing
-#     result = interval[0:2]
-#     expected = Interval(np.array([0, 1]), np.array([1, 2]))
-#     assert np.allclose(result.start, expected.start) and np.allclose(
-#         result.end, expected.end
-#     )
-
-#     # Test list indexing
-#     result = interval[[0, 2]]
-#     expected = Interval(np.array([0, 2]), np.array([1, 3]))
-#     assert np.allclose(result.start, expected.start) and np.allclose(
-#         result.end, expected.end
-#     )
-
-#     # Test boolean indexing
-#     result = interval[[True, False, True]]
-#     expected = Interval(np.array([0, 2]), np.array([1, 3]))
-#     assert np.allclose(result.start, expected.start) and np.allclose(
-#         result.end, expected.end
-#     )
-
-
 @pytest.fixture
 def test_filepath(request):
     import os, tempfile
