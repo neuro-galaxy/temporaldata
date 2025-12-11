@@ -1,8 +1,9 @@
 from collections.abc import Mapping, Sequence
 from typing import Any
+import numpy as np
 
 
-def _size_repr(key: Any, value: Any, indent: int = 0) -> str:
+def size_repr(key: Any, value: Any, indent: int = 0) -> str:
     pad = " " * indent
     if isinstance(value, np.ndarray):
         out = str(list(value.shape))

@@ -8,7 +8,7 @@ import h5py
 import numpy as np
 import pandas as pd
 
-from temporaldata._utils import _size_repr
+from temporaldata._utils import size_repr
 
 
 class ArrayDict(object):

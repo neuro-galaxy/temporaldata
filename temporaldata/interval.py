@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import copy
-from collections.abc import Mapping, Sequence
-from typing import Any, Dict, List, Tuple, Union, Callable, Optional, Type
+from typing import List, Tuple, Union
 import logging
-from pathlib import Path
 
 import h5py
 import numpy as np
 import pandas as pd
+
+from .arraydict import ArrayDict
 
 
 class Interval(ArrayDict):
