@@ -687,9 +687,9 @@ def test_interval_coalesce():
     assert np.allclose(coalesced_data.end, np.array([0.5, 2.5, 6.0, 11.0]))
 
 
-def test_chunk():
+def test_segment():
     interval = Interval(start=np.array([0.0]), end=np.array([10.0]))
-    result = interval.chunk(2.0)
+    result = interval.segment(2.0)
     expected = Interval(
         start=np.array([0.0, 2.0, 4.0, 6.0, 8.0]),
         end=np.array([2.0, 4.0, 6.0, 8.0, 10.0]),
@@ -702,7 +702,7 @@ def test_chunk():
         start=np.array([0.0, 20.0]),
         end=np.array([10.0, 30.0]),
     )
-    result = interval.chunk(2.5)
+    result = interval.segment(2.5)
     expected = Interval(
         start=np.array([0.0, 2.5, 5.0, 7.5, 20.0, 22.5, 25.0, 27.5]),
         end=np.array([2.5, 5.0, 7.5, 10.0, 22.5, 25.0, 27.5, 30.0]),
@@ -712,7 +712,7 @@ def test_chunk():
     )
 
     interval = Interval(start=np.array([0.0]), end=np.array([10.5]))
-    result = interval.chunk(3.0)
+    result = interval.segment(3.0)
     expected = Interval(
         start=np.array([0.0, 3.0, 6.0, 9.0]),
         end=np.array([3.0, 6.0, 9.0, 10.5]),
@@ -722,30 +722,30 @@ def test_chunk():
     )
 
     interval = Interval(start=np.array([0.0]), end=np.array([0.5]))
-    result = interval.chunk(2.0)
+    result = interval.segment(2.0)
     expected = Interval(start=np.array([0.0]), end=np.array([0.5]))
     assert np.allclose(result.start, expected.start) and np.allclose(
         result.end, expected.end
     )
 
     interval = Interval(start=np.array([]), end=np.array([]))
-    result = interval.chunk(2.0)
+    result = interval.segment(2.0)
     expected = Interval(start=np.array([]), end=np.array([]))
     assert np.allclose(result.start, expected.start) and np.allclose(
         result.end, expected.end
     )
 
     interval = Interval(start=np.array([0.0]), end=np.array([2.0]))
-    result = interval.chunk(2.0)
+    result = interval.segment(2.0)
     expected = Interval(start=np.array([0.0]), end=np.array([2.0]))
     assert np.allclose(result.start, expected.start) and np.allclose(
         result.end, expected.end
     )
 
 
-def test_chunk_remove_short():
+def test_segment_remove_short():
     interval = Interval(start=np.array([0.0]), end=np.array([10.5]))
-    result = interval.chunk(3.0, remove_short=False)
+    result = interval.segment(3.0, remove_short=False)
     expected = Interval(
         start=np.array([0.0, 3.0, 6.0, 9.0]),
         end=np.array([3.0, 6.0, 9.0, 10.5]),
@@ -755,7 +755,7 @@ def test_chunk_remove_short():
     )
 
     interval = Interval(start=np.array([0.0]), end=np.array([10.5]))
-    result = interval.chunk(3.0, remove_short=True)
+    result = interval.segment(3.0, remove_short=True)
     expected = Interval(
         start=np.array([0.0, 3.0, 6.0]),
         end=np.array([3.0, 6.0, 9.0]),
@@ -765,7 +765,7 @@ def test_chunk_remove_short():
     )
 
     interval = Interval(start=np.array([0.0, 20.0]), end=np.array([10.5, 25.0]))
-    result = interval.chunk(3.0, remove_short=True)
+    result = interval.segment(3.0, remove_short=True)
     expected = Interval(
         start=np.array([0.0, 3.0, 6.0, 20.0]),
         end=np.array([3.0, 6.0, 9.0, 23.0]),
@@ -775,28 +775,14 @@ def test_chunk_remove_short():
     )
 
     interval = Interval(start=np.array([0.0]), end=np.array([0.5]))
-    result = interval.chunk(2.0, remove_short=True)
+    result = interval.segment(2.0, remove_short=True)
     expected = Interval(start=np.array([]), end=np.array([]))
     assert np.allclose(result.start, expected.start) and np.allclose(
         result.end, expected.end
     )
 
 
-def test_chunk_check_no_overlap():
-    interval = Interval(start=np.array([0.0, 10.0]), end=np.array([5.0, 15.0]))
-    result = interval.chunk(2.0, check_no_overlap=False)
-    assert len(result) == 6
-
-    interval = Interval(start=np.array([0.0, 10.0]), end=np.array([5.0, 15.0]))
-    result = interval.chunk(2.0, check_no_overlap=True)
-    assert len(result) == 6
-
-    interval = Interval(start=np.array([0.0, 4.0]), end=np.array([6.0, 10.0]))
-    with pytest.raises(ValueError):
-        result = interval.chunk(3.0, check_no_overlap=True)
-
-
-def test_chunk_metadata_preservation():
+def test_segment_metadata_preservation():
     interval = Interval(
         start=np.array([0.0, 20.0]),
         end=np.array([6.0, 26.0]),
@@ -804,7 +790,7 @@ def test_chunk_metadata_preservation():
         condition=np.array(["A", "B"]),
         timekeys=["start", "end"],
     )
-    result = interval.chunk(2.0)
+    result = interval.segment(2.0)
 
     expected_start = np.array([0.0, 2.0, 4.0, 20.0, 22.0, 24.0])
     expected_end = np.array([2.0, 4.0, 6.0, 22.0, 24.0, 26.0])
@@ -822,7 +808,7 @@ def test_chunk_metadata_preservation():
         session_id=np.array([42]),
         timekeys=["start", "end"],
     )
-    result = interval.chunk(2.0, remove_short=False)
+    result = interval.segment(2.0, remove_short=False)
 
     expected_start = np.array([0.0, 2.0, 4.0])
     expected_end = np.array([2.0, 4.0, 5.5])
@@ -838,7 +824,7 @@ def test_chunk_metadata_preservation():
         session_id=np.array([42]),
         timekeys=["start", "end"],
     )
-    result = interval.chunk(2.0, remove_short=True)
+    result = interval.segment(2.0, remove_short=True)
 
     expected_start = np.array([0.0, 2.0])
     expected_end = np.array([2.0, 4.0])
@@ -849,14 +835,14 @@ def test_chunk_metadata_preservation():
     assert np.array_equal(result.session_id, expected_session_id)
 
 
-def test_chunk_timekeys_preservation():
+def test_segment_timekeys_preservation():
     interval = Interval(
         start=np.array([0.0, 10.0]),
         end=np.array([4.0, 14.0]),
         go_cue_time=np.array([1.0, 11.0]),
         timekeys=["start", "end", "go_cue_time"],
     )
-    result = interval.chunk(2.0)
+    result = interval.segment(2.0)
 
     expected_start = np.array([0.0, 2.0, 10.0, 12.0])
     expected_end = np.array([2.0, 4.0, 12.0, 14.0])
