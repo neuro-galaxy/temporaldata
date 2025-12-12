@@ -334,6 +334,9 @@ def test_irregular_set_domain():
         domain="auto",
     )
 
+    with pytest.raises(ValueError):
+        data.domain = np.array([0.2, 0.4])
+
     data.domain = Interval(start=0.2, end=0.4)
     assert np.allclose(data.domain.start, np.array([0.2]))
     assert np.allclose(data.domain.end, np.array([0.4]))
