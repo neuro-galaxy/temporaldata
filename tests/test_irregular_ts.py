@@ -322,3 +322,20 @@ def test_lazy_irregular_timeseries(test_filepath):
 
         assert np.allclose(data.timestamps, np.array([0.05, 0.25]))
         assert np.allclose(data.values, np.array([1, 3]))
+
+
+def test_irregular_set_domain():
+    data = IrregularTimeSeries(
+        unit_index=np.array([0, 0, 1, 0, 1, 2]),
+        timestamps=np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6]),
+        values=np.array([0, 1, 2, 3, 4, 5]),
+        waveforms=np.zeros((6, 48)),
+        timekeys=["timestamps"],
+        domain="auto",
+    )
+
+    data.domain = Interval(start=0.2, end=0.4)
+    assert np.allclose(data.domain.start, np.array([0.2]))
+    assert np.allclose(data.domain.end, np.array([0.4]))
+    assert np.allclose(data._domain.start, np.array([0.2]))
+    assert np.allclose(data._domain.end, np.array([0.4]))
