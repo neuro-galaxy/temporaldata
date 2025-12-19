@@ -140,6 +140,14 @@ class IrregularTimeSeries(ArrayDict):
             self._timekeys.append(timekey)
 
     def __setattr__(self, name, value):
+        if name == "domain":
+            if not isinstance(value, Interval):
+                raise ValueError(
+                    f"domain must be an Interval object, got {type(value)}."
+                )
+            object.__setattr__(self, "_domain", value)
+            return
+
         super(IrregularTimeSeries, self).__setattr__(name, value)
 
         if name == "timestamps":
@@ -147,7 +155,6 @@ class IrregularTimeSeries(ArrayDict):
             assert ~np.isnan(value).any(), f"timestamps cannot contain NaNs."
             if value.dtype != np.float64:
                 logging.warning(f"{name} is of type {value.dtype} not of type float64.")
-            # timestamps has been updated, we no longer know whether it is sorted or not
             self._sorted = None
 
     def is_sorted(self):
