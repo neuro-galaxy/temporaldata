@@ -385,6 +385,33 @@ def test_nested_attributes():
     assert data.has_nested_attribute("session_id")
 
 
+def test_set_nested_attribute():
+    data = Data(
+        not_nested="not_nested_attrib",
+        session=Data(id="session_0"),
+        domain=Interval.from_list([(0, 3)]),
+        spikes=IrregularTimeSeries(
+            timestamps=np.array([0.1, 0.2, 0.3, 2.1, 2.2, 2.3]),
+            waveforms=np.zeros((6, 48)),
+            domain="auto",
+        ),
+        units=ArrayDict(
+            id=np.array(["unit_0", "unit_1", "unit_2"]),
+            brain_region=np.array(["M1", "M1", "PMd"]),
+        ),
+    )
+
+    # test inplace
+    data.set_nested_attribute("session.id", "new_session_id")
+    assert data.session.id == "new_session_id"
+    data.set_nested_attribute("not_nested", "new_not_nested_attrib")
+    assert data.not_nested == "new_not_nested_attrib"
+
+    # test return
+    data_ret = data.set_nested_attribute("session.id", "new_session_id")
+    assert id(data_ret) == id(data)
+
+
 def test_data_has_nested_attribute_lazy(test_filepath):
     """Tests the Data.has_nested_attribute method with lazily loaded objects."""
     data_to_save = Data(

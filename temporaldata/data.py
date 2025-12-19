@@ -476,6 +476,34 @@ class Data(object):
                 )
         return out
 
+    def set_nested_attribute(self, path: str, value: Any) -> Data:
+        f"""Inpace set a nested attribute specified by a dot-separated path.
+        Path should be similar to :meth:`get_nested_attribute`.
+
+        Args:
+            path: The dot-separated path to the nested attribute (e.g., "session.id").
+            value: The value to set for the attribute.
+
+        Returns:
+            Data: self with the updated nested attribute.
+
+        Raises:
+            AttributeError: If any component of the path cannot be resolved.
+        """
+        # Split key by dots, resolve using getattr
+        components = path.split(".")
+        obj = self
+        for c in components[:-1]:
+            try:
+                obj = getattr(obj, c)
+            except AttributeError:
+                raise AttributeError(
+                    f"Could not resolve {path} in data (specifically, at level {c}))"
+                )
+
+        setattr(obj, components[-1], value)
+        return self
+
     def has_nested_attribute(self, path: str) -> bool:
         """Check if the attribute specified by the path exists in the Data object."""
         if not path:
