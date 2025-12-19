@@ -411,6 +411,12 @@ def test_set_nested_attribute():
     data_ret = data.set_nested_attribute("session.id", "new_session_id")
     assert id(data_ret) == id(data)
 
+    # test for error
+    with pytest.raises(AttributeError):
+        data.set_nested_attribute("non.existent")
+    with pytest.raises(AttributeError):
+        data.set_nested_attribute("session.nonexistent")
+
 
 def test_data_has_nested_attribute_lazy(test_filepath):
     """Tests the Data.has_nested_attribute method with lazily loaded objects."""
