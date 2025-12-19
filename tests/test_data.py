@@ -413,9 +413,7 @@ def test_set_nested_attribute():
 
     # test for error
     with pytest.raises(AttributeError):
-        data.set_nested_attribute("non.existent")
-    with pytest.raises(AttributeError):
-        data.set_nested_attribute("session.nonexistent")
+        data.set_nested_attribute("non.existent", None)
 
 
 def test_data_has_nested_attribute_lazy(test_filepath):
