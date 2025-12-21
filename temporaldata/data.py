@@ -498,7 +498,7 @@ class Data(object):
                 obj = getattr(obj, c)
             except AttributeError:
                 raise AttributeError(
-                    f"Could not resolve {path} in data (specifically, at level {c}))"
+                    f"Could not resolve {path} in data (specifically, at level {c})"
                 )
 
         setattr(obj, components[-1], value)
