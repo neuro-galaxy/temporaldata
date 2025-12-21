@@ -477,7 +477,7 @@ class Data(object):
         return out
 
     def set_nested_attribute(self, path: str, value: Any) -> Data:
-        f"""Inpace set a nested attribute specified by a dot-separated path.
+        f"""In-place set a nested attribute specified by a dot-separated path.
         Path should be similar to :meth:`get_nested_attribute`.
 
         Args:
