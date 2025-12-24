@@ -398,6 +398,8 @@ class Data(object):
                 (using LazyArrayDict, LazyRegularTimeSeries, etc.); if False,
                 read all data immediately into memory.
 
+        Returns:
+            Data: The loaded :class:`Data` object from the HDF5 file.
 
         .. code-block:: python
 
