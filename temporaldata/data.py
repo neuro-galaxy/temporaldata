@@ -477,11 +477,12 @@ class Data(object):
         return out
 
     def set_nested_attribute(self, path: str, value: Any) -> Data:
-        f"""In-place set a nested attribute specified by a dot-separated path.
-        Path should be similar to :meth:`get_nested_attribute`.
+        f"""Inpace set a nested attribute specified by its path. The path can be nested
+        using dots. For example, if the path is "session.id", this method will 
+        set the value of the ``id`` attribute of the ``session`` object.
 
         Args:
-            path: The dot-separated path to the nested attribute (e.g., "session.id").
+            path: Nested attribute path (can be dot-separated, e.g. "session.id").
             value: The value to set for the attribute.
 
         Returns:
