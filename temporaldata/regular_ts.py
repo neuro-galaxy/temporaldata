@@ -281,15 +281,17 @@ class LazyRegularTimeSeries(RegularTimeSeries):
             start_id = 0
             out_start = self.domain.start[0]
         else:
-            start_id = int(np.ceil((start - self.domain.start[0]) * self.sampling_rate))
+            start_id = np.ceil((start - self.domain.start[0]) * self.sampling_rate)
             out_start = self.domain.start[0] + start_id * 1.0 / self.sampling_rate
+            start_id = int(start_id)
 
         if end > self.domain.end[0]:
             end_id = len(self) + 1
             out_end = self.domain.end[0]
         else:
-            end_id = int(np.floor((end - self.domain.start[0]) * self.sampling_rate))
+            end_id = np.floor((end - self.domain.start[0]) * self.sampling_rate)
             out_end = self.domain.start[0] + (end_id - 1) * 1.0 / self.sampling_rate
+            end_id = int(end_id)
 
         out = self.__class__.__new__(self.__class__)
         out._sampling_rate = self.sampling_rate
