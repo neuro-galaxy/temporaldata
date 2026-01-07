@@ -536,17 +536,7 @@ class Interval(ArrayDict):
             array([1, 1, 1, 1, 2, 2, 2, 2])
         """
         if len(self) == 0:
-            kwargs = {}
-            for key in self.keys():
-                if key in ["start", "end"]:
-                    continue
-                kwargs[key] = getattr(self, key).copy()
-            return Interval(
-                start=np.array([]),
-                end=np.array([]),
-                timekeys=self.timekeys(),
-                **kwargs,
-            )
+            return copy.deepcopy(self)
 
         subdivided_intervals_starts = []
         subdivided_intervals_ends = []
