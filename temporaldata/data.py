@@ -413,7 +413,11 @@ class Data(object):
         return cls.from_hdf5(file, lazy=lazy)
 
     def _check_for_data_leakage(self, *args, **kwargs):
-        """Ensure that split masks are all True"""
+        """Deprecated no-op retained for backward compatibility.
+
+        The ``_check_for_data_leakage`` method no longer performs any validation.
+        Actual data leakage checks should be performed by the sampler.
+        """
         warnings.warn(
             "_check_for_data_leakage() is deprecated. Data leakage should be handled by the sampler.",
             DeprecationWarning,
