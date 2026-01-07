@@ -498,42 +498,17 @@ class Interval(ArrayDict):
         step: float,
         drop_short: bool = False,
     ) -> Interval:
-        r"""Subdivides each interval into fixed-duration segments while preserving
-        attributes.
-
-        If the last segment of an interval is shorter than :obj:`step`, it will be
-        included by default. Set :obj:`drop_short` to :obj:`True` to exclude these
-        partial segments. If an interval is shorter than :obj:`step`, it will be
-        treated as a partial segment (kept if :obj:`drop_short` is :obj:`False`,
-        dropped otherwise).
-
-        Args:
-            step: The duration of each segment.
-            drop_short: If :obj:`True`, excludes segments shorter than :obj:`step`.
-                Defaults to :obj:`False`.
-
+        """
+        Subdivides each interval into contiguous segments of fixed duration and preserves per-interval attributes.
+        
+        Each input interval is split into consecutive segments of length `step`. If the last segment of an interval is shorter than `step`, it is included unless `drop_short` is True. Intervals shorter than `step` produce a single partial segment which is kept or dropped according to `drop_short`. Non-time attributes are copied to each produced segment from their originating interval; timekeys are preserved.
+        
+        Parameters:
+            step (float): Duration of each segment.
+            drop_short (bool): If True, exclude final segments shorter than `step`. Defaults to False.
+        
         Returns:
-            A new :obj:`Interval` object with the subdivided segments.
-
-        Example ::
-
-            >>> from temporaldata import Interval
-            >>> import numpy as np
-
-            >>> interval = Interval(
-            ...     start=np.array([0.0, 20.0]),
-            ...     end=np.array([10.0, 30.0]),
-            ...     trial_id=np.array([1, 2])
-            ... )
-            >>> subdivided = interval.subdivide(2.5)
-            >>> subdivided
-            Interval(
-              start=[8],
-              end=[8],
-              trial_id=[8]
-            )
-            >>> subdivided.trial_id
-            array([1, 1, 1, 1, 2, 2, 2, 2])
+            Interval: A new Interval containing the subdivided start/end pairs and propagated attributes.
         """
         if len(self) == 0:
             kwargs = {}
@@ -579,21 +554,16 @@ class Interval(ArrayDict):
         name: str,
         interval: Interval,
     ):
-        """Adds a boolean mask as an array attribute, which is defined for each
-        interval in the object, and is set to :obj:`True` if the interval intersects
-        with the provided :obj:`Interval` object. The mask attribute will be called
-        :obj:`<name>_mask`.
-
-        This is used to mark intervals as part of train, validation,
-        or test sets, and is useful to ensure that there is no data leakage.
-
-        If an interval belongs to multiple splits, an error will be raised, unless this
-        is expected, in which case the method :meth:`allow_split_mask_overlap` should be
-        called.
-
-        Args:
-            name: name of the split, e.g. "train", "valid", "test".
-            interval: a set of intervals defining the split domain.
+        """
+        Create and attach a boolean mask attribute named "<name>_mask" that marks which intervals in this object intersect the given Interval.
+        
+        Parameters:
+            name (str): Base name for the mask; the attribute created will be f"{name}_mask".
+            interval (Interval): Interval set used to determine intersections; an element-wise True in the mask indicates the corresponding interval in this object overlaps any interval in `interval`.
+        
+        Notes:
+            - Raises AssertionError if an attribute with the same mask name already exists.
+            - The mask is stored as a boolean array attribute on the instance (side effect).
         """
         assert f"{name}_mask" not in self.keys(), (
             f"Attribute {name}_mask already exists. Use another mask name, or rename "
