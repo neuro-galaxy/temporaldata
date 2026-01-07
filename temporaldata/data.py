@@ -477,9 +477,10 @@ class Data(object):
         return out
 
     def set_nested_attribute(self, path: str, value: Any) -> Data:
-        r"""Inpace set a nested attribute specified by its path. The path can be nested
+        r"""Set a nested attribute specified by its path. The path can be nested
         using dots. For example, if the path is "session.id", this method will
         set the value of the ``id`` attribute of the ``session`` object.
+        The attribute is modified in an in-place manner.
 
         Args:
             path: Nested attribute path (can be dot-separated, e.g. "session.id").
