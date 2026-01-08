@@ -412,6 +412,36 @@ class Data(object):
         file = h5py.File(path)
         return cls.from_hdf5(file, lazy=lazy)
 
+    def set_train_domain(self, interval: Interval):
+        """Deprecated no-op retained for backward compatibility."""
+        warnings.warn(
+            "set_train_domain() is being deprecated and will be removed in a future version. "
+            "Please look for an alternative approach using the sampler.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        self.train_domain = interval
+
+    def set_valid_domain(self, interval: Interval):
+        """Deprecated no-op retained for backward compatibility."""
+        warnings.warn(
+            "set_valid_domain() is being deprecated and will be removed in a future version. "
+            "Please look for an alternative approach using the sampler.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        self.valid_domain = interval
+
+    def set_test_domain(self, interval: Interval):
+        """Deprecated no-op retained for backward compatibility."""
+        warnings.warn(
+            "set_test_domain() is being deprecated and will be removed in a future version. "
+            "Please look for an alternative approach using the sampler.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        self.test_domain = interval
+
     def _check_for_data_leakage(self, *args, **kwargs):
         """Deprecated no-op retained for backward compatibility.
 
@@ -419,7 +449,8 @@ class Data(object):
         Actual data leakage checks should be performed by the sampler.
         """
         warnings.warn(
-            "_check_for_data_leakage() is deprecated. Data leakage should be handled by the sampler.",
+            "_check_for_data_leakage() is being deprecated and will be removed in a future version. "
+            "Please look for an alternative approach using the sampler.",
             DeprecationWarning,
             stacklevel=2,
         )
