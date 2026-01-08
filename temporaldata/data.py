@@ -416,7 +416,7 @@ class Data(object):
         """Deprecated no-op retained for backward compatibility."""
         warnings.warn(
             "set_train_domain() is being deprecated and will be removed in a future version. "
-            "Please look for an alternative approach using the sampler.",
+            "Please directly set the train_domain attributes of this Data object.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -426,7 +426,7 @@ class Data(object):
         """Deprecated no-op retained for backward compatibility."""
         warnings.warn(
             "set_valid_domain() is being deprecated and will be removed in a future version. "
-            "Please look for an alternative approach using the sampler.",
+            "Please directly set the valid_domain attributes of this Data object.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -436,7 +436,7 @@ class Data(object):
         """Deprecated no-op retained for backward compatibility."""
         warnings.warn(
             "set_test_domain() is being deprecated and will be removed in a future version. "
-            "Please look for an alternative approach using the sampler.",
+            "Please directly set the test_domain attributes of this Data object.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -449,8 +449,7 @@ class Data(object):
         Actual data leakage checks should be performed by the sampler.
         """
         warnings.warn(
-            "_check_for_data_leakage() is being deprecated and will be removed in a future version. "
-            "Please look for an alternative approach using the sampler.",
+            "_check_for_data_leakage() is being deprecated and will be removed in a future version. ",
             DeprecationWarning,
             stacklevel=2,
         )
