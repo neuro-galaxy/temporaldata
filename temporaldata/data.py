@@ -415,7 +415,7 @@ class Data(object):
     def set_train_domain(self, interval: Interval):
         """Deprecated no-op retained for backward compatibility."""
         warnings.warn(
-            "set_train_domain() is being deprecated and will be removed in a future version. "
+            "set_train_domain() is being deprecated and will be removed in a future version."
             "Please directly set the train_domain attribute of this Data object.",
             DeprecationWarning,
             stacklevel=2,
@@ -425,7 +425,7 @@ class Data(object):
     def set_valid_domain(self, interval: Interval):
         """Deprecated no-op retained for backward compatibility."""
         warnings.warn(
-            "set_valid_domain() is being deprecated and will be removed in a future version. "
+            "set_valid_domain() is being deprecated and will be removed in a future version."
             "Please directly set the valid_domain attribute of this Data object.",
             DeprecationWarning,
             stacklevel=2,
@@ -435,7 +435,7 @@ class Data(object):
     def set_test_domain(self, interval: Interval):
         """Deprecated no-op retained for backward compatibility."""
         warnings.warn(
-            "set_test_domain() is being deprecated and will be removed in a future version. "
+            "set_test_domain() is being deprecated and will be removed in a future version."
             "Please directly set the test_domain attribute of this Data object.",
             DeprecationWarning,
             stacklevel=2,
