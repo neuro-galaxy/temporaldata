@@ -4,7 +4,8 @@ IrregularTimeSeries
 .. currentmodule:: temporaldata
 
 .. autoclass:: IrregularTimeSeries
-   :inherited-members:
    :show-inheritance:
+   :members:
+   :inherited-members:
    :undoc-members:
 

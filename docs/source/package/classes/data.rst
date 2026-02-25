@@ -4,7 +4,6 @@ Data
 .. currentmodule:: temporaldata
 
 .. autoclass:: Data
-   :inherited-members:
-   :show-inheritance:
+   :members:
    :undoc-members:
 

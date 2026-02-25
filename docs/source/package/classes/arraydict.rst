@@ -5,6 +5,5 @@ ArrayDict
 
 .. autoclass:: ArrayDict
    :members:
-   :show-inheritance:
    :undoc-members:
 

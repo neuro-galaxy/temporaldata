@@ -4,7 +4,8 @@ RegularTimeSeries
 .. currentmodule:: temporaldata
 
 .. autoclass:: RegularTimeSeries
-   :inherited-members:
    :show-inheritance:
+   :members:
+   :inherited-members:
    :undoc-members:
 
