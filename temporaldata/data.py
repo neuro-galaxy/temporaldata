@@ -344,7 +344,7 @@ class Data(object):
         file.attrs["absolute_start"] = self._absolute_start
 
     @classmethod
-    def from_hdf5(cls, file, lazy=True):
+    def from_hdf5(cls, file: h5py.File, lazy: bool = True):
         r"""Loads the data object from an HDF5 file. This method will also call the
         `from_hdf5` method of all contained data objects, so that the entire data object
         is loaded from the HDF5 file, i.e. no need to call `from_hdf5` for each contained
@@ -392,6 +392,9 @@ class Data(object):
         # restore the absolute start time
         obj._absolute_start = file.attrs["absolute_start"]
 
+        if lazy:
+            obj._file = file
+
         return obj
 
     @classmethod
@@ -415,14 +418,12 @@ class Data(object):
             data_materialized = Data.load("data.h5", lazy=False)
         """
         file = h5py.File(path)
-        ret = cls.from_hdf5(file, lazy=lazy)
+        obj = cls.from_hdf5(file, lazy=lazy)
 
-        if lazy:
-            ret._file = file
-        else:
-            file.close()
+        if not lazy:
+            obj.close()
 
-        return ret
+        return obj
 
     @property
     def file(self) -> h5py.File | None:
