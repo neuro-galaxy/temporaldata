@@ -65,4 +65,5 @@ If you encounter any bugs or have feature requests, please submit them to our
    :maxdepth: 2
    :caption: Package Reference
 
-   package
+   package/classes/index
+   package/functions/index
