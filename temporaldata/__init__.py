@@ -2,6 +2,7 @@ from .arraydict import ArrayDict, LazyArrayDict
 from .irregular_ts import IrregularTimeSeries, LazyIrregularTimeSeries
 from .regular_ts import RegularTimeSeries, LazyRegularTimeSeries
 from .interval import Interval, LazyInterval
+from .lazy_video import LazyVideo
 from .data import Data
 
 from .concat import concat
