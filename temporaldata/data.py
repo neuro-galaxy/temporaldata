@@ -120,6 +120,7 @@ class Data(object):
 
     _absolute_start = 0.0
     _domain = None
+    _file: Optional[h5py.File] = None
 
     def __init__(
         self,
@@ -414,7 +415,34 @@ class Data(object):
             data_materialized = Data.load("data.h5", lazy=False)
         """
         file = h5py.File(path)
-        return cls.from_hdf5(file, lazy=lazy)
+        ret = cls.from_hdf5(file, lazy=lazy)
+
+        if lazy:
+            ret._file = file
+        else:
+            file.close()
+
+        return ret
+
+    @property
+    def file(self) -> h5py.File | None:
+        return self._file
+
+    def close(self, err: bool = False):
+        r"""Close the file-handle that was opened for lazy-loading.
+        Any lazy attributes that have not been materialized will become invalid.
+
+        Args:
+            err: Raise error if no open file is present. Default ``False``.
+
+        """
+        if self._file is not None:
+            self._file.close()
+            self._file = None
+            return
+
+        if err:
+            raise RuntimeError(f"No file handle is open")
 
     def save(self, path: Union[Path, str]):
         r"""Saves the data object to an HDF5 file at the given path.
