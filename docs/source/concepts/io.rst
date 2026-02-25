@@ -90,7 +90,7 @@ To read data from an HDF5 file, use the ``load`` method:
     .. code-block:: python
 
         # Read neural data from HDF5 file on disk
-        user_session = Data.load("user_data.h5")
+        session = Data.load("neural_data.h5")
             
         # Access neural data
         print(session.spikes.timestamps)  # [1.2, 2.3, 3.1] 
