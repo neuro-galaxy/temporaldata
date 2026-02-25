@@ -600,7 +600,10 @@ class Data(object):
         result = cls.__new__(cls)
         memo[id(self)] = result
         for k, v in self.__dict__.items():
-            if isinstance(v, h5py.Dataset):
+            if k == "_file":
+                # File handle should not be deepcopied
+                result._file = v
+            elif isinstance(v, h5py.Dataset):
                 # h5py.File objects cannot be deepcopied
                 setattr(result, k, v)
             else:
