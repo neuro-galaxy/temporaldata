@@ -573,7 +573,6 @@ def test_data_auto_domain():
 
 
 def test_data_save(tmp_path):
-    """Tests the Data.has_nested_attribute method with lazily loaded objects."""
     data_to_save = Data(
         session_id="session_lazy_hsna_test",
         some_numpy_array=np.array([10, 20, 30]),
