@@ -125,7 +125,7 @@ class Data(object):
         self,
         *,
         domain: Union[Interval, Literal["auto"], None] = None,
-        **kwargs: Dict[str, Union[str, float, int, np.ndarray, ArrayDict]],
+        **kwargs,
     ):
         if domain == "auto":
             # the domain is the union of the domains of the attributes
