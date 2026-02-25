@@ -79,11 +79,9 @@ For time series data, you can efficiently load specific time windows without loa
 Best Practices
 --------------
 
-1. Always use ``with`` statements when working with HDF5 files to ensure proper file handling
-
-2. Use lazy loading when:
+1. Use lazy loading when:
    - Working with large datasets that may not fit in memory
    - Only needing specific time windows or attributes
    - Performing multiple operations before accessing data
 
-3. Consider materializing the data using ``.materialize()`` if you need to load the full data object into memory
+2. Consider materializing the data using ``.materialize()`` if you need to load the full data object into memory
