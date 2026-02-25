@@ -80,6 +80,7 @@ Best Practices
 --------------
 
 1. Use lazy loading when:
+
    - Working with large datasets that may not fit in memory
    - Only needing specific time windows or attributes
    - Performing multiple operations before accessing data
