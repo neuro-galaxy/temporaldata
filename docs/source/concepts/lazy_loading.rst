@@ -34,7 +34,7 @@ Data is loaded on a per-attribute basis. Only the attributes you access are load
 
     .. code-block:: python
 
-        session.load("neural_data.h5")
+        session = Data.load("neural_data.h5")
         
         # No data loaded, just returns attribute names
         print(session.keys())  # ['spikes', 'lfp', 'subject_id', 'date']
