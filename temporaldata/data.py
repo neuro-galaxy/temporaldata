@@ -237,6 +237,8 @@ class Data(object):
                 or (isinstance(value, Data) and value.domain is not None)
             ):
                 out.__dict__[key] = value.slice(start, end, reset_origin)
+            elif key != "_domain" and isinstance(value, LazyVideo):
+                out.__dict__[key] = value.slice(start, end)
             else:
                 out.__dict__[key] = copy.copy(value)
 
