@@ -13,6 +13,7 @@ from .arraydict import ArrayDict, LazyArrayDict
 from .irregular_ts import IrregularTimeSeries, LazyIrregularTimeSeries
 from .regular_ts import RegularTimeSeries, LazyRegularTimeSeries
 from .interval import Interval, LazyInterval
+from .lazy_video import LazyVideo
 from .utils import _size_repr
 
 
@@ -319,7 +320,7 @@ class Data(object):
         """
         for key in self.keys():
             value = getattr(self, key)
-            if isinstance(value, (Data, ArrayDict)):
+            if isinstance(value, (Data, ArrayDict, LazyVideo)):
                 grp = file.create_group(key)
                 if isinstance(value, Data):
                     value.to_hdf5(grp, serialize_fn_map=serialize_fn_map)
@@ -370,7 +371,10 @@ class Data(object):
             if isinstance(value, h5py.Group):
                 class_name = value.attrs["object"]
                 if lazy and class_name != "Data":
-                    group_cls = globals()[f"Lazy{class_name}"]
+                    try:
+                        group_cls = globals()[f"Lazy{class_name}"]
+                    except KeyError:
+                        group_cls = globals()[class_name]
                 else:
                     group_cls = globals()[class_name]
                 if class_name == "Data":

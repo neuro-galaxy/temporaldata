@@ -3,9 +3,11 @@ from __future__ import annotations
 from typing import Dict, List, Union
 import logging
 
+import h5py
 import numpy as np
 
 from .irregular_ts import IrregularTimeSeries
+
 
 class LazyVideo(object):
     r"""An object that lazily loads batches of video data using OpenCV.
@@ -97,7 +99,7 @@ class LazyVideo(object):
         """
 
         timestamps = IrregularTimeSeries(
-            timestamps=self.timestamps,
+            timestamps=np.asarray(self.timestamps, dtype=np.float64),
             frame_indices=self.frame_indices,
             domain="auto",
         )
@@ -112,6 +114,8 @@ class LazyVideo(object):
 
         is_contiguous = np.sum(np.diff(frame_indices)) == (len(frame_indices) - 1)
         n_frames = len(frame_indices)
+        n_channels = 3 if self.colorspace == "RGB" else 1
+        frames = None
 
         for fr, i in enumerate(frame_indices):
             if fr == 0 or not is_contiguous:
@@ -124,11 +128,6 @@ class LazyVideo(object):
                         height, width, _ = frame.shape
                     else:
                         height, width = self.resize
-
-                    if self.colorspace == "RGB":
-                        n_channels = 3
-                    elif self.colorspace == "G":
-                        n_channels = 1
 
                     if self.channel_format == "NCHW":
                         frames = np.zeros(
@@ -158,11 +157,69 @@ class LazyVideo(object):
                 frames[fr] = frame
 
             else:
-                print(
-                    "warning! reached end of video; "
-                    + "returning blank frames for remainder of requested indices"
-                )
+                if fr == 0:
+                    # First read failed (e.g. seek error); return empty so caller gets no frames
+                    if self.channel_format == "NCHW":
+                        frames = np.zeros((0, n_channels, 1, 1), dtype="uint8")
+                    else:
+                        frames = np.zeros((0, 1, 1, n_channels), dtype="uint8")
+                else:
+                    print(
+                        "warning! reached end of video; "
+                        + "returning blank frames for remainder of requested indices"
+                    )
                 break
 
+        if frames is None:
+            if self.channel_format == "NCHW":
+                frames = np.zeros((0, n_channels, 1, 1), dtype="uint8")
+            else:
+                frames = np.zeros((0, 1, 1, n_channels), dtype="uint8")
         return frames
+
+    def to_hdf5(self, file: h5py.Group):
+        r"""Save LazyVideo metadata and timestamps to an HDF5 group.
+
+        The video file itself is not stored; only the path, timestamps, and
+        display options are saved. On load, the same video file path is used
+        to open the video again (path may be relative or absolute).
+        """
+        file.attrs["object"] = self.__class__.__name__
+        file.create_dataset("timestamps", data=self.timestamps)
+        file.attrs["video_file"] = str(self.video_file)
+        file.attrs["colorspace"] = self.colorspace
+        file.attrs["channel_format"] = self.channel_format
+        if self.resize is None:
+            file.attrs["resize"] = np.array([], dtype=np.int64)
+        else:
+            file.attrs["resize"] = np.array(self.resize, dtype=np.int64)
+
+    @classmethod
+    def from_hdf5(cls, file: h5py.Group) -> "LazyVideo":
+        r"""Load a LazyVideo from an HDF5 group (metadata + timestamps only).
+
+        The actual video is opened from the stored path when the object
+        is used; ensure the path is valid on this machine.
+        """
+        if file.attrs.get("object") != cls.__name__:
+            raise ValueError(
+                f"File contains {file.attrs.get('object', 'unknown')}, "
+                f"expected {cls.__name__}."
+            )
+        timestamps = file["timestamps"][:]
+        video_file = str(file.attrs["video_file"])
+        colorspace = str(file.attrs["colorspace"])
+        channel_format = str(file.attrs["channel_format"])
+        r = file.attrs.get("resize")
+        if r is None or (hasattr(r, "__len__") and len(r) == 0):
+            resize = None
+        else:
+            resize = tuple(np.asarray(r).tolist())
+        return cls(
+            timestamps=timestamps,
+            video_file=video_file,
+            resize=resize,
+            colorspace=colorspace,
+            channel_format=channel_format,
+        )
 
