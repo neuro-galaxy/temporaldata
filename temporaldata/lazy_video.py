@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, List, Union
+from typing import Sequence
 import logging
 
 import h5py
@@ -24,7 +24,7 @@ class LazyVideo(object):
     def __init__(
         self,
         timestamps: np.ndarray,
-        video_file: str,
+        video_file: str | Sequence[str],
         resize: tuple | None = None,
         colorspace: str = "RGB",
         channel_format: str = "NCHW",
@@ -40,8 +40,16 @@ class LazyVideo(object):
                 "`pip install -e .[video]`"
             )
 
-        self.timestamps = timestamps
-        self.video_file = video_file
+        self.timestamps = np.asarray(timestamps, dtype=np.float64)
+        if isinstance(video_file, str):
+            video_files = [video_file]
+        else:
+            video_files = [str(path) for path in video_file]
+        if len(video_files) == 0:
+            raise ValueError("At least one video file must be provided.")
+        self.video_files = video_files
+        # Backward-compatible public attribute used in older code paths.
+        self.video_file = video_files[0] if len(video_files) == 1 else list(video_files)
 
         if (resize is None) or (isinstance(resize, tuple) and len(resize) == 2):
             self.resize = resize
@@ -58,23 +66,36 @@ class LazyVideo(object):
         else:
             raise ValueError('"channel_format" arg must be "NCHW" or "NHWC"')
 
-        self.video_capture = cv2.VideoCapture(video_file)
+        self.video_captures = []
+        segment_frame_counts = []
+        for path in self.video_files:
+            capture = cv2.VideoCapture(path)
+            if not capture.isOpened():
+                for opened_capture in self.video_captures:
+                    opened_capture.release()
+                raise IOError(f"Error opening video file {path}")
+            self.video_captures.append(capture)
+            segment_frame_counts.append(
+                int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
+            )
 
-        if not self.video_capture.isOpened():
-            raise IOError(f"Error opening video file {video_file}")
-
-        frame_count = int(self.video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
+        self.segment_frame_counts = np.asarray(segment_frame_counts, dtype=np.int64)
+        self.segment_frame_offsets = np.cumsum(
+            np.concatenate(([0], self.segment_frame_counts[:-1]))
+        )
+        frame_count = int(self.segment_frame_counts.sum())
         if frame_count != self.timestamps.shape[0]:
             raise RuntimeError(
                 f"Video frames ({frame_count}) do not match timestamps ({self.timestamps.shape[0]})"
             )
         self.frame_count = frame_count
 
-        self.frame_indices = np.arange(frame_count)
+        self.frame_indices = np.arange(frame_count, dtype=np.int64)
 
     def __del__(self):
         r"""Close video capture upon object destruction"""
-        self.video_capture.release()
+        for capture in getattr(self, "video_captures", []):
+            capture.release()
 
     def __len__(self):
         r"""Returns the first dimension of timestamps."""
@@ -83,9 +104,51 @@ class LazyVideo(object):
     def __repr__(self):
         cls = self.__class__.__name__
         info = ",\n".join(
-            [f"timestamps=[{self.frame_count}]", f"frames=[{self.frame_count}]"]
+            [
+                f"timestamps=[{self.frame_count}]",
+                f"frames=[{self.frame_count}]",
+                f"segments=[{len(self.video_files)}]",
+            ]
         )
         return f"{cls}(\n{info}\n)"
+
+    @classmethod
+    def concat(cls, videos: Sequence["LazyVideo"]) -> "LazyVideo":
+        if len(videos) == 0:
+            raise ValueError("Expected at least one LazyVideo.")
+        if any(not isinstance(video, cls) for video in videos):
+            raise ValueError("All objects must be LazyVideo instances.")
+
+        first = videos[0]
+        for video in videos[1:]:
+            if video.resize != first.resize:
+                raise ValueError("All LazyVideo objects must share the same resize.")
+            if video.colorspace != first.colorspace:
+                raise ValueError("All LazyVideo objects must share the same colorspace.")
+            if video.channel_format != first.channel_format:
+                raise ValueError(
+                    "All LazyVideo objects must share the same channel_format."
+                )
+
+        timestamps = np.concatenate([video.timestamps for video in videos], axis=0)
+        video_files = [
+            video_file for video in videos for video_file in video.video_files
+        ]
+        return cls(
+            timestamps=timestamps,
+            video_file=video_files,
+            resize=first.resize,
+            colorspace=first.colorspace,
+            channel_format=first.channel_format,
+        )
+
+    def _segment_for_frame(self, frame_index: int):
+        segment_idx = int(
+            np.searchsorted(self.segment_frame_offsets, frame_index, side="right") - 1
+        )
+        segment_start = int(self.segment_frame_offsets[segment_idx])
+        local_index = int(frame_index - segment_start)
+        return segment_idx, local_index
 
     def slice(self, start: float, end: float):
         r"""Returns a new :obj:`IrregularTimeSeries` object that contains the data
@@ -116,11 +179,22 @@ class LazyVideo(object):
         n_frames = len(frame_indices)
         n_channels = 3 if self.colorspace == "RGB" else 1
         frames = None
+        previous_segment_idx = None
+        previous_local_idx = None
 
-        for fr, i in enumerate(frame_indices):
-            if fr == 0 or not is_contiguous:
-                self.video_capture.set(1, i)
-            ret, frame = self.video_capture.read()
+        for fr, frame_index in enumerate(frame_indices):
+            segment_idx, local_index = self._segment_for_frame(int(frame_index))
+            video_capture = self.video_captures[segment_idx]
+            should_seek = (
+                fr == 0
+                or not is_contiguous
+                or previous_segment_idx != segment_idx
+                or previous_local_idx is None
+                or local_index != previous_local_idx + 1
+            )
+            if should_seek:
+                video_capture.set(self.cv2.CAP_PROP_POS_FRAMES, local_index)
+            ret, frame = video_capture.read()
             if ret:
                 # create frames array for first frame
                 if fr == 0:
@@ -155,6 +229,8 @@ class LazyVideo(object):
 
                 # save frame data into array
                 frames[fr] = frame
+                previous_segment_idx = segment_idx
+                previous_local_idx = local_index
 
             else:
                 if fr == 0:
@@ -186,7 +262,11 @@ class LazyVideo(object):
         """
         file.attrs["object"] = self.__class__.__name__
         file.create_dataset("timestamps", data=self.timestamps)
-        file.attrs["video_file"] = str(self.video_file)
+        if len(self.video_files) == 1:
+            file.attrs["video_file"] = str(self.video_files[0])
+        else:
+            dt = h5py.string_dtype(encoding="utf-8")
+            file.create_dataset("video_files", data=np.asarray(self.video_files, dtype=dt))
         file.attrs["colorspace"] = self.colorspace
         file.attrs["channel_format"] = self.channel_format
         if self.resize is None:
@@ -207,7 +287,10 @@ class LazyVideo(object):
                 f"expected {cls.__name__}."
             )
         timestamps = file["timestamps"][:]
-        video_file = str(file.attrs["video_file"])
+        if "video_files" in file:
+            video_file = file["video_files"][:].astype(str).tolist()
+        else:
+            video_file = str(file.attrs["video_file"])
         colorspace = str(file.attrs["colorspace"])
         channel_format = str(file.attrs["channel_format"])
         r = file.attrs.get("resize")
