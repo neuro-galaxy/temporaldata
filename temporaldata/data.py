@@ -430,11 +430,13 @@ class Data(object):
         return self._file
 
     def close(self, err: bool = False):
+    def close(self, strict: bool = False):
         r"""Close the file-handle that was opened for lazy-loading.
         Any lazy attributes that have not been materialized will become invalid.
 
         Args:
-            err: Raise error if no open file is present. Default ``False``.
+            strict: If ``True``, raise an error when no open file handle
+                is present. Default ``False``.
 
         """
         if self._file is not None:
@@ -442,7 +444,7 @@ class Data(object):
             self._file = None
             return
 
-        if err:
+        if strict:
             raise RuntimeError("No file handle is open")
 
     def save(self, path: Union[Path, str]):
