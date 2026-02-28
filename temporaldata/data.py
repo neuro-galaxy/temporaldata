@@ -392,7 +392,7 @@ class Data(object):
         # restore the absolute start time
         obj._absolute_start = file.attrs["absolute_start"]
 
-        if lazy:
+        if lazy and isinstance(file, h5py.File):
             obj._file = file
 
         return obj
@@ -421,7 +421,7 @@ class Data(object):
         obj = cls.from_hdf5(file, lazy=lazy)
 
         if not lazy:
-            obj.close()
+            file.close()
 
         return obj
 
