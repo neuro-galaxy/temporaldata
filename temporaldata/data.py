@@ -443,7 +443,7 @@ class Data(object):
             return
 
         if err:
-            raise RuntimeError(f"No file handle is open")
+            raise RuntimeError("No file handle is open")
 
     def save(self, path: Union[Path, str]):
         r"""Saves the data object to an HDF5 file at the given path.
