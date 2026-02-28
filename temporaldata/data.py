@@ -401,6 +401,14 @@ class Data(object):
     def load(cls, path: Union[Path, str], lazy: bool = True) -> Data:
         r"""Loads the :class:`Data` object from an HDF5 file given its file path.
 
+        When ``lazy=True`` (default), the underlying HDF5 file remains open and
+        data is loaded on demand. The caller is responsible for closing the file
+        handle when done, either by calling :meth:`close` or by using the
+        context manager protocol.
+
+        When ``lazy=False``, all data is read into memory immediately and the
+        file is closed before returning.
+
         Args:
             path: The file path to the HDF5 file containing the :class:`Data` object.
             lazy: If True (default), load contained objects in lazy mode
@@ -414,8 +422,17 @@ class Data(object):
 
             from temporaldata import Data
 
-            data_lazy = Data.load("data.h5")
-            data_materialized = Data.load("data.h5", lazy=False)
+            # lazy with context manager (recommended)
+            with Data.load("data.h5") as data:
+                ...
+
+            # lazy with explicit close
+            data = Data.load("data.h5")
+            ...
+            data.close()
+
+            # non-lazy (no close needed)
+            data = Data.load("data.h5", lazy=False)
         """
         file = h5py.File(path)
         obj = cls.from_hdf5(file, lazy=lazy)
@@ -429,7 +446,13 @@ class Data(object):
     def file(self) -> h5py.File | None:
         return self._file
 
-    def close(self, err: bool = False):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+        return False
+
     def close(self, strict: bool = False):
         r"""Close the file-handle that was opened for lazy-loading.
         Any lazy attributes that have not been materialized will become invalid.
