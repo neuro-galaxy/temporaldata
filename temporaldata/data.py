@@ -344,7 +344,7 @@ class Data(object):
         file.attrs["absolute_start"] = self._absolute_start
 
     @classmethod
-    def from_hdf5(cls, file: h5py.File, lazy: bool = True):
+    def from_hdf5(cls, file: h5py.File | h5py.Group, lazy: bool = True):
         r"""Loads the data object from an HDF5 file. This method will also call the
         `from_hdf5` method of all contained data objects, so that the entire data object
         is loaded from the HDF5 file, i.e. no need to call `from_hdf5` for each contained
