@@ -699,6 +699,13 @@ class TestIntervalCoalesce:
         assert np.allclose(coalesced_data.start, np.array([0.0, 5.0, 10.0]))
         assert np.allclose(coalesced_data.end, np.array([1.0, 6.0, 11.0]))
 
+    def test_empty_interval(self):
+        data = Interval(start=np.array([]), end=np.array([]))
+        coalesced_data = data.coalesce()
+        assert len(coalesced_data) == 0
+        assert np.array_equal(coalesced_data.start, np.array([]))
+        assert np.array_equal(coalesced_data.end, np.array([]))
+
     def test_custom_eps(self):
         data = Interval(
             start=np.array([0.0, 1.001, 5.0]),

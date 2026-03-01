@@ -319,6 +319,9 @@ class Interval(ArrayDict):
         Args:
             eps: The distance threshold for coalescing the intervals. Defaults to 1e-6.
         """
+        if len(self) == 0:
+            return Interval(start=np.array([]), end=np.array([]))
+
         if not self.is_sorted():
             self.sort()
 
