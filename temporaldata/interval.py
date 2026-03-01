@@ -320,26 +320,12 @@ class Interval(ArrayDict):
         if not self.is_sorted():
             self.sort()
 
-        start = []
-        end = []
+        s, e = self.start, self.end
 
-        current_start = self.start[0]
-        current_end = self.end[0]
-
-        for s, e in zip(self.start[1:], self.end[1:]):
-            if s - current_end < eps:
-                # we have an overlap
-                current_end = e
-            else:
-                start.append(current_start)
-                end.append(current_end)
-                current_start = s
-                current_end = e
-
-        start.append(current_start)
-        end.append(current_end)
-
-        return Interval(start=np.array(start), end=np.array(end))
+        mask = s[1:] >= e[:-1] + eps
+        out_start = np.insert(s[1:][mask], 0, s[0], axis=0)
+        out_end = np.append(e[:-1][mask], [e[-1]], axis=0)
+        return Interval(out_start, out_end)
 
     def difference(self, other):
         r"""Returns the difference between two sets of intervals. The intervals are
