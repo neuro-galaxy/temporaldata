@@ -749,6 +749,14 @@ class TestIntervalCoalesce:
         assert np.allclose(coalesced_data.start, np.array([0.0]))
         assert np.allclose(coalesced_data.end, np.array([2.0]))
 
+    def test_negative_eps_raises(self):
+        data = Interval(
+            start=np.array([0.0, 2.0]),
+            end=np.array([1.0, 3.0]),
+        )
+        with pytest.raises(ValueError, match="eps must be non-negative"):
+            data.coalesce(eps=-0.1)
+
 
 def test_subdivide():
     interval = Interval(start=np.array([0.0]), end=np.array([10.0]))
