@@ -397,6 +397,13 @@ class Data(object):
 
         return obj
 
+    @property
+    def file(self) -> h5py.File | None:
+        r"""The underlying HDF5 file handle, or ``None`` if no file
+        is open. Only set when the object was created via :meth:`load` or
+        :meth:`from_hdf5` with ``lazy=True``."""
+        return self._file
+
     @classmethod
     def load(cls, path: Union[Path, str], lazy: bool = True) -> Data:
         r"""Loads the :class:`Data` object from an HDF5 file given its file path.
@@ -441,13 +448,6 @@ class Data(object):
             file.close()
 
         return obj
-
-    @property
-    def file(self) -> h5py.File | None:
-        r"""The underlying HDF5 file handle, or ``None`` if no file
-        is open. Only set when the object was created via :meth:`load` or
-        :meth:`from_hdf5` with ``lazy=True``."""
-        return self._file
 
     def __enter__(self):
         return self
