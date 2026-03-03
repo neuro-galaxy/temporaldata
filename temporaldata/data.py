@@ -444,6 +444,9 @@ class Data(object):
 
     @property
     def file(self) -> h5py.File | None:
+        r"""The underlying HDF5 file handle, or ``None`` if no file
+        is open. Only set when the object was created via :meth:`load` or
+        :meth:`from_hdf5` with ``lazy=True``."""
         return self._file
 
     def __enter__(self):
