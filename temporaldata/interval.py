@@ -309,7 +309,7 @@ class Interval(ArrayDict):
         out.end[-1] = out.end[-1] + size[-1]
         return out
 
-    def coalesce(self, eps=1e-6):
+    def coalesce(self, eps: float = 1e-6):
         r"""Coalesces the intervals that are closer than :obj:`eps`. This operation
         returns a new :obj:`Interval` object, and does not resolve the existing
         attributes.
