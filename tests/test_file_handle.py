@@ -183,6 +183,32 @@ class TestLoadFileLifecycle:
         data = Data.load(saved_data, lazy=False)
         assert np.all(data.spikes.x == np.array([1.0, 2.0, 3.0]))
 
+    def test_load_closes_file_on_error(self, test_filepath):
+        from unittest.mock import patch
+
+        # write a corrupt file (missing required 'object' attr on a group)
+        with h5py.File(test_filepath, "w") as f:
+            f.attrs["object"] = "Data"
+            f.attrs["absolute_start"] = 0.0
+            f.create_group("bad_child")
+            # no 'object' attr on the group => from_hdf5 will raise
+
+        # capture the file handle created inside load()
+        opened_file = None
+        original_init = h5py.File.__init__
+
+        def tracking_init(self, *args, **kwargs):
+            nonlocal opened_file
+            original_init(self, *args, **kwargs)
+            opened_file = self
+
+        with patch.object(h5py.File, "__init__", tracking_init):
+            with pytest.raises(KeyError):
+                Data.load(test_filepath)
+
+        assert opened_file is not None
+        assert not opened_file.id.valid
+
 
 class TestDeepCopy:
     def test_deepcopy_preserves_file_ref(self, saved_data):

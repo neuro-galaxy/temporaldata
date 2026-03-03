@@ -442,7 +442,11 @@ class Data(object):
             data = Data.load("data.h5", lazy=False)
         """
         file = h5py.File(path)
-        obj = cls.from_hdf5(file, lazy=lazy)
+        try:
+            obj = cls.from_hdf5(file, lazy=lazy)
+        except Exception:
+            file.close()
+            raise
 
         if not lazy:
             file.close()
