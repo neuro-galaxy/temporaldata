@@ -316,6 +316,17 @@ class Interval(ArrayDict):
 
         Args:
             eps: The distance threshold for coalescing the intervals. Defaults to 1e-6.
+
+        Example:
+            >>> interval = Interval(
+            ...     start=np.array([0.0, 1.0, 2.0, 5.0, 5.5, 10.0]),
+            ...     end=np.array([1.0, 2.0, 3.0, 5.5, 7.0, 12.0]),
+            ... )
+            >>> coalesced = interval.coalesce()
+            >>> coalesced.start
+            array([ 0.,  5., 10.])
+            >>> coalesced.end
+            array([ 3.,  7., 12.])
         """
         if len(self) == 0:
             return Interval(start=np.array([]), end=np.array([]))
