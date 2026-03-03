@@ -320,6 +320,9 @@ class Interval(ArrayDict):
         if len(self) == 0:
             return Interval(start=np.array([]), end=np.array([]))
 
+        if eps < 0:
+            raise ValueError(f"eps must be non-negative, got eps={eps}")
+
         if not self.is_sorted():
             self.sort()
 
