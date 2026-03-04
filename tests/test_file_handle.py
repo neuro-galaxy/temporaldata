@@ -101,6 +101,7 @@ class TestFileProperty:
     def test_file_not_in_keys(self, saved_data):
         data = Data.load(saved_data)
         assert "_file" not in data.keys()
+        assert "file" not in data.keys()
         data.close()
 
     def test_nested_data_file_is_none(self, nested_saved_data):
