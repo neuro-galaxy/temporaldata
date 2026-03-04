@@ -209,6 +209,18 @@ class TestLoadFileLifecycle:
         assert opened_file is not None
         assert not opened_file.id.valid
 
+    def test_slice_on_lazy_loaded_data(self, saved_data):
+        with Data.load(saved_data) as data:
+            sliced = data.slice(0.5, 2.0)
+            # slice [0.5, 2.0): timestamps 1.0 is included, reset to 0.5
+            assert np.all(sliced.spikes.timestamps == np.array([0.5]))
+            assert np.all(sliced.spikes.x == np.array([2.0]))
+            # trials [0,1) and [1,2) overlap with [0.5, 2.0), reset by -0.5
+            assert np.allclose(sliced.trials.start, np.array([-0.5, 0.5]))
+            assert np.allclose(sliced.trials.end, np.array([0.5, 1.5]))
+            # sliced object should not hold a file handle
+            assert sliced.file is None
+
 
 class TestDeepCopy:
     def test_deepcopy_preserves_file_ref(self, saved_data):
