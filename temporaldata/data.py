@@ -455,13 +455,6 @@ class Data(object):
 
         return obj
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
-        return False
-
     def close(self, strict: bool = False):
         r"""Close the file-handle that was opened for lazy-loading.
         Any lazy attributes that have not been materialized will become invalid.
@@ -494,6 +487,13 @@ class Data(object):
         """
         with h5py.File(path, "w") as f:
             self.to_hdf5(f)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+        return False
 
     def set_train_domain(self, interval: Interval):
         """Deprecated no-op retained for backward compatibility."""
