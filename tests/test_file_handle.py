@@ -239,6 +239,14 @@ class TestLoadFileLifecycle:
             assert np.all(selected.spikes.x == np.array([1.0, 3.0]))
             assert selected.file is None
 
+    def test_to_dict_excludes_file(self, saved_data):
+        with Data.load(saved_data) as data:
+            d = data.to_dict()
+            assert "_file" not in d
+            assert "file" not in d
+            assert "spikes" in d
+            assert "session_id" in d
+
 
 class TestDeepCopy:
     def test_deepcopy_preserves_file_ref(self, saved_data):

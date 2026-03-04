@@ -299,7 +299,8 @@ class Data(object):
 
     def to_dict(self) -> Dict[str, Any]:
         r"""Returns a dictionary of stored key/value pairs."""
-        return copy.deepcopy(self.__dict__)
+        out_dict = {k: v for k, v in self.__dict__.items() if k != "_file"}
+        return copy.deepcopy(out_dict)
 
     def to_hdf5(self, file, serialize_fn_map=None):
         r"""Saves the data object to an HDF5 file. This method will also call the
