@@ -8,10 +8,10 @@ import warnings
 import h5py
 import numpy as np
 
-from .arraydict import ArrayDict
-from .irregular_ts import IrregularTimeSeries
-from .regular_ts import RegularTimeSeries
-from .interval import Interval
+from .arraydict import ArrayDict, LazyArrayDict
+from .irregular_ts import IrregularTimeSeries, LazyIrregularTimeSeries
+from .regular_ts import RegularTimeSeries, LazyRegularTimeSeries
+from .interval import Interval, LazyInterval
 from .utils import _size_repr
 
 

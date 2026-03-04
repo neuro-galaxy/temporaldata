@@ -28,3 +28,17 @@
 | LazyInterval .start/.end access | 2,000   | 532.968   | 1.02x   |
 
 
+## After Phase 2: Vectorize `__and__`, `__or__`, `difference`
+
+
+| Benchmark                       | Iters   | Mean (µs) | vs Baseline | vs Phase 1 |
+| ------------------------------- | ------- | --------- | ----------- | ---------- |
+| ArrayDict.keys() x100k          | 100,000 | 0.123     | 5.06x       | 1.02x      |
+| Interval.**and** (single)       | 1,000   | 26.494    | 21.79x      | 20.37x     |
+| Interval.**and** (multi)        | 200     | 620.331   | 1.26x       | 1.20x      |
+| Interval.**or**                 | 200     | 43.614    | 99.01x      | 97.45x     |
+| Interval.difference             | 200     | 3,841.421 | 1.08x       | 1.06x      |
+| Data.slice() end-to-end         | 500     | 195.049   | 0.91x       | 0.93x      |
+| LazyInterval .start/.end access | 2,000   | 531.261   | 1.03x       | 1.00x      |
+
+

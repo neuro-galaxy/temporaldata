@@ -579,6 +579,96 @@ def easy_symmetric_check(I1, I2, Iexp, op):
     easy_check(I2, I1, Iexp, op)
 
 
+def test_and_edge_cases():
+    op = lambda x, y: x & y
+    empty = Interval(np.array([]), np.array([]))
+
+    # both empty
+    easy_symmetric_check(empty, empty, empty, op)
+
+    # one empty
+    I1 = Interval.from_list([(1.0, 2.0)])
+    easy_symmetric_check(I1, empty, empty, op)
+
+    # full containment: one interval fully inside another
+    I1 = Interval.from_list([(0.0, 10.0)])
+    I2 = Interval.from_list([(3.0, 5.0)])
+    Iexp = Interval.from_list([(3.0, 5.0)])
+    easy_symmetric_check(I1, I2, Iexp, op)
+
+    # identical intervals
+    I1 = Interval.from_list([(1.0, 3.0), (5.0, 7.0)])
+    easy_symmetric_check(I1, I1, I1, op)
+
+    # single-segment with many-segment: Data.slice() hot path
+    I1 = Interval.from_list([(0.0, 1.0), (2.0, 3.0), (4.0, 5.0)])
+    I2 = Interval.from_list([(1.5, 4.5)])
+    Iexp = Interval.from_list([(2.0, 3.0), (4.0, 4.5)])
+    easy_check(I1, I2, Iexp, op)
+    Iexp_rev = Interval.from_list([(2.0, 3.0), (4.0, 4.5)])
+    easy_check(I2, I1, Iexp_rev, op)
+
+
+def test_or_edge_cases():
+    op = lambda x, y: x | y
+    empty = Interval(np.array([]), np.array([]))
+
+    # both empty
+    easy_symmetric_check(empty, empty, empty, op)
+
+    # one empty
+    I1 = Interval.from_list([(1.0, 2.0)])
+    easy_symmetric_check(I1, empty, I1, op)
+
+    # full containment
+    I1 = Interval.from_list([(0.0, 10.0)])
+    I2 = Interval.from_list([(3.0, 5.0)])
+    Iexp = Interval.from_list([(0.0, 10.0)])
+    easy_symmetric_check(I1, I2, Iexp, op)
+
+    # identical intervals
+    I1 = Interval.from_list([(1.0, 3.0), (5.0, 7.0)])
+    Iexp = Interval.from_list([(1.0, 3.0), (5.0, 7.0)])
+    easy_symmetric_check(I1, I1, Iexp, op)
+
+    # multiple containments in a row
+    I1 = Interval.from_list([(0.0, 20.0)])
+    I2 = Interval.from_list([(1.0, 3.0), (5.0, 7.0), (9.0, 11.0)])
+    Iexp = Interval.from_list([(0.0, 20.0)])
+    easy_symmetric_check(I1, I2, Iexp, op)
+
+
+def test_difference_edge_cases():
+    op = lambda x, y: x.difference(y)
+    empty = Interval(np.array([]), np.array([]))
+
+    # both empty
+    easy_check(empty, empty, empty, op)
+
+    # self empty
+    I1 = Interval.from_list([(1.0, 2.0)])
+    easy_check(empty, I1, empty, op)
+
+    # other empty
+    I1 = Interval.from_list([(1.0, 2.0)])
+    easy_check(I1, empty, I1, op)
+
+    # self fully contains other
+    I1 = Interval.from_list([(0.0, 10.0)])
+    I2 = Interval.from_list([(3.0, 5.0)])
+    Iexp = Interval.from_list([(0.0, 3.0), (5.0, 10.0)])
+    easy_check(I1, I2, Iexp, op)
+
+    # identical intervals: difference should be empty
+    I1 = Interval.from_list([(1.0, 3.0), (5.0, 7.0)])
+    easy_check(I1, I1, empty, op)
+
+    # no overlap
+    I1 = Interval.from_list([(0.0, 1.0)])
+    I2 = Interval.from_list([(5.0, 6.0)])
+    easy_check(I1, I2, I1, op)
+
+
 def test_dilate():
     data = Interval(np.array([1.0, 5.0, 11.0]), np.array([2.0, 7.0, 12.0]))
 
