@@ -269,10 +269,11 @@ class Data(object):
 
         for key, value in self.__dict__.items():
             # todo update domain
-            if key != "_domain" and (
-                isinstance(value, (IrregularTimeSeries, RegularTimeSeries, Interval))
-                or (isinstance(value, Data) and value.domain is not None)
-            ):
+            if key in ("_domain", "_file"):
+                continue
+            elif isinstance(
+                value, (IrregularTimeSeries, RegularTimeSeries, Interval)
+            ) or (isinstance(value, Data) and value.domain is not None):
                 if isinstance(value, RegularTimeSeries):
                     value = value.to_irregular()
                 out.__dict__[key] = value.select_by_interval(interval)

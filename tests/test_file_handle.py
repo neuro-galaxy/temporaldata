@@ -221,6 +221,18 @@ class TestLoadFileLifecycle:
             # sliced object should not hold a file handle
             assert sliced.file is None
 
+    def test_select_by_interval_on_lazy_loaded_data(self, saved_data):
+        with Data.load(saved_data) as data:
+            interval = Interval(
+                start=np.array([0.0, 1.5]),
+                end=np.array([0.5, 2.5]),
+            )
+            selected = data.select_by_interval(interval)
+            # timestamps 0.0 is in [0.0, 0.5), 2.0 is in [1.5, 2.5)
+            assert np.all(selected.spikes.timestamps == np.array([0.0, 2.0]))
+            assert np.all(selected.spikes.x == np.array([1.0, 3.0]))
+            assert selected.file is None
+
 
 class TestDeepCopy:
     def test_deepcopy_preserves_file_ref(self, saved_data):
