@@ -286,7 +286,7 @@ class Data(object):
 
         info = ""
         for key, value in self.__dict__.items():
-            if key == "_domain":
+            if key in ("_domain", "_file"):
                 continue
             if isinstance(value, ArrayDict):
                 info = info + key + "=" + repr(value) + ",\n"
