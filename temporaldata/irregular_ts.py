@@ -417,13 +417,12 @@ class LazyIrregularTimeSeries(IrregularTimeSeries):
 
     _lazy_ops = dict()
     _unicode_keys = []
+    _n_lazy = 0
 
     def _maybe_first_dim(self):
         if len(self.keys()) == 0:
             return None
         else:
-            # if slice is waiting to be resolved, we need to resolve it now to get the
-            # first dimension
             if "unresolved_slice" in self._lazy_ops:
                 return self.timestamps.shape[0]
 
@@ -448,26 +447,17 @@ class LazyIrregularTimeSeries(IrregularTimeSeries):
             getattr(self, key)
 
     def __getattribute__(self, name):
-        if name not in ["__dict__", "keys"]:
+        if name not in ("__dict__", "keys"):
             if name in self.__dict__ and not name.startswith("_"):
-                # out could either be a numpy array or a reference to a h5py dataset
-                # if is not loaded, now is the time to load it and apply any outstanding
-                # slicing or masking.
                 out = self.__dict__[name]
 
                 if isinstance(out, h5py.Dataset):
-                    # convert into numpy array
-
-                    # first we check if timestamps was resolved
+                    resolved = False
                     if "unresolved_slice" in self._lazy_ops:
-                        # slice and unresolved_slice cannot both be queued
                         assert "slice" not in self._lazy_ops
-                        # slicing never happened, and we need to resolve timestamps
-                        # to identify the time points that we need
                         self._resolve_timestamps_after_slice()
-                        # after this "unresolved_slice" is replaced with "slice"
+                        resolved = True
 
-                    # timestamps are resolved and there is a "slice"
                     if "slice" in self._lazy_ops:
                         idx_l, idx_r, start, origin_translation = self._lazy_ops[
                             "slice"
@@ -476,31 +466,25 @@ class LazyIrregularTimeSeries(IrregularTimeSeries):
                         if name in self._timekeys:
                             out = out - origin_translation
 
-                    # there could have been masking, so apply it
                     if "mask" in self._lazy_ops:
                         out = out[self._lazy_ops["mask"]]
 
-                    # no lazy operations found, just load the entire array
                     if len(self._lazy_ops) == 0:
                         out = out[:]
 
                     if name in self._unicode_keys:
-                        # convert back to unicode
                         out = out.astype("U")
 
-                    # store it in memory now that it is loaded
                     self.__dict__[name] = out
 
-                # if all attributes are loaded, we can remove the lazy flag
-                all_loaded = all(
-                    isinstance(self.__dict__[key], np.ndarray) for key in self.keys()
-                )
-                if all_loaded:
-                    # simply change classes
+                    # _resolve already decremented for timestamps
+                    if not (resolved and name == "timestamps"):
+                        self.__dict__["_n_lazy"] -= 1
+
+                if self.__dict__["_n_lazy"] == 0:
                     self.__class__ = IrregularTimeSeries
-                    # delete unnecessary attributes
-                    del self._lazy_ops, self._unicode_keys
-                    if hasattr(self, "_timestamp_indices_1s"):
+                    del self._lazy_ops, self._unicode_keys, self._n_lazy
+                    if "_timestamp_indices_1s" in self.__dict__:
                         del self._timestamp_indices_1s
 
                 return out
@@ -517,19 +501,21 @@ class LazyIrregularTimeSeries(IrregularTimeSeries):
                 f"({first_dim})."
             )
 
-        # make a copy
         out = self.__class__.__new__(self.__class__)
         out._unicode_keys = self._unicode_keys
         out._timekeys = self._timekeys
         out._domain = self._domain
         out._lazy_ops = {}
 
+        n_lazy = 0
         for key in self.keys():
             value = self.__dict__[key]
             if isinstance(value, h5py.Dataset):
                 out.__dict__[key] = value
+                n_lazy += 1
             else:
                 out.__dict__[key] = value[mask].copy()
+        out._n_lazy = n_lazy
 
         # store the mask operation in _lazy_ops for differed execution of attributes
         # that are not yet loaded
@@ -549,7 +535,6 @@ class LazyIrregularTimeSeries(IrregularTimeSeries):
         start, end, sequence_start, origin_translation = self._lazy_ops[
             "unresolved_slice"
         ]
-        # sequence_start: Time corresponding to _timstamps_indices_1s[0]
 
         start_closest_sec_idx = np.clip(
             np.floor(start - sequence_start).astype(int),
@@ -577,6 +562,7 @@ class LazyIrregularTimeSeries(IrregularTimeSeries):
         del self._lazy_ops["unresolved_slice"]
         self._lazy_ops["slice"] = (idx_l, idx_r, start, origin_translation)
         self.__dict__["timestamps"] = timestamps - origin_translation
+        self.__dict__["_n_lazy"] -= 1
 
     def slice(self, start: float, end: float, reset_origin: bool = True):
         out = self.__class__.__new__(self.__class__)
@@ -641,11 +627,13 @@ class LazyIrregularTimeSeries(IrregularTimeSeries):
                     self._lazy_ops["slice"][3] + origin_translation,
                 )
 
+        n_lazy = int(isinstance(out.__dict__.get("timestamps"), h5py.Dataset))
         for key in self.keys():
             if key != "timestamps":
                 value = self.__dict__[key]
                 if isinstance(value, h5py.Dataset):
                     out.__dict__[key] = value
+                    n_lazy += 1
                 else:
                     if idx_l is None:
                         raise NotImplementedError(
@@ -655,6 +643,7 @@ class LazyIrregularTimeSeries(IrregularTimeSeries):
                     out.__dict__[key] = value[idx_l:idx_r].copy()
                     if reset_origin and key in self._timekeys:
                         out.__dict__[key] = out.__dict__[key] - start
+        out._n_lazy = n_lazy
 
         if "mask" in self._lazy_ops:
             if idx_l is None:
@@ -688,6 +677,7 @@ class LazyIrregularTimeSeries(IrregularTimeSeries):
         ), "object type mismatch"
 
         obj = cls.__new__(cls)
+        n_lazy = 0
         for key, value in file.items():
             if key == "domain":
                 obj.__dict__["_domain"] = Interval.from_hdf5(file[key])
@@ -695,10 +685,12 @@ class LazyIrregularTimeSeries(IrregularTimeSeries):
                 obj.__dict__["_timestamp_indices_1s"] = value[:]
             else:
                 obj.__dict__[key] = value
+                n_lazy += 1
 
         obj._unicode_keys = file.attrs["_unicode_keys"].astype(str).tolist()
         obj._timekeys = file.attrs["timekeys"].astype(str).tolist()
         obj._sorted = True
         obj._lazy_ops = {}
+        obj._n_lazy = n_lazy
 
         return obj

@@ -828,6 +828,7 @@ class LazyInterval(Interval):
 
     _lazy_ops = dict()
     _unicode_keys = []
+    _n_lazy = 0
 
     def _maybe_first_dim(self):
         if "unresolved_slice" in self._lazy_ops:
@@ -839,14 +840,15 @@ class LazyInterval(Interval):
         return super()._maybe_first_dim()
 
     def __getattribute__(self, name):
-        if name not in ["__dict__", "keys"]:
+        if name not in ("__dict__", "keys"):
             if name in self.__dict__ and not name.startswith("_"):
                 out = self.__dict__[name]
 
                 if isinstance(out, h5py.Dataset):
-                    # convert into numpy array
+                    resolved = False
                     if "unresolved_slice" in self._lazy_ops:
                         self._resolve_start_end_after_slice()
+                        resolved = True
                     if "slice" in self._lazy_ops:
                         idx_l, idx_r, start, origin_translation = self._lazy_ops[
                             "slice"
@@ -860,19 +862,17 @@ class LazyInterval(Interval):
                         out = out[:]
 
                     if name in self._unicode_keys:
-                        # convert back to unicode
                         out = out.astype("U")
 
-                    # store it
                     self.__dict__[name] = out
 
-                # If all attributes are loaded, we can remove the lazy flag
-                all_loaded = all(
-                    isinstance(self.__dict__[key], np.ndarray) for key in self.keys()
-                )
-                if all_loaded:
+                    # _resolve already decremented for start & end
+                    if not (resolved and name in ("start", "end")):
+                        self.__dict__["_n_lazy"] -= 1
+
+                if self.__dict__["_n_lazy"] == 0:
                     self.__class__ = Interval
-                    del self._lazy_ops, self._unicode_keys
+                    del self._lazy_ops, self._unicode_keys, self._n_lazy
 
                 return out
         return super(LazyInterval, self).__getattribute__(name)
@@ -888,18 +888,20 @@ class LazyInterval(Interval):
                 f"({first_dim})."
             )
 
-        # make a copy
         out = self.__class__.__new__(self.__class__)
         out._unicode_keys = self._unicode_keys
         out._timekeys = self._timekeys
         out._lazy_ops = {}
 
+        n_lazy = 0
         for key in self.keys():
             value = self.__dict__[key]
             if isinstance(value, h5py.Dataset):
                 out.__dict__[key] = value
+                n_lazy += 1
             else:
                 out.__dict__[key] = value[mask].copy()
+        out._n_lazy = n_lazy
 
         if "mask" not in self._lazy_ops:
             out._lazy_ops["mask"] = mask
@@ -915,15 +917,10 @@ class LazyInterval(Interval):
     def _resolve_start_end_after_slice(self):
         start, end, origin_translation = self._lazy_ops["unresolved_slice"]
 
-        # todo confirm sorted
-        # assert self.is_sorted()
-
-        # anything that starts before the end of the slicing window
         start_vec = self.__dict__["start"][:]
         end_vec = self.__dict__["end"][:]
         idx_l = np.searchsorted(end_vec, start, side="right")
 
-        # anything that will end after the start of the slicing window
         idx_r = np.searchsorted(start_vec, end)
 
         del self._lazy_ops["unresolved_slice"]
@@ -932,6 +929,7 @@ class LazyInterval(Interval):
             self.__dict__["start"][idx_l:idx_r] - origin_translation
         )
         self.__dict__["end"] = self.__dict__["end"][idx_l:idx_r] - origin_translation
+        self.__dict__["_n_lazy"] -= 2
 
     def slice(self, start: float, end: float, reset_origin: bool = True):
         r"""Returns a new :obj:`Interval` object that contains the data between the
@@ -983,10 +981,12 @@ class LazyInterval(Interval):
                     self._lazy_ops["slice"][3] + origin_translation,
                 )
 
+        n_lazy = 0
         for key in self.keys():
             value = self.__dict__[key]
             if isinstance(value, h5py.Dataset):
                 out.__dict__[key] = value
+                n_lazy += 1
             else:
                 if idx_l is None:
                     raise NotImplementedError(
@@ -996,6 +996,7 @@ class LazyInterval(Interval):
                 out.__dict__[key] = value[idx_l:idx_r].copy()
                 if reset_origin and key in self._timekeys:
                     out.__dict__[key] = out.__dict__[key] - start
+        out._n_lazy = n_lazy
 
         if "mask" in self._lazy_ops:
             if idx_l is None:
@@ -1034,5 +1035,6 @@ class LazyInterval(Interval):
         obj._timekeys = file.attrs["timekeys"].astype(str).tolist()
         obj._sorted = True
         obj._lazy_ops = {}
+        obj._n_lazy = len(file)
 
         return obj

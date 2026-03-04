@@ -177,6 +177,39 @@ def test_lazy_array_dict(test_filepath):
         assert np.array_equal(data.unit_id, np.array(["unit01", "unit03"]))
 
 
+def test_lazy_array_dict_n_lazy_counter(test_filepath):
+    """Verify the _n_lazy counter tracks materialization correctly."""
+    data = ArrayDict(
+        unit_id=np.array(["unit01", "unit02", "unit03", "unit04"]),
+        brain_region=np.array([b"PMd", b"M1", b"PMd", b"M1"]),
+        waveform_mean=np.tile(np.arange(4)[:, np.newaxis], (1, 48)),
+    )
+
+    with h5py.File(test_filepath, "w") as f:
+        data.to_hdf5(f)
+
+    del data
+
+    with h5py.File(test_filepath, "r") as f:
+        data = LazyArrayDict.from_hdf5(f)
+        assert data.__dict__["_n_lazy"] == 3
+        data.unit_id
+        assert data.__dict__["_n_lazy"] == 2
+        data.brain_region
+        assert data.__dict__["_n_lazy"] == 1
+        data.waveform_mean
+        assert data.__class__ == ArrayDict
+        assert "_n_lazy" not in data.__dict__
+
+    # _n_lazy after select_by_mask with partial loading
+    with h5py.File(test_filepath, "r") as f:
+        data = LazyArrayDict.from_hdf5(f)
+        mask = data.brain_region == b"PMd"
+        assert data.__dict__["_n_lazy"] == 2
+        data2 = data.select_by_mask(mask)
+        assert data2.__dict__["_n_lazy"] == 2
+
+
 def test_array_dict_from_dataframe():
     # Create a sample DataFrame
     df = pd.DataFrame(

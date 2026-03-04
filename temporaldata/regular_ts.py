@@ -222,6 +222,7 @@ class LazyRegularTimeSeries(RegularTimeSeries):
     """
 
     _lazy_ops = dict()
+    _n_lazy = 0
 
     def _maybe_first_dim(self):
         if len(self.keys()) == 0:
@@ -246,28 +247,23 @@ class LazyRegularTimeSeries(RegularTimeSeries):
             return self.__dict__[self.keys()[0]].shape[0]
 
     def __getattribute__(self, name):
-        if name not in ["__dict__", "keys"]:
+        if name not in ("__dict__", "keys"):
             if name in self.__dict__ and not name.startswith("_"):
                 out = self.__dict__[name]
 
                 if isinstance(out, h5py.Dataset):
-                    # convert into numpy array
                     if "slice" in self._lazy_ops:
                         idx_l, idx_r = self._lazy_ops["slice"]
                         out = out[idx_l:idx_r]
                     else:
                         out = out[:]
 
-                    # store it
                     self.__dict__[name] = out
+                    self.__dict__["_n_lazy"] -= 1
 
-                # If all attributes are loaded, we can remove the lazy flag
-                all_loaded = all(
-                    isinstance(self.__dict__[key], np.ndarray) for key in self.keys()
-                )
-                if all_loaded:
+                if self.__dict__["_n_lazy"] == 0:
                     self.__class__ = RegularTimeSeries
-                    del self._lazy_ops
+                    del self._lazy_ops, self._n_lazy
 
                 return out
         return super(LazyRegularTimeSeries, self).__getattribute__(name)
@@ -299,13 +295,16 @@ class LazyRegularTimeSeries(RegularTimeSeries):
             out._domain.start = out._domain.start - start
             out._domain.end = out._domain.end - start
 
+        n_lazy = 0
         for key in self.keys():
             if isinstance(self.__dict__[key], h5py.Dataset):
                 out.__dict__[key] = self.__dict__[key]
+                n_lazy += 1
             else:
                 out.__dict__[key] = self.__dict__[key][start_id:end_id].copy()
 
         out._lazy_ops = {}
+        out._n_lazy = n_lazy
 
         if "slice" not in self._lazy_ops:
             out._lazy_ops["slice"] = (start_id, end_id)
@@ -340,12 +339,15 @@ class LazyRegularTimeSeries(RegularTimeSeries):
         ), "object type mismatch"
 
         obj = cls.__new__(cls)
+        n_lazy = 0
         for key, value in file.items():
             if key == "domain":
                 obj.__dict__["_domain"] = Interval.from_hdf5(file[key])
             else:
                 obj.__dict__[key] = value
+                n_lazy += 1
         obj._lazy_ops = {}
         obj._sampling_rate = file.attrs["sampling_rate"]
+        obj._n_lazy = n_lazy
 
         return obj
