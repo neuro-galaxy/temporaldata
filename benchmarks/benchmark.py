@@ -1,13 +1,13 @@
-"""Benchmark suite for temporaldata hot paths.
+"""Benchmark suite for temporaldata.
 
 Benchmarks are modeled on real torch_brain workloads: Data.slice() on
 realistic lazy-loaded recording objects, IrregularTimeSeries/Interval
 inner-loop slicing, and Interval set operations at production-typical sizes.
 
 Usage:
-    uv run python benchmarks/bench_hotpath.py
-    uv run python benchmarks/bench_hotpath.py --json
-    uv run python benchmarks/bench_hotpath.py --save results.jsonl
+    uv run python benchmarks/benchmark.py
+    uv run python benchmarks/benchmark.py --json
+    uv run python benchmarks/benchmark.py --save results.jsonl
 
 Set TEMPORALDATA_SOURCE to override where temporaldata is imported from
 (used by compare.py to benchmark code from arbitrary commits).

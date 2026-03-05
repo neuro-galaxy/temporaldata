@@ -1,7 +1,7 @@
 """Compare temporaldata benchmarks across git commits.
 
 Extracts temporaldata source from arbitrary commits via `git archive` and
-runs the current bench_hotpath.py against each, then displays a side-by-side
+runs the current benchmark.py against each, then displays a side-by-side
 comparison table.
 
 Usage:
@@ -25,7 +25,7 @@ import tempfile
 import time
 
 
-BENCH_SCRIPT = os.path.join(os.path.dirname(__file__), "bench_hotpath.py")
+BENCH_SCRIPT = os.path.join(os.path.dirname(__file__), "benchmark.py")
 REPO_ROOT = os.path.join(os.path.dirname(__file__), "..")
 
 
@@ -70,7 +70,7 @@ def extract_source(commit: str) -> str:
 
 
 def run_benchmark(source_dir: str | None, label: str) -> list[dict]:
-    """Run bench_hotpath.py, optionally overriding the import source."""
+    """Run benchmark.py, optionally overriding the import source."""
     env = os.environ.copy()
     if source_dir is not None:
         env["TEMPORALDATA_SOURCE"] = source_dir
