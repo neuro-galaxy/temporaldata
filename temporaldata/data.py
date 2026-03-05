@@ -173,6 +173,11 @@ class Data(object):
         if not name.startswith("_"):
             object.__setattr__(self, "_cached_public_keys", None)
 
+    def __delattr__(self, name):
+        super().__delattr__(name)
+        if not name.startswith("_"):
+            object.__setattr__(self, "_cached_public_keys", None)
+
     @property
     def domain(self):
         r"""Returns the domain of the data object."""
