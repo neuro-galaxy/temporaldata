@@ -65,7 +65,7 @@ def _make_disjoint_intervals(
 
 
 def _build_realistic_data():
-    """Build a PetersonBrunton-like Data object with nested splits.
+    """Build a large realistic Data object with nested splits.
 
     Matches real brainsets structure: ecog, pose, behavior intervals,
     channels, metadata Data children (brainset/subject/session/device),
@@ -103,7 +103,7 @@ def _build_realistic_data():
         domain=Interval(0.0, 1000.0),
     )
 
-    n_trials = 50
+    n_trials = 500
     trial_starts = np.arange(0, n_trials * 18, 18, dtype=np.float64)
     trial_dur = rng.uniform(5, 15, n_trials)
     trial_ends = trial_starts + trial_dur
@@ -120,7 +120,7 @@ def _build_realistic_data():
         behavior_id=rng.integers(0, 2, n_trials),
     )
 
-    n_ch = 64
+    n_ch = 128
     channels = ArrayDict(
         id=np.arange(n_ch),
         hemisphere=rng.integers(0, 2, n_ch),
@@ -128,12 +128,12 @@ def _build_realistic_data():
     )
 
     splits_kwargs = {}
-    for task in ["active_vs_inactive", "all_active_behavior", "pose_estimation"]:
+    for task in ["task_1", "task_2", "task_3"]:
         for fold in range(3):
             for split_name in ["train", "valid", "test"]:
                 key = f"{task}_fold_{fold}_{split_name}"
-                n_seg = int(rng.integers(4, 12))
-                gap = 900.0 / n_seg
+                n_seg = int(rng.integers(400, 1200))
+                gap = 90000.0 / n_seg
                 s = np.arange(n_seg, dtype=np.float64) * gap
                 e = s + rng.uniform(3, gap * 0.8, n_seg)
                 splits_kwargs[key] = Interval(start=s, end=e)
@@ -144,12 +144,12 @@ def _build_realistic_data():
     )
 
     brainset = Data(
-        id="peterson_brunton_2022",
-        origin_version="0.220127",
-        source="dandi",
+        id="large_realistic_data",
+        origin_version="0.0.1",
+        source="synthetic",
     )
     subject = Data(id="sub_01", species="human")
-    session = Data(id="sess_01", recording_date="2022-01-01")
+    session = Data(id="sess_01", recording_date="2026-01-01")
     device = Data(id="ecog_grid", recording_tech="ECoG")
 
     return Data(
@@ -179,15 +179,8 @@ def _save_data_to_hdf5(data, path):
 
 
 def bench_data_slice_lazy():
-    """Data.slice() on a lazy-loaded PetersonBrunton-like recording.
-
-    This is THE primary hot path in torch_brain: loading a recording from
-    HDF5 with lazy=True, then slicing a 1s window for each training sample.
-
-    The old code's __getattribute__ called keys() (via filter+lambda) on
-    every attribute access of every lazy object, multiplied across the
-    27 Intervals in splits + ecog + pose + trial Intervals.  The new code
-    uses O(1) dict lookups and an _n_lazy counter instead.
+    """
+    Data.slice() on a lazy-loaded realistic recording.
     """
     tmpfile = tempfile.NamedTemporaryFile(suffix=".h5", delete=False)
     path = tmpfile.name
@@ -210,11 +203,7 @@ def bench_data_slice_lazy():
 
 
 def bench_data_slice_inmemory():
-    """Data.slice() on an in-memory PetersonBrunton-like recording.
-
-    Shows the benefit of keys() caching across repeated slices on the
-    same object (as happens when sampling multiple windows per recording).
-    """
+    """Data.slice() on an in-memory realistic recording."""
     data = _build_realistic_data()
 
     def go():
@@ -224,8 +213,7 @@ def bench_data_slice_inmemory():
 
 
 def bench_its_slice():
-    """IrregularTimeSeries.slice() — inner hot path called per attribute
-    inside Data.slice(). 50k timestamps, 3 array columns."""
+    """IrregularTimeSeries.slice() on a realistic recording."""
     rng = np.random.default_rng(42)
     n = 50_000
     ts = np.sort(rng.uniform(0, 1000, n))
@@ -255,13 +243,7 @@ def bench_interval_slice():
 
 
 def bench_interval_and_single():
-    """Interval.__and__ 1000 segments & single window.
-
-    Demonstrates the algorithmic win from replacing sorted_traversal
-    (O(n+m) Python sweep with np.append) with searchsorted-based approach.
-    The old code swept all 2002 endpoints; the new code does one searchsorted
-    on 1000 elements.
-    """
+    """Interval.__and__ 1000 segments & single window."""
     d1 = _make_disjoint_intervals(1000, seed=42)
     single = Interval(500.0, 600.0)
 
@@ -272,12 +254,7 @@ def bench_interval_and_single():
 
 
 def bench_interval_and_multi():
-    """Interval.__and__ 1000 & 100 segments.
-
-    Shows vectorization scaling: the old sorted_traversal was O((n+m) log(n+m))
-    Python-level with np.append per result segment. The new approach uses
-    searchsorted per segment in other, with vectorized slicing.
-    """
+    """Interval.__and__ 1000 & 100 segments."""
     d1 = _make_disjoint_intervals(1000, seed=42)
     d2 = _make_disjoint_intervals(100, seed=99)
 
@@ -288,12 +265,7 @@ def bench_interval_and_multi():
 
 
 def bench_interval_or():
-    """Interval.__or__ 1000 & 100 segments.
-
-    The old code used sorted_traversal with np.append per merged segment —
-    O(k^2) where k = number of output segments. The new code uses a fully
-    vectorized concat + argsort + maximum.accumulate approach.
-    """
+    """Interval.__or__ 1000 & 100 segments."""
     d1 = _make_disjoint_intervals(1000, seed=42)
     d2 = _make_disjoint_intervals(100, seed=99)
 
@@ -304,10 +276,7 @@ def bench_interval_or():
 
 
 def bench_interval_difference():
-    """Interval.difference 1000 & 100 segments.
-
-    Same sorted_traversal vs searchsorted improvement as __and__.
-    """
+    """Interval.difference 1000 & 100 segments."""
     d1 = _make_disjoint_intervals(1000, seed=42)
     d2 = _make_disjoint_intervals(100, seed=99)
 
@@ -318,7 +287,7 @@ def bench_interval_difference():
 
 
 def bench_arraydict_keys():
-    """ArrayDict.keys() — tests the caching optimization."""
+    """ArrayDict.keys() tests the caching optimization."""
     ad = ArrayDict(**{f"key_{i}": np.arange(100, dtype=np.float64) for i in range(10)})
 
     def go():
@@ -328,8 +297,7 @@ def bench_arraydict_keys():
 
 
 def bench_lazy_interval_access():
-    """LazyInterval with 10 attributes — stresses the _n_lazy O(1) counter
-    vs the old O(n) all_loaded scan on every attribute access."""
+    """LazyInterval with 10 attributes stresses the _n_lazy O(1) counter."""
     tmpfile = tempfile.NamedTemporaryFile(suffix=".h5", delete=False)
     path = tmpfile.name
     tmpfile.close()

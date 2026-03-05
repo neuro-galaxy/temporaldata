@@ -750,23 +750,48 @@ class Interval(ArrayDict):
         if len(self) == 0 or len(other) == 0:
             return Interval(start=_empty, end=_empty)
 
-        out_starts = []
-        out_ends = []
+        if len(self) == 1 and len(other) == 1:
+            start = max(self.start[0], other.start[0])
+            end = min(self.end[0], other.end[0])
+            if start < end:
+                return Interval(
+                    start=np.array([start], dtype=np.float64),
+                    end=np.array([end], dtype=np.float64),
+                )
+            return Interval(start=_empty, end=_empty)
 
-        for j in range(len(other)):
-            a, b = other.start[j], other.end[j]
+        def _intersect_one(a, b):
             left = np.searchsorted(self.end, a, side="right")
             right = np.searchsorted(self.start, b, side="left")
             if left >= right:
-                continue
+                return None
+
             s = self.start[left:right].copy()
             e = self.end[left:right].copy()
             s[0] = max(s[0], a)
             e[-1] = min(e[-1], b)
             keep = s < e
-            if np.any(keep):
-                out_starts.append(s[keep])
-                out_ends.append(e[keep])
+            if not np.any(keep):
+                return None
+            return s[keep], e[keep]
+
+        # This path is common during slicing where `other` is a single window.
+        if len(other) == 1:
+            overlap = _intersect_one(other.start[0], other.end[0])
+            if overlap is None:
+                return Interval(start=_empty, end=_empty)
+            s, e = overlap
+            return Interval(start=s, end=e)
+
+        out_starts = []
+        out_ends = []
+
+        for j in range(len(other)):
+            overlap = _intersect_one(other.start[j], other.end[j])
+            if overlap is not None:
+                s, e = overlap
+                out_starts.append(s)
+                out_ends.append(e)
 
         if not out_starts:
             return Interval(start=_empty, end=_empty)
