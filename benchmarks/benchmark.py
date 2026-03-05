@@ -44,14 +44,14 @@ from temporaldata import (
 
 def _bench(label: str, stmt, number: int) -> dict:
     times = timeit.repeat(stmt, number=number, repeat=5)
-    mean_us = min(times) / number * 1e6
+    mean_us = np.mean(times) / number * 1e6
     return {"label": label, "number": number, "mean_us": round(mean_us, 3)}
 
 
 def _make_disjoint_intervals(
     n, span=10_000, min_gap=1.0, min_dur=0.5, max_dur=2.0, seed=42
 ):
-    rng = np.random.default_rng(seed)
+    rng = np.random.RandomState(seed)
     starts = np.empty(n, dtype=np.float64)
     ends = np.empty(n, dtype=np.float64)
     t = 0.0
@@ -72,7 +72,7 @@ def _build_realistic_data():
     and a nested splits Data containing ~27 Intervals for
     3 task types x 3 folds x train/valid/test.
     """
-    rng = np.random.default_rng(42)
+    rng = np.random.RandomState(42)
 
     domain_starts = np.array([0.0, 120.0, 250.0, 400.0, 550.0, 700.0, 850.0])
     domain_ends = np.array([100.0, 230.0, 380.0, 520.0, 680.0, 830.0, 980.0])
@@ -110,21 +110,21 @@ def _build_realistic_data():
     active_behavior_trials = Interval(
         start=trial_starts,
         end=trial_ends,
-        behavior_id=rng.integers(0, 4, n_trials),
+        behavior_id=rng.randint(0, 4, n_trials),
         go_cue_time=trial_starts + rng.uniform(0.5, 2.0, n_trials),
         timekeys=["start", "end", "go_cue_time"],
     )
     active_vs_inactive_trials = Interval(
         start=trial_starts.copy(),
         end=trial_ends.copy(),
-        behavior_id=rng.integers(0, 2, n_trials),
+        behavior_id=rng.randint(0, 2, n_trials),
     )
 
     n_ch = 128
     channels = ArrayDict(
         id=np.arange(n_ch),
-        hemisphere=rng.integers(0, 2, n_ch),
-        surface=rng.integers(0, 2, n_ch),
+        hemisphere=rng.randint(0, 2, n_ch),
+        surface=rng.randint(0, 2, n_ch),
     )
 
     splits_kwargs = {}
@@ -132,7 +132,7 @@ def _build_realistic_data():
         for fold in range(3):
             for split_name in ["train", "valid", "test"]:
                 key = f"{task}_fold_{fold}_{split_name}"
-                n_seg = int(rng.integers(400, 1200))
+                n_seg = int(rng.randint(400, 1200))
                 gap = 90000.0 / n_seg
                 s = np.arange(n_seg, dtype=np.float64) * gap
                 e = s + rng.uniform(3, gap * 0.8, n_seg)
@@ -186,20 +186,21 @@ def bench_data_slice_lazy():
     path = tmpfile.name
     tmpfile.close()
 
-    data = _build_realistic_data()
-    _save_data_to_hdf5(data, path)
+    try:
+        data = _build_realistic_data()
+        _save_data_to_hdf5(data, path)
 
-    results = None
-    with h5py.File(path, "r") as f:
+        results = None
+        with h5py.File(path, "r") as f:
 
-        def go():
-            lazy_data = Data.from_hdf5(f, lazy=True)
-            lazy_data.slice(300.0, 301.0)
+            def go():
+                lazy_data = Data.from_hdf5(f, lazy=True)
+                lazy_data.slice(300.0, 301.0)
 
-        results = _bench("Data.slice() (lazy, realistic)", go, number=200)
-
-    os.unlink(path)
-    return results
+            results = _bench("Data.slice() (lazy, realistic)", go, number=200)
+        return results
+    finally:
+        os.unlink(path)
 
 
 def bench_data_slice_inmemory():
@@ -214,12 +215,12 @@ def bench_data_slice_inmemory():
 
 def bench_its_slice():
     """IrregularTimeSeries.slice() on a realistic recording."""
-    rng = np.random.default_rng(42)
+    rng = np.random.RandomState(42)
     n = 50_000
     ts = np.sort(rng.uniform(0, 1000, n))
     its = IrregularTimeSeries(
         timestamps=ts,
-        unit_index=rng.integers(0, 100, n),
+        unit_index=rng.randint(0, 100, n),
         waveforms=rng.standard_normal((n, 48)),
         domain=Interval(0.0, 1000.0),
     )
@@ -302,7 +303,7 @@ def bench_lazy_interval_access():
     path = tmpfile.name
     tmpfile.close()
 
-    rng = np.random.default_rng(42)
+    rng = np.random.RandomState(42)
     n_intervals = 200
     starts = np.sort(rng.uniform(0, 10_000, n_intervals))
     ends = starts + rng.uniform(0.5, 2.0, n_intervals)
@@ -310,12 +311,12 @@ def bench_lazy_interval_access():
     iv = Interval(
         start=starts,
         end=ends,
-        trial_type=rng.integers(0, 5, n_intervals),
-        condition=rng.integers(0, 3, n_intervals),
+        trial_type=rng.randint(0, 5, n_intervals),
+        condition=rng.randint(0, 3, n_intervals),
         reward=rng.standard_normal(n_intervals),
         go_cue_time=starts + rng.uniform(0.1, 0.3, n_intervals),
         reaction_time=rng.uniform(0.15, 0.5, n_intervals),
-        success=rng.integers(0, 2, n_intervals),
+        success=rng.randint(0, 2, n_intervals),
         target_pos_x=rng.standard_normal(n_intervals),
         target_pos_y=rng.standard_normal(n_intervals),
         timekeys=["start", "end", "go_cue_time"],

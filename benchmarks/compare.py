@@ -52,17 +52,38 @@ def short_hash(full_hash: str) -> str:
 def extract_source(commit: str) -> str:
     """Extract temporaldata/ from a commit into a temp directory."""
     tmpdir = tempfile.mkdtemp(prefix="tdbench_")
-    result = subprocess.run(
-        f"git archive {commit} -- temporaldata/ | tar xf - -C {tmpdir}",
-        shell=True,
-        capture_output=True,
-        text=True,
+    git_proc = subprocess.run(
+        ["git", "archive", commit, "--", "temporaldata/"],
         cwd=REPO_ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
     )
-    if result.returncode != 0:
+    if git_proc.returncode != 0:
         shutil.rmtree(tmpdir, ignore_errors=True)
         print(
-            f"Error: git archive failed for {short_hash(commit)}: {result.stderr.strip()}",
+            (
+                f"Error: git archive failed for {short_hash(commit)}: "
+                f"{git_proc.stderr.decode(errors='replace').strip()}"
+            ),
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    tar_proc = subprocess.run(
+        ["tar", "xf", "-", "-C", tmpdir],
+        input=git_proc.stdout,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if tar_proc.returncode != 0:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+        print(
+            (
+                f"Error: tar extraction failed for {short_hash(commit)}: "
+                f"{tar_proc.stderr.decode(errors='replace').strip()}"
+            ),
             file=sys.stderr,
         )
         sys.exit(1)
