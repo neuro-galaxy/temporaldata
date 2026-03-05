@@ -266,13 +266,13 @@ def test_lazy_interval_n_lazy_counter(test_filepath):
     with h5py.File(test_filepath, "r") as f:
         data = LazyInterval.from_hdf5(f)
         assert data.__dict__["_n_lazy"] == 4
-        data.start
+        _ = data.start
         assert data.__dict__["_n_lazy"] == 3
-        data.end
+        _ = data.end
         assert data.__dict__["_n_lazy"] == 2
-        data.go_cue_time
+        _ = data.go_cue_time
         assert data.__dict__["_n_lazy"] == 1
-        data.drifting_gratings_dir
+        _ = data.drifting_gratings_dir
         assert data.__class__ == Interval
         assert "_n_lazy" not in data.__dict__
 
@@ -304,7 +304,7 @@ def test_lazy_interval_n_lazy_counter(test_filepath):
         assert isinstance(data.__dict__["end"], np.ndarray)
 
         # final attribute triggers demotion
-        data.drifting_gratings_dir
+        _ = data.drifting_gratings_dir
         assert data.__class__ == Interval
         assert "_n_lazy" not in data.__dict__
 

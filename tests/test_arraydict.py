@@ -193,11 +193,11 @@ def test_lazy_array_dict_n_lazy_counter(test_filepath):
     with h5py.File(test_filepath, "r") as f:
         data = LazyArrayDict.from_hdf5(f)
         assert data.__dict__["_n_lazy"] == 3
-        data.unit_id
+        _ = data.unit_id
         assert data.__dict__["_n_lazy"] == 2
-        data.brain_region
+        _ = data.brain_region
         assert data.__dict__["_n_lazy"] == 1
-        data.waveform_mean
+        _ = data.waveform_mean
         assert data.__class__ == ArrayDict
         assert "_n_lazy" not in data.__dict__
 
