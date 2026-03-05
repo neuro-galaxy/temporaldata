@@ -233,7 +233,7 @@ class Data(object):
         for key, value in self.__dict__.items():
             # todo update domain
             if key in ("_domain", "_file"):
-                continue
+                pass
             elif isinstance(
                 value, (IrregularTimeSeries, RegularTimeSeries, Interval)
             ) or (isinstance(value, Data) and value.domain is not None):
@@ -270,7 +270,7 @@ class Data(object):
         for key, value in self.__dict__.items():
             # todo update domain
             if key in ("_domain", "_file"):
-                continue
+                pass
             elif isinstance(
                 value, (IrregularTimeSeries, RegularTimeSeries, Interval)
             ) or (isinstance(value, Data) and value.domain is not None):
@@ -289,8 +289,8 @@ class Data(object):
         info = ""
         for key, value in self.__dict__.items():
             if key in ("_domain", "_file"):
-                continue
-            if isinstance(value, ArrayDict):
+                pass
+            elif isinstance(value, ArrayDict):
                 info = info + key + "=" + repr(value) + ",\n"
             elif value is not None:
                 info = info + _size_repr(key, value) + ",\n"
