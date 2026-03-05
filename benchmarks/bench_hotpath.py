@@ -1,25 +1,36 @@
 """Benchmark suite for temporaldata hot paths.
 
-Usage:
-    uv run python benchmarks/bench_hotpath.py [--save FILENAME]
+Benchmarks are modeled on real torch_brain workloads: Data.slice() on
+realistic lazy-loaded recording objects, IrregularTimeSeries/Interval
+inner-loop slicing, and Interval set operations at production-typical sizes.
 
-When --save is provided, results are appended as a JSON record to the file.
+Usage:
+    uv run python benchmarks/bench_hotpath.py
+    uv run python benchmarks/bench_hotpath.py --json
+    uv run python benchmarks/bench_hotpath.py --save results.jsonl
+
+Set TEMPORALDATA_SOURCE to override where temporaldata is imported from
+(used by compare.py to benchmark code from arbitrary commits).
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import time
-import timeit
 import os
 import sys
 import tempfile
+import time
+import timeit
+import traceback
+
+_source = os.environ.get(
+    "TEMPORALDATA_SOURCE", os.path.join(os.path.dirname(__file__), "..")
+)
+sys.path.insert(0, _source)
 
 import h5py
 import numpy as np
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from temporaldata import (
     ArrayDict,
@@ -31,26 +42,15 @@ from temporaldata import (
 )
 
 
-def _bench(label: str, stmt, number: int, setup=lambda: None) -> dict:
-    setup()
+def _bench(label: str, stmt, number: int) -> dict:
     times = timeit.repeat(stmt, number=number, repeat=5)
     mean_us = min(times) / number * 1e6
     return {"label": label, "number": number, "mean_us": round(mean_us, 3)}
 
 
-def bench_arraydict_keys():
-    ad = ArrayDict(**{f"key_{i}": np.arange(100, dtype=np.float64) for i in range(10)})
-
-    def go():
-        ad.keys()
-
-    return _bench("ArrayDict.keys() x100k", go, number=100_000)
-
-
 def _make_disjoint_intervals(
     n, span=10_000, min_gap=1.0, min_dur=0.5, max_dur=2.0, seed=42
 ):
-    """Generate n sorted disjoint intervals spread over [0, span]."""
     rng = np.random.default_rng(seed)
     starts = np.empty(n, dtype=np.float64)
     ends = np.empty(n, dtype=np.float64)
@@ -64,126 +64,360 @@ def _make_disjoint_intervals(
     return Interval(start=starts, end=ends)
 
 
+def _build_realistic_data():
+    """Build a PetersonBrunton-like Data object with nested splits.
+
+    Matches real brainsets structure: ecog, pose, behavior intervals,
+    channels, metadata Data children (brainset/subject/session/device),
+    and a nested splits Data containing ~27 Intervals for
+    3 task types x 3 folds x train/valid/test.
+    """
+    rng = np.random.default_rng(42)
+
+    domain_starts = np.array([0.0, 120.0, 250.0, 400.0, 550.0, 700.0, 850.0])
+    domain_ends = np.array([100.0, 230.0, 380.0, 520.0, 680.0, 830.0, 980.0])
+    domain = Interval(start=domain_starts, end=domain_ends)
+
+    ecog = RegularTimeSeries(
+        signal=rng.standard_normal((500_000, 4)),
+        sampling_rate=500.0,
+        domain=Interval(0.0, 1000.0),
+    )
+
+    pose_kwargs = {}
+    for part in [
+        "r_wrist",
+        "l_wrist",
+        "l_ear",
+        "l_elbow",
+        "l_shoulder",
+        "nose",
+        "r_ear",
+        "r_elbow",
+        "r_shoulder",
+    ]:
+        pose_kwargs[part] = rng.standard_normal((30_000, 2))
+    pose = RegularTimeSeries(
+        **pose_kwargs,
+        sampling_rate=30.0,
+        domain=Interval(0.0, 1000.0),
+    )
+
+    n_trials = 50
+    trial_starts = np.arange(0, n_trials * 18, 18, dtype=np.float64)
+    trial_dur = rng.uniform(5, 15, n_trials)
+    trial_ends = trial_starts + trial_dur
+    active_behavior_trials = Interval(
+        start=trial_starts,
+        end=trial_ends,
+        behavior_id=rng.integers(0, 4, n_trials),
+        go_cue_time=trial_starts + rng.uniform(0.5, 2.0, n_trials),
+        timekeys=["start", "end", "go_cue_time"],
+    )
+    active_vs_inactive_trials = Interval(
+        start=trial_starts.copy(),
+        end=trial_ends.copy(),
+        behavior_id=rng.integers(0, 2, n_trials),
+    )
+
+    n_ch = 64
+    channels = ArrayDict(
+        id=np.arange(n_ch),
+        hemisphere=rng.integers(0, 2, n_ch),
+        surface=rng.integers(0, 2, n_ch),
+    )
+
+    splits_kwargs = {}
+    for task in ["active_vs_inactive", "all_active_behavior", "pose_estimation"]:
+        for fold in range(3):
+            for split_name in ["train", "valid", "test"]:
+                key = f"{task}_fold_{fold}_{split_name}"
+                n_seg = int(rng.integers(4, 12))
+                gap = 900.0 / n_seg
+                s = np.arange(n_seg, dtype=np.float64) * gap
+                e = s + rng.uniform(3, gap * 0.8, n_seg)
+                splits_kwargs[key] = Interval(start=s, end=e)
+
+    splits = Data(
+        **splits_kwargs,
+        domain=active_vs_inactive_trials,
+    )
+
+    brainset = Data(
+        id="peterson_brunton_2022",
+        origin_version="0.220127",
+        source="dandi",
+    )
+    subject = Data(id="sub_01", species="human")
+    session = Data(id="sess_01", recording_date="2022-01-01")
+    device = Data(id="ecog_grid", recording_tech="ECoG")
+
+    return Data(
+        ecog=ecog,
+        pose=pose,
+        active_behavior_trials=active_behavior_trials,
+        active_vs_inactive_trials=active_vs_inactive_trials,
+        channels=channels,
+        splits=splits,
+        brainset=brainset,
+        subject=subject,
+        session=session,
+        device=device,
+        pose_valid_domain=Interval(start=domain_starts.copy(), end=domain_ends.copy()),
+        domain=domain,
+    )
+
+
+def _save_data_to_hdf5(data, path):
+    with h5py.File(path, "w") as f:
+        data.to_hdf5(f)
+
+
+# ---------------------------------------------------------------------------
+# Benchmarks
+# ---------------------------------------------------------------------------
+
+
+def bench_data_slice_lazy():
+    """Data.slice() on a lazy-loaded PetersonBrunton-like recording.
+
+    This is THE primary hot path in torch_brain: loading a recording from
+    HDF5 with lazy=True, then slicing a 1s window for each training sample.
+
+    The old code's __getattribute__ called keys() (via filter+lambda) on
+    every attribute access of every lazy object, multiplied across the
+    27 Intervals in splits + ecog + pose + trial Intervals.  The new code
+    uses O(1) dict lookups and an _n_lazy counter instead.
+    """
+    tmpfile = tempfile.NamedTemporaryFile(suffix=".h5", delete=False)
+    path = tmpfile.name
+    tmpfile.close()
+
+    data = _build_realistic_data()
+    _save_data_to_hdf5(data, path)
+
+    results = None
+    with h5py.File(path, "r") as f:
+
+        def go():
+            lazy_data = Data.from_hdf5(f, lazy=True)
+            lazy_data.slice(300.0, 301.0)
+
+        results = _bench("Data.slice() (lazy, realistic)", go, number=200)
+
+    os.unlink(path)
+    return results
+
+
+def bench_data_slice_inmemory():
+    """Data.slice() on an in-memory PetersonBrunton-like recording.
+
+    Shows the benefit of keys() caching across repeated slices on the
+    same object (as happens when sampling multiple windows per recording).
+    """
+    data = _build_realistic_data()
+
+    def go():
+        data.slice(300.0, 301.0)
+
+    return _bench("Data.slice() (in-memory)", go, number=500)
+
+
+def bench_its_slice():
+    """IrregularTimeSeries.slice() — inner hot path called per attribute
+    inside Data.slice(). 50k timestamps, 3 array columns."""
+    rng = np.random.default_rng(42)
+    n = 50_000
+    ts = np.sort(rng.uniform(0, 1000, n))
+    its = IrregularTimeSeries(
+        timestamps=ts,
+        unit_index=rng.integers(0, 100, n),
+        waveforms=rng.standard_normal((n, 48)),
+        domain=Interval(0.0, 1000.0),
+    )
+
+    def go():
+        its.slice(500.0, 501.0)
+
+    return _bench("IrregularTimeSeries.slice()", go, number=1_000)
+
+
+def bench_interval_slice():
+    """Interval.slice() — 100 trial intervals over 1000s, slice a 1s window."""
+    starts = np.arange(0, 1000, 10, dtype=np.float64)
+    ends = starts + 5.0
+    iv = Interval(start=starts, end=ends)
+
+    def go():
+        iv.slice(500.0, 501.0)
+
+    return _bench("Interval.slice()", go, number=2_000)
+
+
 def bench_interval_and_single():
+    """Interval.__and__ 1000 segments & single window.
+
+    Demonstrates the algorithmic win from replacing sorted_traversal
+    (O(n+m) Python sweep with np.append) with searchsorted-based approach.
+    The old code swept all 2002 endpoints; the new code does one searchsorted
+    on 1000 elements.
+    """
     d1 = _make_disjoint_intervals(1000, seed=42)
     single = Interval(500.0, 600.0)
 
     def go():
         d1 & single
 
-    return _bench("Interval.__and__ (single)", go, number=1_000)
+    return _bench("Interval.__and__ (1k&single)", go, number=1_000)
 
 
 def bench_interval_and_multi():
+    """Interval.__and__ 1000 & 100 segments.
+
+    Shows vectorization scaling: the old sorted_traversal was O((n+m) log(n+m))
+    Python-level with np.append per result segment. The new approach uses
+    searchsorted per segment in other, with vectorized slicing.
+    """
     d1 = _make_disjoint_intervals(1000, seed=42)
     d2 = _make_disjoint_intervals(100, seed=99)
 
     def go():
         d1 & d2
 
-    return _bench("Interval.__and__ (multi)", go, number=200)
+    return _bench("Interval.__and__ (1k&100)", go, number=200)
 
 
 def bench_interval_or():
+    """Interval.__or__ 1000 & 100 segments.
+
+    The old code used sorted_traversal with np.append per merged segment —
+    O(k^2) where k = number of output segments. The new code uses a fully
+    vectorized concat + argsort + maximum.accumulate approach.
+    """
     d1 = _make_disjoint_intervals(1000, seed=42)
     d2 = _make_disjoint_intervals(100, seed=99)
 
     def go():
         d1 | d2
 
-    return _bench("Interval.__or__", go, number=200)
+    return _bench("Interval.__or__ (1k|100)", go, number=200)
 
 
 def bench_interval_difference():
+    """Interval.difference 1000 & 100 segments.
+
+    Same sorted_traversal vs searchsorted improvement as __and__.
+    """
     d1 = _make_disjoint_intervals(1000, seed=42)
     d2 = _make_disjoint_intervals(100, seed=99)
 
     def go():
         d1.difference(d2)
 
-    return _bench("Interval.difference", go, number=200)
+    return _bench("Interval.difference (1k-100)", go, number=200)
 
 
-def bench_data_slice():
-    rng = np.random.default_rng(42)
-    n_spikes = 50_000
-    ts = np.sort(rng.uniform(0, 1000, n_spikes))
-    data = Data(
-        spikes=IrregularTimeSeries(
-            timestamps=ts,
-            unit_index=rng.integers(0, 100, n_spikes),
-            domain=Interval(0.0, 1000.0),
-        ),
-        lfp=RegularTimeSeries(
-            raw=rng.standard_normal((250_000, 4)),
-            sampling_rate=250.0,
-            domain=Interval(0.0, 1000.0),
-        ),
-        trials=Interval(
-            start=np.arange(0, 1000, 10, dtype=np.float64),
-            end=np.arange(10, 1010, 10, dtype=np.float64),
-        ),
-        domain=Interval(
-            start=np.array([0.0, 500.0]),
-            end=np.array([400.0, 1000.0]),
-        ),
-    )
+def bench_arraydict_keys():
+    """ArrayDict.keys() — tests the caching optimization."""
+    ad = ArrayDict(**{f"key_{i}": np.arange(100, dtype=np.float64) for i in range(10)})
 
     def go():
-        data.slice(100.0, 200.0)
+        ad.keys()
 
-    return _bench("Data.slice() end-to-end", go, number=500)
+    return _bench("ArrayDict.keys() x100k", go, number=100_000)
 
 
 def bench_lazy_interval_access():
+    """LazyInterval with 10 attributes — stresses the _n_lazy O(1) counter
+    vs the old O(n) all_loaded scan on every attribute access."""
     tmpfile = tempfile.NamedTemporaryFile(suffix=".h5", delete=False)
     path = tmpfile.name
     tmpfile.close()
 
     rng = np.random.default_rng(42)
-    starts = np.sort(rng.uniform(0, 10_000, 500))
-    ends = starts + rng.uniform(0.5, 2.0, 500)
-    iv = Interval(start=starts, end=ends)
+    n_intervals = 200
+    starts = np.sort(rng.uniform(0, 10_000, n_intervals))
+    ends = starts + rng.uniform(0.5, 2.0, n_intervals)
+
+    iv = Interval(
+        start=starts,
+        end=ends,
+        trial_type=rng.integers(0, 5, n_intervals),
+        condition=rng.integers(0, 3, n_intervals),
+        reward=rng.standard_normal(n_intervals),
+        go_cue_time=starts + rng.uniform(0.1, 0.3, n_intervals),
+        reaction_time=rng.uniform(0.15, 0.5, n_intervals),
+        success=rng.integers(0, 2, n_intervals),
+        target_pos_x=rng.standard_normal(n_intervals),
+        target_pos_y=rng.standard_normal(n_intervals),
+        timekeys=["start", "end", "go_cue_time"],
+    )
 
     with h5py.File(path, "w") as f:
         iv.to_hdf5(f)
 
-    results = []
+    results = None
     with h5py.File(path, "r") as f:
 
         def go():
             lazy = LazyInterval.from_hdf5(f)
             _ = lazy.start
             _ = lazy.end
+            _ = lazy.trial_type
+            _ = lazy.condition
+            _ = lazy.reward
 
-        results = _bench("LazyInterval .start/.end access", go, number=2_000)
+        results = _bench("LazyInterval access (10 attrs)", go, number=2_000)
 
     os.unlink(path)
     return results
 
 
+# ---------------------------------------------------------------------------
+# Runner
+# ---------------------------------------------------------------------------
+
+BENCHMARKS = [
+    bench_data_slice_lazy,
+    bench_data_slice_inmemory,
+    bench_its_slice,
+    bench_interval_slice,
+    bench_interval_and_single,
+    bench_interval_and_multi,
+    bench_interval_or,
+    bench_interval_difference,
+    bench_arraydict_keys,
+    bench_lazy_interval_access,
+]
+
+
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--save", type=str, default=None)
+    parser = argparse.ArgumentParser(description="Run temporaldata benchmarks.")
+    parser.add_argument("--json", action="store_true", help="Output results as JSON")
+    parser.add_argument(
+        "--save", type=str, default=None, help="Append results to a JSONL file"
+    )
     args = parser.parse_args()
 
-    benchmarks = [
-        bench_arraydict_keys,
-        bench_interval_and_single,
-        bench_interval_and_multi,
-        bench_interval_or,
-        bench_interval_difference,
-        bench_data_slice,
-        bench_lazy_interval_access,
-    ]
-
     results = []
-    print(f"{'Benchmark':<42} {'Iters':>8} {'Mean (µs)':>12}")
-    print("-" * 65)
-    for bench_fn in benchmarks:
-        r = bench_fn()
+    if not args.json:
+        print(f"{'Benchmark':<42} {'Iters':>8} {'Mean (µs)':>12}")
+        print("-" * 65)
+
+    for bench_fn in BENCHMARKS:
+        try:
+            r = bench_fn()
+        except Exception:
+            r = {"label": bench_fn.__name__, "error": traceback.format_exc()}
         results.append(r)
-        print(f"{r['label']:<42} {r['number']:>8} {r['mean_us']:>12.3f}")
+        if not args.json:
+            if "error" in r:
+                print(f"{r['label']:<42} {'ERROR':>8} {'---':>12}")
+            else:
+                print(f"{r['label']:<42} {r['number']:>8} {r['mean_us']:>12.3f}")
+
+    if args.json:
+        print(json.dumps({"results": results}))
 
     if args.save:
         record = {
@@ -192,7 +426,8 @@ def main():
         }
         with open(args.save, "a") as f:
             f.write(json.dumps(record) + "\n")
-        print(f"\nResults saved to {args.save}")
+        if not args.json:
+            print(f"\nResults saved to {args.save}")
 
 
 if __name__ == "__main__":
