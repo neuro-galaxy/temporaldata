@@ -633,8 +633,8 @@ class Interval(ArrayDict):
             unsigned_to_long (bool, optional): Whether to automatically convert unsigned
               integers to int64 dtype. Defaults to :obj:`True`.
         """
-        assert "start" in df.columns, f"Column 'start' not found in dataframe."
-        assert "end" in df.columns, f"Column 'end' not found in dataframe."
+        assert "start" in df.columns, "Column 'start' not found in dataframe."
+        assert "end" in df.columns, "Column 'end' not found in dataframe."
 
         return super().from_dataframe(
             df,
@@ -879,9 +879,8 @@ class LazyInterval(Interval):
         return super()._maybe_first_dim()
 
     def __getattribute__(self, name):
-        if not name in ["__dict__", "keys"]:
-            # intercept attribute calls
-            if name in self.keys():
+        if name not in ["__dict__", "keys"]:
+            if name in self.__dict__ and not name.startswith("_"):
                 out = self.__dict__[name]
 
                 if isinstance(out, h5py.Dataset):

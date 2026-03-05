@@ -144,7 +144,7 @@ class IrregularTimeSeries(ArrayDict):
 
         if name == "timestamps":
             assert value.ndim == 1, "timestamps must be 1D."
-            assert ~np.isnan(value).any(), f"timestamps cannot contain NaNs."
+            assert ~np.isnan(value).any(), "timestamps cannot contain NaNs."
             if value.dtype != np.float64:
                 logging.warning(f"{name} is of type {value.dtype} not of type float64.")
             # timestamps has been updated, we no longer know whether it is sorted or not
@@ -448,9 +448,8 @@ class LazyIrregularTimeSeries(IrregularTimeSeries):
             getattr(self, key)
 
     def __getattribute__(self, name):
-        if not name in ["__dict__", "keys"]:
-            # intercept attribute calls
-            if name in self.keys():
+        if name not in ["__dict__", "keys"]:
+            if name in self.__dict__ and not name.startswith("_"):
                 # out could either be a numpy array or a reference to a h5py dataset
                 # if is not loaded, now is the time to load it and apply any outstanding
                 # slicing or masking.
