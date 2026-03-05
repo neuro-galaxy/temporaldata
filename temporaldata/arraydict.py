@@ -339,6 +339,7 @@ class LazyArrayDict(ArrayDict):
 
     _lazy_ops = dict()
     _unicode_keys = []
+    _n_lazy = 0
 
     def _maybe_first_dim(self):
         if len(self.keys()) == 0:
@@ -364,34 +365,25 @@ class LazyArrayDict(ArrayDict):
             getattr(self, key)
 
     def __getattribute__(self, name):
-        if not name in ["__dict__", "keys"]:
-            # intercept attribute calls. this is where data that is not loaded is loaded
-            # and when any lazy operations are applied
-            if name in self.keys():
+        if name not in ("__dict__", "keys"):
+            if name in self.__dict__ and not name.startswith("_"):
                 out = self.__dict__[name]
 
                 if isinstance(out, h5py.Dataset):
-                    # apply any mask, and return the numpy array
                     if "mask" in self._lazy_ops:
                         out = out[self._lazy_ops["mask"]]
                     else:
                         out = out[:]
 
-                    # if the array was originally unicode, convert it back to unicode
                     if name in self._unicode_keys:
                         out = out.astype("U")
 
-                    # store it, now the array is loaded
                     self.__dict__[name] = out
+                    self.__dict__["_n_lazy"] -= 1
 
-                # if all attributes are loaded, we can remove the lazy flag
-                all_loaded = all(
-                    isinstance(self.__dict__[key], np.ndarray) for key in self.keys()
-                )
-                if all_loaded:
+                if self.__dict__["_n_lazy"] == 0:
                     self.__class__ = ArrayDict
-                    # delete special private attributes
-                    del self._lazy_ops, self._unicode_keys
+                    del self._lazy_ops, self._unicode_keys, self._n_lazy
                 return out
 
         return super(LazyArrayDict, self).__getattribute__(name)
@@ -407,22 +399,19 @@ class LazyArrayDict(ArrayDict):
                 f"({first_dim})."
             )
 
-        # make a copy
         out = self.__class__.__new__(self.__class__)
-        # private attributes
         out._unicode_keys = self._unicode_keys
         out._lazy_ops = {}
 
-        # array attributes
+        n_lazy = 0
         for key in self.keys():
             value = self.__dict__[key]
             if isinstance(value, h5py.Dataset):
-                # the mask will be applied when the getattr is called for this key
-                # the details of the mask operation are stored in _lazy_ops
                 out.__dict__[key] = value
+                n_lazy += 1
             else:
-                # this is a numpy array that is already loaded in memory, apply the mask
                 out.__dict__[key] = value[mask].copy()
+        out._n_lazy = n_lazy
 
         # store the mask operation in _lazy_ops for differed execution
         if "mask" not in self._lazy_ops:
@@ -467,5 +456,6 @@ class LazyArrayDict(ArrayDict):
 
         obj._unicode_keys = file.attrs["_unicode_keys"].astype(str).tolist()
         obj._lazy_ops = {}
+        obj._n_lazy = len(file)
 
         return obj

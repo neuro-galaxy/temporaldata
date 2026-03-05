@@ -298,7 +298,7 @@ def bench_arraydict_keys():
 
 
 def bench_lazy_interval_access():
-    """LazyInterval with 10 attributes stresses the _n_lazy O(1) counter."""
+    """LazyInterval with attributes stresses the _n_lazy O(1) counter."""
     tmpfile = tempfile.NamedTemporaryFile(suffix=".h5", delete=False)
     path = tmpfile.name
     tmpfile.close()
@@ -311,15 +311,8 @@ def bench_lazy_interval_access():
     iv = Interval(
         start=starts,
         end=ends,
-        trial_type=rng.randint(0, 5, n_intervals),
-        condition=rng.randint(0, 3, n_intervals),
-        reward=rng.standard_normal(n_intervals),
-        go_cue_time=starts + rng.uniform(0.1, 0.3, n_intervals),
-        reaction_time=rng.uniform(0.15, 0.5, n_intervals),
-        success=rng.randint(0, 2, n_intervals),
-        target_pos_x=rng.standard_normal(n_intervals),
-        target_pos_y=rng.standard_normal(n_intervals),
-        timekeys=["start", "end", "go_cue_time"],
+        **{f"target_pos_{i}": rng.standard_normal(n_intervals) for i in range(500)},
+        timekeys=["start", "end"],
     )
 
     with h5py.File(path, "w") as f:
@@ -332,11 +325,11 @@ def bench_lazy_interval_access():
             lazy = LazyInterval.from_hdf5(f)
             _ = lazy.start
             _ = lazy.end
-            _ = lazy.trial_type
-            _ = lazy.condition
-            _ = lazy.reward
 
-        results = _bench("LazyInterval access (10 attrs)", go, number=2_000)
+            for i in range(500):
+                _ = getattr(lazy, f"target_pos_{i}")
+
+        results = _bench("LazyInterval access (500 attrs)", go, number=25)
 
     os.unlink(path)
     return results
@@ -347,15 +340,15 @@ def bench_lazy_interval_access():
 # ---------------------------------------------------------------------------
 
 BENCHMARKS = [
-    bench_data_slice_lazy,
-    bench_data_slice_inmemory,
-    bench_its_slice,
-    bench_interval_slice,
-    bench_interval_and_single,
-    bench_interval_and_multi,
-    bench_interval_or,
-    bench_interval_difference,
-    bench_arraydict_keys,
+    # bench_data_slice_lazy,
+    # bench_data_slice_inmemory,
+    # bench_its_slice,
+    # bench_interval_slice,
+    # bench_interval_and_single,
+    # bench_interval_and_multi,
+    # bench_interval_or,
+    # bench_interval_difference,
+    # bench_arraydict_keys,
     bench_lazy_interval_access,
 ]
 
