@@ -115,18 +115,11 @@ class IrregularTimeSeries(ArrayDict):
 
         self._domain = domain
 
-    # todo add setter for domain
     @property
     def domain(self):
         r"""The time domain over which the time series is defined. Usually a single
         interval, but could also be a set of intervals."""
         return self._domain
-
-    @domain.setter
-    def domain(self, value: Interval):
-        if not isinstance(value, Interval):
-            raise ValueError(f"domain must be an Interval object, got {type(value)}.")
-        self._domain = value
 
     def timekeys(self):
         r"""Returns a list of all time-based attributes."""
@@ -145,6 +138,13 @@ class IrregularTimeSeries(ArrayDict):
                 raise ValueError(
                     f"domain must be an Interval object, got {type(value)}."
                 )
+
+            if not value.is_disjoint():
+                raise ValueError("The domain intervals must not be overlapping.")
+
+            if not value.is_sorted():
+                value.sort()
+
             object.__setattr__(self, "_domain", value)
             return
 

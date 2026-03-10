@@ -334,11 +334,24 @@ def test_irregular_set_domain():
         domain="auto",
     )
 
+    # auto domain should span the full timestamp range
+    assert np.allclose(data.domain.start, np.array([0.1]))
+    assert np.allclose(data.domain.end, np.array([0.6]))
+
+    # setting with a non-Interval should raise
     with pytest.raises(ValueError):
         data.domain = np.array([0.2, 0.4])
 
+    # setting with an overlapping domain should raise
+    with pytest.raises(ValueError):
+        data.domain = Interval(start=np.array([0.1, 0.3]), end=np.array([0.4, 0.5]))
+
+    # setting with an unsorted domain should auto-sort
+    data.domain = Interval(start=np.array([0.5, 0.1]), end=np.array([0.6, 0.2]))
+    assert np.allclose(data.domain.start, np.array([0.1, 0.5]))
+    assert np.allclose(data.domain.end, np.array([0.2, 0.6]))
+
+    # setting with a valid Interval should work
     data.domain = Interval(start=0.2, end=0.4)
     assert np.allclose(data.domain.start, np.array([0.2]))
     assert np.allclose(data.domain.end, np.array([0.4]))
-    assert np.allclose(data._domain.start, np.array([0.2]))
-    assert np.allclose(data._domain.end, np.array([0.4]))
