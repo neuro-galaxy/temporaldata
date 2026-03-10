@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Mapping, Sequence
-from typing import Any, Dict, List, Tuple, Union, Callable, Optional, Type
+from typing import Any, Dict, List, Literal, Tuple, Union, Callable, Optional, Type
 from pathlib import Path
+import warnings
 
 import h5py
 import numpy as np
@@ -16,14 +17,18 @@ from .utils import _size_repr
 
 
 class Data(object):
-    r"""A data object is a container for other data objects such as :obj:`ArrayDict`,
-     :obj:`RegularTimeSeries`, :obj:`IrregularTimeSeries`, and :obj:`Interval` objects.
-     But also regular objects like sclars, strings and numpy arrays.
+    r"""A flexible container for other data objects such as
+    :obj:`ArrayDict`, :obj:`RegularTimeSeries`, :obj:`IrregularTimeSeries`,
+    and :obj:`Interval` objects, as well as nested :obj:`Data` objects and
+    regular Python objects like scalars, strings, and numpy arrays.
 
     Args:
-        start: Start time.
-        end: End time.
-        **kwargs: Arbitrary attributes.
+        **kwargs: Arbitrary attributes to attach to the data object (e.g.
+            spikes, lfp, units, trials, metadata).
+        domain: An :obj:`Interval` specifying time domain of the data object.
+            If ``"auto"``, the domain is computed as the union of the domains
+            of any time-based attributes.
+            Defaults to :obj:`None`.
 
     Example ::
 
@@ -115,12 +120,13 @@ class Data(object):
 
     _absolute_start = 0.0
     _domain = None
+    _file: Optional[h5py.File] = None
 
     def __init__(
         self,
         *,
-        domain=None,
-        **kwargs: Dict[str, Union[str, float, int, np.ndarray, ArrayDict]],
+        domain: Union[Interval, Literal["auto"], None] = None,
+        **kwargs,
     ):
         if domain == "auto":
             # the domain is the union of the domains of the attributes
@@ -226,10 +232,11 @@ class Data(object):
 
         for key, value in self.__dict__.items():
             # todo update domain
-            if key != "_domain" and (
-                isinstance(value, (IrregularTimeSeries, RegularTimeSeries, Interval))
-                or (isinstance(value, Data) and value.domain is not None)
-            ):
+            if key in ("_domain", "_file"):
+                pass
+            elif isinstance(
+                value, (IrregularTimeSeries, RegularTimeSeries, Interval)
+            ) or (isinstance(value, Data) and value.domain is not None):
                 out.__dict__[key] = value.slice(start, end, reset_origin)
             else:
                 out.__dict__[key] = copy.copy(value)
@@ -262,10 +269,11 @@ class Data(object):
 
         for key, value in self.__dict__.items():
             # todo update domain
-            if key != "_domain" and (
-                isinstance(value, (IrregularTimeSeries, RegularTimeSeries, Interval))
-                or (isinstance(value, Data) and value.domain is not None)
-            ):
+            if key in ("_domain", "_file"):
+                pass
+            elif isinstance(
+                value, (IrregularTimeSeries, RegularTimeSeries, Interval)
+            ) or (isinstance(value, Data) and value.domain is not None):
                 if isinstance(value, RegularTimeSeries):
                     value = value.to_irregular()
                 out.__dict__[key] = value.select_by_interval(interval)
@@ -280,9 +288,9 @@ class Data(object):
 
         info = ""
         for key, value in self.__dict__.items():
-            if key == "_domain":
-                continue
-            if isinstance(value, ArrayDict):
+            if key in ("_domain", "_file"):
+                pass
+            elif isinstance(value, ArrayDict):
                 info = info + key + "=" + repr(value) + ",\n"
             elif value is not None:
                 info = info + _size_repr(key, value) + ",\n"
@@ -291,7 +299,8 @@ class Data(object):
 
     def to_dict(self) -> Dict[str, Any]:
         r"""Returns a dictionary of stored key/value pairs."""
-        return copy.deepcopy(self.__dict__)
+        out_dict = {k: v for k, v in self.__dict__.items() if k != "_file"}
+        return copy.deepcopy(out_dict)
 
     def to_hdf5(self, file, serialize_fn_map=None):
         r"""Saves the data object to an HDF5 file. This method will also call the
@@ -327,7 +336,7 @@ class Data(object):
             elif value is not None:
                 # each attribute should be small (generally < 64k)
                 # there is no partial I/O; the entire attribute must be read
-                value = serialize(value, serialize_fn_map=serialize_fn_map)
+                value = _serialize(value, serialize_fn_map=serialize_fn_map)
                 file.attrs[key] = value
 
         if self._domain is not None:
@@ -338,7 +347,7 @@ class Data(object):
         file.attrs["absolute_start"] = self._absolute_start
 
     @classmethod
-    def from_hdf5(cls, file, lazy=True):
+    def from_hdf5(cls, file: h5py.File | h5py.Group, lazy: bool = True):
         r"""Loads the data object from an HDF5 file. This method will also call the
         `from_hdf5` method of all contained data objects, so that the entire data object
         is loaded from the HDF5 file, i.e. no need to call `from_hdf5` for each contained
@@ -368,7 +377,10 @@ class Data(object):
                     group_cls = globals()[f"Lazy{class_name}"]
                 else:
                     group_cls = globals()[class_name]
-                data[key] = group_cls.from_hdf5(value)
+                if class_name == "Data":
+                    data[key] = group_cls.from_hdf5(value, lazy=lazy)
+                else:
+                    data[key] = group_cls.from_hdf5(value)
             else:
                 # if array, it will be loaded no matter what, always prefer ArrayDict
                 data[key] = value[:]
@@ -383,66 +395,149 @@ class Data(object):
         # restore the absolute start time
         obj._absolute_start = file.attrs["absolute_start"]
 
+        if lazy and isinstance(file, h5py.File):
+            obj._file = file
+
         return obj
 
+    @property
+    def file(self) -> h5py.File | None:
+        r"""The underlying HDF5 file handle, or ``None`` if no file
+        is open. Only set when the object was created via :meth:`load` or
+        :meth:`from_hdf5` with ``lazy=True``."""
+        return self._file
+
     @classmethod
-    def load(cls, path: Union[Path, str], lazy=True) -> Data:
+    def load(cls, path: Union[Path, str], lazy: bool = True) -> Data:
+        r"""Loads the :class:`Data` object from an HDF5 file given its file path.
+
+        When ``lazy=True`` (default), the underlying HDF5 file remains open and
+        data is loaded on demand. The caller is responsible for closing the file
+        handle when done, either by calling :meth:`close` or by using the
+        context manager protocol.
+
+        When ``lazy=False``, all data is read into memory immediately and the
+        file is closed before returning.
+
+        Args:
+            path: The file path to the HDF5 file containing the :class:`Data` object.
+            lazy: If True (default), load contained objects in lazy mode
+                (using LazyArrayDict, LazyRegularTimeSeries, etc.); if False,
+                read all data immediately into memory.
+
+        Returns:
+            Data: The loaded :class:`Data` object from the HDF5 file.
+
+        .. code-block:: python
+
+            from temporaldata import Data
+
+            # lazy with context manager (recommended)
+            with Data.load("data.h5") as data:
+                ...
+
+            # lazy with explicit close
+            data = Data.load("data.h5")
+            ...
+            data.close()
+
+            # non-lazy (no close needed)
+            data = Data.load("data.h5", lazy=False)
+        """
         file = h5py.File(path)
-        return cls.from_hdf5(file, lazy=lazy)
+        try:
+            obj = cls.from_hdf5(file, lazy=lazy)
+        except Exception:
+            file.close()
+            raise
+
+        if not lazy:
+            file.close()
+
+        return obj
+
+    def close(self, strict: bool = False):
+        r"""Close the file-handle that was opened for lazy-loading.
+        Any lazy attributes that have not been materialized will become invalid.
+
+        Args:
+            strict: If ``True``, raise an error when no open file handle
+                is present. Default ``False``.
+
+        """
+        if self._file is not None:
+            self._file.close()
+            self._file = None
+            return
+
+        if strict:
+            raise RuntimeError("No file handle is open")
+
+    def save(self, path: Union[Path, str]):
+        r"""Saves the data object to an HDF5 file at the given path.
+
+        Args:
+            path: Destination file path
+
+        .. code-block:: python
+
+                from temporaldata import Data
+
+                data = Data(...)
+                data.save("data.h5")
+        """
+        with h5py.File(path, "w") as f:
+            self.to_hdf5(f)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+        return False
 
     def set_train_domain(self, interval: Interval):
-        """Set the train domain for all attributes."""
+        """Deprecated no-op retained for backward compatibility."""
+        warnings.warn(
+            "set_train_domain() is being deprecated and will be removed in a future version. "
+            "Please directly set the train_domain attribute of this Data object.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.train_domain = interval
-        self.add_split_mask("train", interval)
 
     def set_valid_domain(self, interval: Interval):
-        """Set the valid domain for all attributes."""
+        """Deprecated no-op retained for backward compatibility."""
+        warnings.warn(
+            "set_valid_domain() is being deprecated and will be removed in a future version. "
+            "Please directly set the valid_domain attribute of this Data object.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.valid_domain = interval
-        self.add_split_mask("valid", interval)
 
     def set_test_domain(self, interval: Interval):
-        """Set the test domain for all attributes."""
+        """Deprecated no-op retained for backward compatibility."""
+        warnings.warn(
+            "set_test_domain() is being deprecated and will be removed in a future version. "
+            "Please directly set the test_domain attribute of this Data object.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.test_domain = interval
-        self.add_split_mask("test", interval)
 
-    def add_split_mask(
-        self,
-        name: str,
-        interval: Interval,
-    ):
-        """Create split masks for all Data, Interval & IrregularTimeSeries objects
-        contained within this Data object.
+    def _check_for_data_leakage(self, *args, **kwargs):
+        """Deprecated no-op retained for backward compatibility.
+
+        The ``_check_for_data_leakage`` method no longer performs any validation.
+        Actual data leakage checks should be performed by the sampler.
         """
-        for key in self.keys():
-            if key.endswith("_domain"):
-                # domains are not split
-                assert isinstance(getattr(self, key), Interval)
-                continue
-            obj = getattr(self, key)
-            if isinstance(
-                obj, (Data, RegularTimeSeries, IrregularTimeSeries, Interval)
-            ):
-                obj.add_split_mask(name, interval)
-
-    def _check_for_data_leakage(self, name):
-        """Ensure that split masks are all True"""
-        for key in self.keys():
-            if key.endswith("_domain"):
-                continue
-            obj = getattr(self, key)
-            if isinstance(obj, (IrregularTimeSeries, Interval)):
-                assert hasattr(obj, f"{name}_mask"), (
-                    f"Split mask for '{name}' not found in Data object. "
-                    f"Please register this split in prepare_data.py using "
-                    f"the session.register_split(...) method. In Data object: \n"
-                    f"{self}"
-                )
-                assert getattr(obj, f"{name}_mask").all(), (
-                    f"Data leakage detected split mask for '{name}' is not all True "
-                    f"in self.{key}."
-                )
-            if isinstance(obj, Data):
-                obj._check_for_data_leakage(name)
+        warnings.warn(
+            "_check_for_data_leakage() is being deprecated and will be removed in a future version. ",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return True
 
     def keys(self) -> List[str]:
         r"""Returns a list of all attribute names."""
@@ -472,6 +567,36 @@ class Data(object):
                     f"Could not resolve {path} in data (specifically, at level {c})"
                 )
         return out
+
+    def set_nested_attribute(self, path: str, value: Any) -> Data:
+        r"""Set a nested attribute specified by its path. The path can be nested
+        using dots. For example, if the path is "session.id", this method will
+        set the value of the ``id`` attribute of the ``session`` object.
+        The attribute is modified in an in-place manner.
+
+        Args:
+            path: Nested attribute path (can be dot-separated, e.g. "session.id").
+            value: The value to set for the attribute.
+
+        Returns:
+            Data: self with the updated nested attribute.
+
+        Raises:
+            AttributeError: If any component of the path cannot be resolved.
+        """
+        # Split key by dots, resolve using getattr
+        components = path.split(".")
+        obj = self
+        for c in components[:-1]:
+            try:
+                obj = getattr(obj, c)
+            except AttributeError:
+                raise AttributeError(
+                    f"Could not resolve {path} in data (specifically, at level {c})"
+                )
+
+        setattr(obj, components[-1], value)
+        return self
 
     def has_nested_attribute(self, path: str) -> bool:
         """Check if the attribute specified by the path exists in the Data object."""
@@ -511,8 +636,8 @@ class Data(object):
         result = cls.__new__(cls)
         memo[id(self)] = result
         for k, v in self.__dict__.items():
-            if isinstance(v, h5py.Dataset):
-                # h5py.File objects cannot be deepcopied
+            if isinstance(v, (h5py.Dataset, h5py.File)):
+                # open files cannot be deepcopied
                 setattr(result, k, v)
             else:
                 setattr(result, k, copy.deepcopy(v, memo))
@@ -532,7 +657,7 @@ class Data(object):
         return self
 
 
-def serialize(
+def _serialize(
     elem,
     serialize_fn_map: Optional[Dict[Union[Type, Tuple[Type, ...]], Callable]] = None,
 ):
@@ -562,7 +687,7 @@ def serialize(
 
     if isinstance(elem, (list, tuple)):
         return elem_type(
-            [serialize(e, serialize_fn_map=serialize_fn_map) for e in elem]
+            [_serialize(e, serialize_fn_map=serialize_fn_map) for e in elem]
         )
 
     # element does not need to be seralized, or type not supported

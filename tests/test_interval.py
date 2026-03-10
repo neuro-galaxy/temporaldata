@@ -660,28 +660,286 @@ def test_is_dijoint_is_sorted():
     assert empty_interval.is_sorted() == True
 
 
-def test_interval_coalesce():
-    data = Interval(
-        start=np.array([0.0, 1.0, 2.0]),
-        end=np.array([1.0, 2.0, 3.0]),
-        go_cue_time=np.array([0.5, 1.5, 2.5]),
-        drifting_gratings_dir=np.array([0, 45, 90]),
+class TestIntervalCoalesce:
+    def test_contiguous_intervals(self):
+        data = Interval(
+            start=np.array([0.0, 1.0, 2.0]),
+            end=np.array([1.0, 2.0, 3.0]),
+            go_cue_time=np.array([0.5, 1.5, 2.5]),
+            drifting_gratings_dir=np.array([0, 45, 90]),
+            timekeys=["start", "end", "go_cue_time"],
+        )
+
+        coalesced_data = data.coalesce()
+        assert len(coalesced_data) == 1
+        # only keep start and end
+        assert len(coalesced_data.keys()) == 2
+        assert np.allclose(coalesced_data.start, np.array([0.0]))
+        assert np.allclose(coalesced_data.end, np.array([3.0]))
+
+    def test_mixed_overlapping_and_separated(self):
+        data = Interval(
+            start=np.array([0.0, 1.0, 2.0, 4.0, 4.5, 5.0, 10.0]),
+            end=np.array([0.5, 2.0, 2.5, 4.5, 5.0, 6.0, 11.0]),
+        )
+
+        coalesced_data = data.coalesce()
+        assert len(coalesced_data) == 4
+        assert np.allclose(coalesced_data.start, np.array([0.0, 1.0, 4.0, 10.0]))
+        assert np.allclose(coalesced_data.end, np.array([0.5, 2.5, 6.0, 11.0]))
+
+    def test_already_disjoint(self):
+        data = Interval(
+            start=np.array([0.0, 5.0, 10.0]),
+            end=np.array([1.0, 6.0, 11.0]),
+        )
+
+        coalesced_data = data.coalesce()
+        assert len(coalesced_data) == 3
+        assert np.allclose(coalesced_data.start, np.array([0.0, 5.0, 10.0]))
+        assert np.allclose(coalesced_data.end, np.array([1.0, 6.0, 11.0]))
+
+    def test_empty_interval(self):
+        data = Interval(start=np.array([]), end=np.array([]))
+        coalesced_data = data.coalesce()
+        assert len(coalesced_data) == 0
+        assert np.array_equal(coalesced_data.start, np.array([]))
+        assert np.array_equal(coalesced_data.end, np.array([]))
+
+    def test_custom_eps(self):
+        data = Interval(
+            start=np.array([0.0, 1.001, 5.0]),
+            end=np.array([1.0, 2.0, 6.0]),
+        )
+
+        # default eps=1e-6: gap of 0.001 is too large, no coalescing
+        coalesced_default = data.coalesce()
+        assert len(coalesced_default) == 3
+
+        # eps=0.01: gap of 0.001 is within threshold, first two coalesce
+        coalesced_custom = data.coalesce(eps=0.01)
+        assert len(coalesced_custom) == 2
+        assert np.allclose(coalesced_custom.start, np.array([0.0, 5.0]))
+        assert np.allclose(coalesced_custom.end, np.array([2.0, 6.0]))
+
+    def test_gap_exactly_at_eps(self):
+        eps = 0.01
+        data = Interval(
+            start=np.array([0.0, 1.0 + eps]),
+            end=np.array([1.0, 2.0]),
+        )
+
+        # gap == eps is NOT less than eps, so intervals stay separate
+        coalesced_data = data.coalesce(eps=eps)
+        assert len(coalesced_data) == 2
+        assert np.allclose(coalesced_data.start, np.array([0.0, 1.0 + eps]))
+        assert np.allclose(coalesced_data.end, np.array([1.0, 2.0]))
+
+    def test_gap_just_under_eps(self):
+        eps = 0.01
+        gap = eps - 1e-10
+        data = Interval(
+            start=np.array([0.0, 1.0 + gap]),
+            end=np.array([1.0, 2.0]),
+        )
+
+        # gap < eps, so intervals coalesce
+        coalesced_data = data.coalesce(eps=eps)
+        assert len(coalesced_data) == 1
+        assert np.allclose(coalesced_data.start, np.array([0.0]))
+        assert np.allclose(coalesced_data.end, np.array([2.0]))
+
+    def test_negative_eps_raises(self):
+        data = Interval(
+            start=np.array([0.0, 2.0]),
+            end=np.array([1.0, 3.0]),
+        )
+        with pytest.raises(ValueError, match="eps must be non-negative"):
+            data.coalesce(eps=-0.1)
+
+
+def test_subdivide():
+    interval = Interval(start=np.array([0.0]), end=np.array([10.0]))
+    result = interval.subdivide(2.0)
+    expected = Interval(
+        start=np.array([0.0, 2.0, 4.0, 6.0, 8.0]),
+        end=np.array([2.0, 4.0, 6.0, 8.0, 10.0]),
+    )
+    assert np.allclose(result.start, expected.start) and np.allclose(
+        result.end, expected.end
+    )
+
+    interval = Interval(
+        start=np.array([0.0, 20.0]),
+        end=np.array([10.0, 30.0]),
+    )
+    result = interval.subdivide(2.5)
+    expected = Interval(
+        start=np.array([0.0, 2.5, 5.0, 7.5, 20.0, 22.5, 25.0, 27.5]),
+        end=np.array([2.5, 5.0, 7.5, 10.0, 22.5, 25.0, 27.5, 30.0]),
+    )
+    assert np.allclose(result.start, expected.start) and np.allclose(
+        result.end, expected.end
+    )
+
+    interval = Interval(start=np.array([0.0]), end=np.array([10.5]))
+    result = interval.subdivide(3.0)
+    expected = Interval(
+        start=np.array([0.0, 3.0, 6.0, 9.0]),
+        end=np.array([3.0, 6.0, 9.0, 10.5]),
+    )
+    assert np.allclose(result.start, expected.start) and np.allclose(
+        result.end, expected.end
+    )
+
+    interval = Interval(start=np.array([0.0]), end=np.array([0.5]))
+    result = interval.subdivide(2.0)
+    expected = Interval(start=np.array([0.0]), end=np.array([0.5]))
+    assert np.allclose(result.start, expected.start) and np.allclose(
+        result.end, expected.end
+    )
+
+    interval = Interval(start=np.array([]), end=np.array([]))
+    result = interval.subdivide(2.0)
+    expected = Interval(start=np.array([]), end=np.array([]))
+    assert np.allclose(result.start, expected.start) and np.allclose(
+        result.end, expected.end
+    )
+
+    interval = Interval(start=np.array([0.0]), end=np.array([2.0]))
+    result = interval.subdivide(2.0)
+    expected = Interval(start=np.array([0.0]), end=np.array([2.0]))
+    assert np.allclose(result.start, expected.start) and np.allclose(
+        result.end, expected.end
+    )
+
+
+def test_subdivide_drop_short():
+    interval = Interval(start=np.array([0.0]), end=np.array([10.5]))
+    result = interval.subdivide(3.0, drop_short=False)
+    expected = Interval(
+        start=np.array([0.0, 3.0, 6.0, 9.0]),
+        end=np.array([3.0, 6.0, 9.0, 10.5]),
+    )
+    assert np.allclose(result.start, expected.start) and np.allclose(
+        result.end, expected.end
+    )
+
+    interval = Interval(start=np.array([0.0]), end=np.array([10.5]))
+    result = interval.subdivide(3.0, drop_short=True)
+    expected = Interval(
+        start=np.array([0.0, 3.0, 6.0]),
+        end=np.array([3.0, 6.0, 9.0]),
+    )
+    assert np.allclose(result.start, expected.start) and np.allclose(
+        result.end, expected.end
+    )
+
+    interval = Interval(start=np.array([0.0, 20.0]), end=np.array([10.5, 25.0]))
+    result = interval.subdivide(3.0, drop_short=True)
+    expected = Interval(
+        start=np.array([0.0, 3.0, 6.0, 20.0]),
+        end=np.array([3.0, 6.0, 9.0, 23.0]),
+    )
+    assert np.allclose(result.start, expected.start) and np.allclose(
+        result.end, expected.end
+    )
+
+    interval = Interval(start=np.array([0.0]), end=np.array([0.5]))
+    result = interval.subdivide(2.0, drop_short=True)
+    expected = Interval(start=np.array([]), end=np.array([]))
+    assert np.allclose(result.start, expected.start) and np.allclose(
+        result.end, expected.end
+    )
+
+
+def test_subdivide_attributes_preservation():
+    interval = Interval(
+        start=np.array([0.0, 20.0]),
+        end=np.array([6.0, 26.0]),
+        trial_id=np.array([1, 2]),
+        condition=np.array(["A", "B"]),
+        timekeys=["start", "end"],
+    )
+    result = interval.subdivide(2.0)
+
+    expected_start = np.array([0.0, 2.0, 4.0, 20.0, 22.0, 24.0])
+    expected_end = np.array([2.0, 4.0, 6.0, 22.0, 24.0, 26.0])
+    expected_trial_id = np.array([1, 1, 1, 2, 2, 2])
+    expected_condition = np.array(["A", "A", "A", "B", "B", "B"])
+
+    assert np.allclose(result.start, expected_start)
+    assert np.allclose(result.end, expected_end)
+    assert np.array_equal(result.trial_id, expected_trial_id)
+    assert np.array_equal(result.condition, expected_condition)
+
+    interval = Interval(
+        start=np.array([0.0]),
+        end=np.array([5.5]),
+        session_id=np.array([42]),
+        timekeys=["start", "end"],
+    )
+    result = interval.subdivide(2.0, drop_short=False)
+
+    expected_start = np.array([0.0, 2.0, 4.0])
+    expected_end = np.array([2.0, 4.0, 5.5])
+    expected_session_id = np.array([42, 42, 42])
+
+    assert np.allclose(result.start, expected_start)
+    assert np.allclose(result.end, expected_end)
+    assert np.array_equal(result.session_id, expected_session_id)
+
+    interval = Interval(
+        start=np.array([0.0]),
+        end=np.array([5.5]),
+        session_id=np.array([42]),
+        timekeys=["start", "end"],
+    )
+    result = interval.subdivide(2.0, drop_short=True)
+
+    expected_start = np.array([0.0, 2.0])
+    expected_end = np.array([2.0, 4.0])
+    expected_session_id = np.array([42, 42])
+
+    assert np.allclose(result.start, expected_start)
+    assert np.allclose(result.end, expected_end)
+    assert np.array_equal(result.session_id, expected_session_id)
+
+
+def test_subdivide_empty_interval_preserves_attributes():
+    interval = Interval(
+        start=np.array([]),
+        end=np.array([]),
+        trial_id=np.array([], dtype=int),
+        condition=np.array([], dtype=str),
+        timekeys=["start", "end"],
+    )
+    result = interval.subdivide(2.0)
+
+    assert len(result) == 0
+    assert np.allclose(result.start, np.array([]))
+    assert np.allclose(result.end, np.array([]))
+    assert "trial_id" in result.keys()
+    assert "condition" in result.keys()
+    assert len(result.trial_id) == 0
+    assert len(result.condition) == 0
+    assert result.timekeys() == ["start", "end"]
+
+
+def test_subdivide_timekeys_preservation():
+    interval = Interval(
+        start=np.array([0.0, 10.0]),
+        end=np.array([4.0, 14.0]),
+        go_cue_time=np.array([1.0, 11.0]),
         timekeys=["start", "end", "go_cue_time"],
     )
+    result = interval.subdivide(2.0)
 
-    coalesced_data = data.coalesce()
-    assert len(coalesced_data) == 1
-    # only keep start and end
-    assert len(coalesced_data.keys()) == 2
-    assert np.allclose(coalesced_data.start, np.array([0.0]))
-    assert np.allclose(coalesced_data.end, np.array([3.0]))
+    expected_start = np.array([0.0, 2.0, 10.0, 12.0])
+    expected_end = np.array([2.0, 4.0, 12.0, 14.0])
+    expected_go_cue_time = np.array([1.0, 1.0, 11.0, 11.0])
 
-    data = Interval(
-        start=np.array([0.0, 1.0, 2.0, 4.0, 4.5, 5.0, 10.0]),
-        end=np.array([0.5, 2.0, 2.5, 4.5, 5.0, 6.0, 11.0]),
-    )
-
-    coalesced_data = data.coalesce()
-    assert len(coalesced_data) == 4
-    assert np.allclose(coalesced_data.start, np.array([0.0, 1.0, 4.0, 10.0]))
-    assert np.allclose(coalesced_data.end, np.array([0.5, 2.5, 6.0, 11.0]))
+    assert np.allclose(result.start, expected_start)
+    assert np.allclose(result.end, expected_end)
+    assert np.array_equal(result.go_cue_time, expected_go_cue_time)
+    assert "go_cue_time" in result.timekeys()

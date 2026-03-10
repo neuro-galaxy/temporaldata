@@ -76,7 +76,6 @@ class Interval(ArrayDict):
 
     _sorted = None
     _timekeys = None
-    _allow_split_mask_overlap = False
 
     def __init__(
         self,
@@ -310,37 +309,40 @@ class Interval(ArrayDict):
         out.end[-1] = out.end[-1] + size[-1]
         return out
 
-    def coalesce(self, eps=1e-6):
+    def coalesce(self, eps: float = 1e-6):
         r"""Coalesces the intervals that are closer than :obj:`eps`. This operation
         returns a new :obj:`Interval` object, and does not resolve the existing
         attributes.
 
         Args:
             eps: The distance threshold for coalescing the intervals. Defaults to 1e-6.
+
+        Example:
+            >>> interval = Interval(
+            ...     start=np.array([0.0, 1.0, 2.0, 5.0, 5.5, 10.0]),
+            ...     end=np.array([1.0, 2.0, 3.0, 5.5, 7.0, 12.0]),
+            ... )
+            >>> coalesced = interval.coalesce()
+            >>> coalesced.start
+            array([ 0.,  5., 10.])
+            >>> coalesced.end
+            array([ 3.,  7., 12.])
         """
+        if len(self) == 0:
+            return Interval(start=np.array([]), end=np.array([]))
+
+        if eps < 0:
+            raise ValueError(f"eps must be non-negative, got eps={eps}")
+
         if not self.is_sorted():
             self.sort()
 
-        start = []
-        end = []
+        s, e = self.start, self.end
 
-        current_start = self.start[0]
-        current_end = self.end[0]
-
-        for s, e in zip(self.start[1:], self.end[1:]):
-            if s - current_end < eps:
-                # we have an overlap
-                current_end = e
-            else:
-                start.append(current_start)
-                end.append(current_end)
-                current_start = s
-                current_end = e
-
-        start.append(current_start)
-        end.append(current_end)
-
-        return Interval(start=np.array(start), end=np.array(end))
+        mask = s[1:] >= e[:-1] + eps
+        out_start = np.insert(s[1:][mask], 0, s[0], axis=0)
+        out_end = np.append(e[:-1][mask], [e[-1]], axis=0)
+        return Interval(out_start, out_end)
 
     def difference(self, other):
         r"""Returns the difference between two sets of intervals. The intervals are
@@ -412,14 +414,50 @@ class Interval(ArrayDict):
         before splitting.
 
         Args:
-            sizes: A list of integers or floats. If integers, the list must sum to the
-            number of intervals. If floats, the list must sum to 1.0.
+            sizes: A list of integers or floats.
+
+                - **Integers**: The list must sum to the number of intervals.
+                  Example: ``[60, 20, 20]`` for 100 intervals.
+
+                - **Floats**: The list must sum to 1.0.
+                  Example: ``[0.6, 0.2, 0.2]`` for a 60/20/20 split.
+
             shuffle: If :obj:`True`, the intervals will be shuffled before splitting.
             random_seed: The random seed to use for shuffling.
+
+        Returns:
+            A list of :obj:`Interval` objects, one for each element in ``sizes``.
 
         .. note::
             This method will not guarantee that the resulting sets will be disjoint, if
             the intervals are not already disjoint.
+
+        Examples:
+            Split 10 intervals into 60/20/20 sets using integers:
+
+            >>> from temporaldata import Interval
+            >>> intervals = Interval.linspace(0, 1, 10)
+            >>> train, val, test = intervals.split([6, 2, 2])
+            >>> print(len(train), len(val), len(test))
+            6 2 2
+
+            Split using proportions (floats):
+
+            >>> intervals = Interval.linspace(0, 1, 100)
+            >>> train, val, test = intervals.split([0.7, 0.15, 0.15])
+            >>> print(len(train), len(val), len(test))
+            70 15 15
+
+            Split with shuffling:
+
+            >>> intervals = Interval.linspace(0, 1, 100)
+            >>> train, test = intervals.split(
+            ...     [0.8, 0.2],
+            ...     shuffle=True,
+            ...     random_seed=42
+            ... )
+            >>> print(len(train), len(test))
+            80 20
         """
 
         assert len(sizes) > 1, "must split into at least two sets"
@@ -457,48 +495,76 @@ class Interval(ArrayDict):
 
         return splits
 
-    def add_split_mask(
+    def subdivide(
         self,
-        name: str,
-        interval: Interval,
-    ):
-        """Adds a boolean mask as an array attribute, which is defined for each
-        interval in the object, and is set to :obj:`True` if the interval intersects
-        with the provided :obj:`Interval` object. The mask attribute will be called
-        :obj:`<name>_mask`.
+        step: float,
+        drop_short: bool = False,
+    ) -> Interval:
+        r"""Subdivides each interval into fixed-duration segments while preserving
+        attributes.
 
-        This is used to mark intervals as part of train, validation,
-        or test sets, and is useful to ensure that there is no data leakage.
-
-        If an interval belongs to multiple splits, an error will be raised, unless this
-        is expected, in which case the method :meth:`allow_split_mask_overlap` should be
-        called.
+        If the last segment of an interval is shorter than :obj:`step`, it will be
+        included by default. Set :obj:`drop_short` to :obj:`True` to exclude these
+        partial segments. If an interval is shorter than :obj:`step`, it will be
+        treated as a partial segment (kept if :obj:`drop_short` is :obj:`False`,
+        dropped otherwise).
 
         Args:
-            name: name of the split, e.g. "train", "valid", "test".
-            interval: a set of intervals defining the split domain.
+            step: The duration of each segment.
+            drop_short: If :obj:`True`, excludes segments shorter than :obj:`step`.
+                Defaults to :obj:`False`.
+
+        Returns:
+            A new :obj:`Interval` object with the subdivided segments.
+
+        Example ::
+
+            >>> from temporaldata import Interval
+            >>> import numpy as np
+
+            >>> interval = Interval(
+            ...     start=np.array([0.0, 20.0]),
+            ...     end=np.array([10.0, 30.0]),
+            ...     trial_id=np.array([1, 2])
+            ... )
+            >>> subdivided = interval.subdivide(2.5)
+            >>> subdivided
+            Interval(
+              start=[8],
+              end=[8],
+              trial_id=[8]
+            )
+            >>> subdivided.trial_id
+            array([1, 1, 1, 1, 2, 2, 2, 2])
         """
-        assert f"{name}_mask" not in self.keys(), (
-            f"Attribute {name}_mask already exists. Use another mask name, or rename "
-            f"the existing attribute."
+        if len(self) == 0:
+            return copy.deepcopy(self)
+
+        subdivided_intervals_starts = []
+        subdivided_intervals_ends = []
+        original_indices = []
+
+        for i, (start, end) in enumerate(zip(self.start, self.end)):
+            subdivided = Interval.arange(
+                start, end, step=step, include_end=not drop_short
+            )
+            subdivided_intervals_starts.append(subdivided.start)
+            subdivided_intervals_ends.append(subdivided.end)
+            original_indices.extend([i] * len(subdivided))
+
+        all_starts = np.concatenate(subdivided_intervals_starts)
+        all_ends = np.concatenate(subdivided_intervals_ends)
+
+        kwargs = {}
+        for key in self.keys():
+            if key in ["start", "end"]:
+                continue
+            val = getattr(self, key)
+            kwargs[key] = val[original_indices]
+
+        return Interval(
+            start=all_starts, end=all_ends, timekeys=self.timekeys(), **kwargs
         )
-
-        mask_array = np.zeros_like(self.start, dtype=bool)
-        for start, end in zip(interval.start, interval.end):
-            mask_array |= (self.start < end) & (self.end > start)
-
-        setattr(self, f"{name}_mask", mask_array)
-
-    def allow_split_mask_overlap(self):
-        r"""Disables the check for split mask overlap. This means there could be an
-        overlap between the intervals across different splits. This is useful when
-        an interval is allowed to belong to multiple splits."""
-        logging.warning(
-            f"You are disabling the check for split mask overlap. "
-            f"This means there could be an overlap between the intervals "
-            f"across different splits. "
-        )
-        self._allow_split_mask_overlap = True
 
     @classmethod
     def linspace(cls, start: float, end: float, steps: int):
@@ -641,7 +707,6 @@ class Interval(ArrayDict):
 
         file.attrs["_unicode_keys"] = np.array(_unicode_keys, dtype="S")
         file.attrs["timekeys"] = np.array(self._timekeys, dtype="S")
-        file.attrs["allow_split_mask_overlap"] = self._allow_split_mask_overlap
         file.attrs["object"] = self.__class__.__name__
 
     @classmethod
@@ -673,9 +738,6 @@ class Interval(ArrayDict):
                 data[key] = data[key].astype("U")
         timekeys = file.attrs["timekeys"].astype(str).tolist()
         obj = cls(**data, timekeys=timekeys)
-
-        if file.attrs["allow_split_mask_overlap"]:
-            obj.allow_split_mask_overlap()
 
         return obj
 
