@@ -193,7 +193,12 @@ def main():
         if len(args.commits) == 0:
             results = run_benchmark(None, "working tree")
             print_single(results, "working tree")
-            save_record = {"label": "working-tree", "results": results}
+            save_record = {
+                "baseline": "working-tree",
+                "target": None,
+                "results_baseline": results,
+                "results_target": None,
+            }
 
         elif len(args.commits) == 1:
             commit = resolve_commit(args.commits[0])
