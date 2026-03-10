@@ -48,9 +48,7 @@ def _bench(label: str, stmt, number: int) -> dict:
     return {"label": label, "number": number, "mean_us": round(mean_us, 3)}
 
 
-def _make_disjoint_intervals(
-    n, span=10_000, min_gap=1.0, min_dur=0.5, max_dur=2.0, seed=42
-):
+def _make_disjoint_intervals(n, min_gap=1.0, min_dur=0.5, max_dur=2.0, seed=42):
     rng = np.random.RandomState(seed)
     starts = np.empty(n, dtype=np.float64)
     ends = np.empty(n, dtype=np.float64)
@@ -325,24 +323,29 @@ def bench_lazy_interval_access():
         timekeys=["start", "end", "go_cue_time"],
     )
 
-    with h5py.File(path, "w") as f:
-        iv.to_hdf5(f)
+    try:
+        with h5py.File(path, "w") as f:
+            iv.to_hdf5(f)
 
-    results = None
-    with h5py.File(path, "r") as f:
+        with h5py.File(path, "r") as f:
 
-        def go():
-            lazy = LazyInterval.from_hdf5(f)
-            _ = lazy.start
-            _ = lazy.end
-            _ = lazy.trial_type
-            _ = lazy.condition
-            _ = lazy.reward
+            def go():
+                lazy = LazyInterval.from_hdf5(f)
+                _ = lazy.start
+                _ = lazy.end
+                _ = lazy.trial_type
+                _ = lazy.condition
+                _ = lazy.reward
+                _ = lazy.go_cue_time
+                _ = lazy.reaction_time
+                _ = lazy.success
+                _ = lazy.target_pos_x
+                _ = lazy.target_pos_y
 
-        results = _bench("LazyInterval access (10 attrs)", go, number=2_000)
-
-    os.unlink(path)
-    return results
+            return _bench("LazyInterval access (10 attrs)", go, number=2_000)
+    finally:
+        if os.path.exists(path):
+            os.unlink(path)
 
 
 # ---------------------------------------------------------------------------
