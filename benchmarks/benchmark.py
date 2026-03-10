@@ -48,9 +48,7 @@ def _bench(label: str, stmt, number: int) -> dict:
     return {"label": label, "number": number, "mean_us": round(mean_us, 3)}
 
 
-def _make_disjoint_intervals(
-    n, span=10_000, min_gap=1.0, min_dur=0.5, max_dur=2.0, seed=42
-):
+def _make_disjoint_intervals(n, min_gap=1.0, min_dur=0.5, max_dur=2.0, seed=42):
     rng = np.random.RandomState(seed)
     starts = np.empty(n, dtype=np.float64)
     ends = np.empty(n, dtype=np.float64)
@@ -100,6 +98,15 @@ def _build_realistic_data():
     pose = RegularTimeSeries(
         **pose_kwargs,
         sampling_rate=30.0,
+        domain=Interval(0.0, 1000.0),
+    )
+
+    n_spikes = 50_000
+    spike_times = np.sort(rng.uniform(0, 1000, n_spikes))
+    spikes = IrregularTimeSeries(
+        timestamps=spike_times,
+        unit_index=rng.randint(0, 100, n_spikes),
+        waveforms=rng.standard_normal((n_spikes, 48)),
         domain=Interval(0.0, 1000.0),
     )
 
@@ -155,6 +162,7 @@ def _build_realistic_data():
     return Data(
         ecog=ecog,
         pose=pose,
+        spikes=spikes,
         active_behavior_trials=active_behavior_trials,
         active_vs_inactive_trials=active_vs_inactive_trials,
         channels=channels,
@@ -166,11 +174,6 @@ def _build_realistic_data():
         pose_valid_domain=Interval(start=domain_starts.copy(), end=domain_ends.copy()),
         domain=domain,
     )
-
-
-def _save_data_to_hdf5(data, path):
-    with h5py.File(path, "w") as f:
-        data.to_hdf5(f)
 
 
 # ---------------------------------------------------------------------------
@@ -188,17 +191,15 @@ def bench_data_slice_lazy():
 
     try:
         data = _build_realistic_data()
-        _save_data_to_hdf5(data, path)
+        data.save(path)
 
-        results = None
         with h5py.File(path, "r") as f:
+            lazy_data = Data.from_hdf5(f, lazy=True)
 
             def go():
-                lazy_data = Data.from_hdf5(f, lazy=True)
                 lazy_data.slice(300.0, 301.0)
 
-            results = _bench("Data.slice() (lazy, realistic)", go, number=200)
-        return results
+            return _bench("Data.slice() (lazy, realistic)", go, number=200)
     finally:
         os.unlink(path)
 
