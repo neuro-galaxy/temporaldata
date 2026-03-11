@@ -298,8 +298,8 @@ def bench_arraydict_keys():
     return _bench("ArrayDict.keys() x100k", go, number=100_000)
 
 
-def bench_lazy_interval_access():
-    """LazyInterval with 10 attributes stresses the _n_lazy O(1) counter."""
+def bench_lazy_interval_access(num_attrs: int = 500):
+    """LazyInterval with attributes stresses the _n_lazy O(1) counter."""
     tmpfile = tempfile.NamedTemporaryFile(suffix=".h5", delete=False)
     path = tmpfile.name
     tmpfile.close()
@@ -312,40 +312,39 @@ def bench_lazy_interval_access():
     iv = Interval(
         start=starts,
         end=ends,
-        trial_type=rng.randint(0, 5, n_intervals),
-        condition=rng.randint(0, 3, n_intervals),
-        reward=rng.standard_normal(n_intervals),
-        go_cue_time=starts + rng.uniform(0.1, 0.3, n_intervals),
-        reaction_time=rng.uniform(0.15, 0.5, n_intervals),
-        success=rng.randint(0, 2, n_intervals),
-        target_pos_x=rng.standard_normal(n_intervals),
-        target_pos_y=rng.standard_normal(n_intervals),
-        timekeys=["start", "end", "go_cue_time"],
+        **{
+            f"target_pos_{i}": rng.standard_normal(n_intervals)
+            for i in range(num_attrs)
+        },
+        timekeys=["start", "end"],
     )
 
-    try:
-        with h5py.File(path, "w") as f:
-            iv.to_hdf5(f)
+    with h5py.File(path, "w") as f:
+        iv.to_hdf5(f)
 
-        with h5py.File(path, "r") as f:
+    results = None
+    with h5py.File(path, "r") as f:
 
-            def go():
-                lazy = LazyInterval.from_hdf5(f)
-                _ = lazy.start
-                _ = lazy.end
-                _ = lazy.trial_type
-                _ = lazy.condition
-                _ = lazy.reward
-                _ = lazy.go_cue_time
-                _ = lazy.reaction_time
-                _ = lazy.success
-                _ = lazy.target_pos_x
-                _ = lazy.target_pos_y
+        def go():
+            lazy = LazyInterval.from_hdf5(f)
+            _ = lazy.start
+            _ = lazy.end
 
-            return _bench("LazyInterval access (10 attrs)", go, number=2_000)
-    finally:
-        if os.path.exists(path):
-            os.unlink(path)
+            for i in range(num_attrs):
+                _ = getattr(lazy, f"target_pos_{i}")
+
+        results = _bench(f"LazyInterval access ({num_attrs} attrs)", go, number=25)
+
+    os.unlink(path)
+    return results
+
+
+def bench_lazy_interval_access_500():
+    return bench_lazy_interval_access(num_attrs=500)
+
+
+def bench_lazy_interval_access_10():
+    return bench_lazy_interval_access(num_attrs=10)
 
 
 # ---------------------------------------------------------------------------
@@ -362,7 +361,8 @@ BENCHMARKS = [
     bench_interval_or,
     bench_interval_difference,
     bench_arraydict_keys,
-    bench_lazy_interval_access,
+    bench_lazy_interval_access_10,
+    bench_lazy_interval_access_500,
 ]
 
 

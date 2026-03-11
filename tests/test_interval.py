@@ -247,6 +247,68 @@ def test_lazy_interval(test_filepath):
         assert np.allclose(data.start, np.array([0, 3]))
 
 
+def test_lazy_interval_n_lazy_counter(test_filepath):
+    """Verify the _n_lazy counter tracks materialization correctly."""
+    data = Interval(
+        start=np.array([0, 1, 2, 3, 4, 5, 6, 7, 8]),
+        end=np.array([1, 2, 3, 4, 5, 6, 7, 8, 9]),
+        go_cue_time=np.array([0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5]),
+        drifting_gratings_dir=np.array([0, 45, 90, 45, 180, 90, 0, 90, 45]),
+        timekeys=["start", "end", "go_cue_time"],
+    )
+
+    with h5py.File(test_filepath, "w") as f:
+        data.to_hdf5(f)
+
+    del data
+
+    # _n_lazy decrements on each materialization and triggers demotion at 0
+    with h5py.File(test_filepath, "r") as f:
+        data = LazyInterval.from_hdf5(f)
+        assert data.__dict__["_n_lazy"] == 4
+        _ = data.start
+        assert data.__dict__["_n_lazy"] == 3
+        _ = data.end
+        assert data.__dict__["_n_lazy"] == 2
+        _ = data.go_cue_time
+        assert data.__dict__["_n_lazy"] == 1
+        _ = data.drifting_gratings_dir
+        assert data.__class__ == Interval
+        assert "_n_lazy" not in data.__dict__
+
+    # _n_lazy is correct after select_by_mask on partially-loaded object
+    with h5py.File(test_filepath, "r") as f:
+        data = LazyInterval.from_hdf5(f)
+        _ = data.start
+        assert data.__dict__["_n_lazy"] == 3
+        mask = np.array([True] * 5 + [False] * 4)
+        data2 = data.select_by_mask(mask)
+        assert data2.__dict__["_n_lazy"] == 3
+
+    # Accessing a non-start/end attribute first on a sliced lazy interval
+    # triggers _resolve (materializes start & end) then materializes the attribute
+    with h5py.File(test_filepath, "r") as f:
+        data = LazyInterval.from_hdf5(f)
+        data = data.slice(2.0, 6.0)
+        assert data.__dict__["_n_lazy"] == 4
+
+        # access go_cue_time first: triggers _resolve for start/end (-2) then
+        # materializes go_cue_time (-1), leaving _n_lazy == 1
+        go_cue = data.go_cue_time
+        assert np.allclose(go_cue, np.array([0.5, 1.5, 2.5, 3.5]))
+        assert data.__dict__["_n_lazy"] == 1
+        assert data.__class__ == LazyInterval
+
+        # start and end should be numpy now (materialized by _resolve)
+        assert isinstance(data.__dict__["start"], np.ndarray)
+        assert isinstance(data.__dict__["end"], np.ndarray)
+
+        # final attribute triggers demotion
+        _ = data.drifting_gratings_dir
+        assert data.__class__ == Interval
+        assert "_n_lazy" not in data.__dict__
+
+
 def test_interval_select_by_interval():
     data = Interval(
         start=np.array([0.0, 1, 2]),
