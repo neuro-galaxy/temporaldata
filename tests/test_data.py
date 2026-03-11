@@ -84,6 +84,15 @@ def test_data():
     assert data.absolute_start == 1.4
 
 
+def test_keys_cache_invalidated_on_public_attribute_deletion():
+    data = Data(foo=1, bar=2)
+    assert data.keys() == ["foo", "bar"]
+
+    del data.foo
+
+    assert data.keys() == ["bar"]
+
+
 def test_data_copy():
     data = Data(
         session_id="session_0",

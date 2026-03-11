@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import copy
-from collections.abc import Mapping, Sequence
 from typing import Any, Dict, List, Literal, Tuple, Union, Callable, Optional, Type
 from pathlib import Path
 import warnings
@@ -172,6 +171,13 @@ class Data(object):
                 f"({name})."
             )
         super().__setattr__(name, value)
+        if not name.startswith("_"):
+            object.__setattr__(self, "_cached_public_keys", None)
+
+    def __delattr__(self, name):
+        super().__delattr__(name)
+        if not name.startswith("_"):
+            object.__setattr__(self, "_cached_public_keys", None)
 
     @property
     def domain(self):
@@ -539,9 +545,15 @@ class Data(object):
         )
         return True
 
+    _cached_public_keys = None
+
     def keys(self) -> List[str]:
         r"""Returns a list of all attribute names."""
-        return list(filter(lambda x: not x.startswith("_"), self.__dict__))
+        cached = self.__dict__.get("_cached_public_keys")
+        if cached is None:
+            cached = tuple(k for k in self.__dict__ if not k.startswith("_"))
+            object.__setattr__(self, "_cached_public_keys", cached)
+        return list(cached)
 
     def __contains__(self, key: str) -> bool:
         r"""Returns :obj:`True` if the attribute :obj:`key` is present in the

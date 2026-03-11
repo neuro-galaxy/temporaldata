@@ -42,9 +42,15 @@ class ArrayDict(object):
         for key, value in kwargs.items():
             self.__setattr__(key, value)
 
+    _cached_public_keys = None
+
     def keys(self) -> List[str]:
         r"""Returns a list of all array attribute names."""
-        return list(filter(lambda x: not x.startswith("_"), self.__dict__))
+        cached = self.__dict__.get("_cached_public_keys")
+        if cached is None:
+            cached = tuple(k for k in self.__dict__ if not k.startswith("_"))
+            object.__setattr__(self, "_cached_public_keys", cached)
+        return list(cached)
 
     def _maybe_first_dim(self):
         # If self has at least one attribute, returns the first dimension of
@@ -85,6 +91,13 @@ class ArrayDict(object):
                     f"is {first_dim}."
                 )
         super(ArrayDict, self).__setattr__(name, value)
+        if not name.startswith("_"):
+            object.__setattr__(self, "_cached_public_keys", None)
+
+    def __delattr__(self, name):
+        super().__delattr__(name)
+        if not name.startswith("_"):
+            object.__setattr__(self, "_cached_public_keys", None)
 
     def __contains__(self, key: str) -> bool:
         r"""Returns :obj:`True` if the attribute :obj:`key` is present in the data."""
@@ -364,10 +377,8 @@ class LazyArrayDict(ArrayDict):
             getattr(self, key)
 
     def __getattribute__(self, name):
-        if not name in ["__dict__", "keys"]:
-            # intercept attribute calls. this is where data that is not loaded is loaded
-            # and when any lazy operations are applied
-            if name in self.keys():
+        if name not in ["__dict__", "keys"]:
+            if name in self.__dict__ and not name.startswith("_"):
                 out = self.__dict__[name]
 
                 if isinstance(out, h5py.Dataset):

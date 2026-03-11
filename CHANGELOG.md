@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Added `set_nested_attribute` method to `Data`. ([#86](https://github.com/neuro-galaxy/temporaldata/pull/67))
 - Added `Data.save` method. ([#88](https://github.com/neuro-galaxy/temporaldata/pull/88))
 - Benchmarking suite for temporaldata. ([#100](https://github.com/neuro-galaxy/temporaldata/pull/100))
+- Enhanced performance for accessing public attribute keys on data objects through an improved caching mechanism. ([#101](https://github.com/neuro-galaxy/temporaldata/pull/101))
 
 ### Fixed
 - Fixed a bug where `RegularTimeSeries.slice` does not update the `domain` attribute and leads to incorrect resolution of `timestamps` after slicing. ([#39](https://github.com/neuro-galaxy/temporaldata/pull/39))

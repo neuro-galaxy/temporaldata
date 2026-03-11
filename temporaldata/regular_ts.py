@@ -246,9 +246,8 @@ class LazyRegularTimeSeries(RegularTimeSeries):
             return self.__dict__[self.keys()[0]].shape[0]
 
     def __getattribute__(self, name):
-        if not name in ["__dict__", "keys"]:
-            # intercept attribute calls
-            if name in self.keys():
+        if name not in ["__dict__", "keys"]:
+            if name in self.__dict__ and not name.startswith("_"):
                 out = self.__dict__[name]
 
                 if isinstance(out, h5py.Dataset):
