@@ -608,6 +608,12 @@ def test_and_edge_cases():
     Iexp_rev = Interval.from_list([(2.0, 3.0), (4.0, 4.5)])
     easy_check(I2, I1, Iexp_rev, op)
 
+    # point interval intersected with a containing interval
+    point = Interval(np.array([2.0]), np.array([2.0]))
+    other = Interval(np.array([1.0]), np.array([3.0]))
+    Iexp = Interval(np.array([2.0]), np.array([2.0]))
+    easy_symmetric_check(point, other, Iexp, op)
+
 
 def test_or_edge_cases():
     op = lambda x, y: x | y
@@ -636,6 +642,47 @@ def test_or_edge_cases():
     I2 = Interval.from_list([(1.0, 3.0), (5.0, 7.0), (9.0, 11.0)])
     Iexp = Interval.from_list([(0.0, 20.0)])
     easy_symmetric_check(I1, I2, Iexp, op)
+
+    # adjacent intervals with empty operand must still merge
+    I1 = Interval.from_list([(0.0, 1.0), (1.0, 2.0)])
+    Iexp = Interval.from_list([(0.0, 2.0)])
+    easy_symmetric_check(I1, empty, Iexp, op)
+
+    I1 = Interval.from_list([(0.0, 1.0), (1.0, 2.0), (5.0, 6.0), (6.0, 7.0)])
+    Iexp = Interval.from_list([(0.0, 2.0), (5.0, 7.0)])
+    easy_symmetric_check(I1, empty, Iexp, op)
+
+    # adjacent self-union (doc example: adjacent | adjacent → merged)
+    adjacent = Interval(np.array([1.0, 2.0]), np.array([2.0, 3.0]))
+    Iexp = Interval.from_list([(1.0, 3.0)])
+    easy_symmetric_check(adjacent, adjacent, Iexp, op)
+
+    # point interval union
+    point = Interval(np.array([2.0]), np.array([2.0]))
+    other = Interval(np.array([1.0]), np.array([3.0]))
+    Iexp = Interval.from_list([(1.0, 3.0)])
+    easy_symmetric_check(point, other, Iexp, op)
+
+
+def test_overlapping_input_raises():
+    """Operations on non-disjoint or unsorted intervals must raise ValueError."""
+    valid = Interval.from_list([(1.0, 2.0)])
+    overlapping = Interval(np.array([1.0, 2.0]), np.array([3.0, 4.0]))
+    unsorted = Interval(np.array([3.0, 1.0]), np.array([4.0, 2.0]))
+
+    for bad in [overlapping, unsorted]:
+        with pytest.raises(ValueError):
+            bad | valid
+        with pytest.raises(ValueError):
+            valid | bad
+        with pytest.raises(ValueError):
+            bad & valid
+        with pytest.raises(ValueError):
+            valid & bad
+        with pytest.raises(ValueError):
+            bad.difference(valid)
+        with pytest.raises(ValueError):
+            valid.difference(bad)
 
 
 def test_difference_edge_cases():

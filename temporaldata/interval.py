@@ -753,7 +753,10 @@ class Interval(ArrayDict):
         if len(self) == 1 and len(other) == 1:
             start = max(self.start[0], other.start[0])
             end = min(self.end[0], other.end[0])
-            if start < end:
+            either_is_point = (
+                self.start[0] == self.end[0] or other.start[0] == other.end[0]
+            )
+            if start < end or (start == end and either_is_point):
                 return Interval(
                     start=np.array([start], dtype=np.float64),
                     end=np.array([end], dtype=np.float64),
@@ -770,7 +773,7 @@ class Interval(ArrayDict):
             e = self.end[left:right].copy()
             s[0] = max(s[0], a)
             e[-1] = min(e[-1], b)
-            keep = s < e
+            keep = s <= e if a == b else s < e
             if not np.any(keep):
                 return None
             return s[keep], e[keep]
@@ -811,10 +814,8 @@ class Interval(ArrayDict):
         if not other.is_sorted():
             raise ValueError("right Interval object must be sorted.")
 
-        if len(self) == 0:
-            return Interval(start=other.start.copy(), end=other.end.copy())
-        if len(other) == 0:
-            return Interval(start=self.start.copy(), end=self.end.copy())
+        if len(self) == 0 and len(other) == 0:
+            return Interval(start=np.array([]), end=np.array([]))
 
         all_starts = np.concatenate([self.start, other.start])
         all_ends = np.concatenate([self.end, other.end])
