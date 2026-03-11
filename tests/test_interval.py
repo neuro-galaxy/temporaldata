@@ -1080,3 +1080,115 @@ def test_subdivide_timekeys_preservation():
     assert np.allclose(result.end, expected_end)
     assert np.array_equal(result.go_cue_time, expected_go_cue_time)
     assert "go_cue_time" in result.timekeys()
+
+
+class TestPointIntervals:
+    """Point intervals (start == end) must be handled correctly."""
+
+    # -- union ---------------------------------------------------------
+
+    def test_union_preserves_standalone_point(self):
+        point = Interval(np.array([5.0]), np.array([5.0]))
+        empty = Interval(np.array([]), np.array([]))
+        result = point | empty
+        assert len(result) == 1
+        assert result.start[0] == 5.0 and result.end[0] == 5.0
+
+    def test_union_point_or_empty_is_identity(self):
+        point = Interval(np.array([5.0]), np.array([5.0]))
+        empty = Interval(np.array([]), np.array([]))
+        easy_symmetric_check(point, empty, point, lambda x, y: x | y)
+
+    def test_union_two_distinct_points(self):
+        p1 = Interval(np.array([1.0]), np.array([1.0]))
+        p2 = Interval(np.array([3.0]), np.array([3.0]))
+        result = p1 | p2
+        assert len(result) == 2
+        assert np.allclose(result.start, [1.0, 3.0])
+        assert np.allclose(result.end, [1.0, 3.0])
+
+    def test_union_point_absorbed_by_range(self):
+        point = Interval(np.array([2.0]), np.array([2.0]))
+        rng = Interval(np.array([1.0]), np.array([3.0]))
+        expected = Interval.from_list([(1.0, 3.0)])
+        easy_symmetric_check(point, rng, expected, lambda x, y: x | y)
+
+    def test_union_duplicate_points_merge(self):
+        p = Interval(np.array([2.0]), np.array([2.0]))
+        result = p | p
+        assert len(result) == 1
+        assert result.start[0] == 2.0 and result.end[0] == 2.0
+
+    # -- intersection --------------------------------------------------
+
+    def test_intersect_point_with_containing_range(self):
+        point = Interval(np.array([2.0]), np.array([2.0]))
+        rng = Interval(np.array([1.0]), np.array([3.0]))
+        expected = Interval(np.array([2.0]), np.array([2.0]))
+        easy_symmetric_check(point, rng, expected, lambda x, y: x & y)
+
+    def test_intersect_point_with_point_same(self):
+        p = Interval(np.array([2.0]), np.array([2.0]))
+        expected = Interval(np.array([2.0]), np.array([2.0]))
+        easy_symmetric_check(p, p, expected, lambda x, y: x & y)
+
+    def test_intersect_point_with_point_different(self):
+        p1 = Interval(np.array([1.0]), np.array([1.0]))
+        p2 = Interval(np.array([3.0]), np.array([3.0]))
+        empty = Interval(np.array([]), np.array([]))
+        easy_symmetric_check(p1, p2, empty, lambda x, y: x & y)
+
+    def test_intersect_point_outside_range(self):
+        point = Interval(np.array([5.0]), np.array([5.0]))
+        rng = Interval(np.array([1.0]), np.array([3.0]))
+        empty = Interval(np.array([]), np.array([]))
+        easy_symmetric_check(point, rng, empty, lambda x, y: x & y)
+
+    def test_intersect_point_at_range_boundary(self):
+        point = Interval(np.array([3.0]), np.array([3.0]))
+        rng = Interval(np.array([1.0]), np.array([3.0]))
+        expected = Interval(np.array([3.0]), np.array([3.0]))
+        easy_symmetric_check(point, rng, expected, lambda x, y: x & y)
+
+    def test_intersect_point_at_range_start(self):
+        point = Interval(np.array([1.0]), np.array([1.0]))
+        rng = Interval(np.array([1.0]), np.array([5.0]))
+        expected = Interval(np.array([1.0]), np.array([1.0]))
+        easy_symmetric_check(point, rng, expected, lambda x, y: x & y)
+
+    # -- difference ----------------------------------------------------
+
+    def test_difference_point_minus_covering_range(self):
+        point = Interval(np.array([2.0]), np.array([2.0]))
+        rng = Interval(np.array([1.0]), np.array([3.0]))
+        empty = Interval(np.array([]), np.array([]))
+        easy_check(point, rng, empty, lambda x, y: x.difference(y))
+
+    def test_difference_point_minus_same_point(self):
+        p = Interval(np.array([2.0]), np.array([2.0]))
+        empty = Interval(np.array([]), np.array([]))
+        easy_check(p, p, empty, lambda x, y: x.difference(y))
+
+    def test_difference_point_minus_disjoint(self):
+        point = Interval(np.array([5.0]), np.array([5.0]))
+        rng = Interval(np.array([1.0]), np.array([3.0]))
+        easy_check(point, rng, point, lambda x, y: x.difference(y))
+
+    def test_difference_range_minus_inner_point(self):
+        rng = Interval(np.array([1.0]), np.array([3.0]))
+        point = Interval(np.array([2.0]), np.array([2.0]))
+        expected = Interval.from_list([(1.0, 2.0), (2.0, 3.0)])
+        easy_check(rng, point, expected, lambda x, y: x.difference(y))
+
+    def test_difference_point_minus_empty(self):
+        point = Interval(np.array([2.0]), np.array([2.0]))
+        empty = Interval(np.array([]), np.array([]))
+        easy_check(point, empty, point, lambda x, y: x.difference(y))
+
+    def test_difference_multiple_points_minus_some(self):
+        points = Interval(np.array([1.0, 3.0, 5.0]), np.array([1.0, 3.0, 5.0]))
+        other = Interval(np.array([3.0]), np.array([3.0]))
+        result = points.difference(other)
+        assert len(result) == 2
+        assert np.allclose(result.start, [1.0, 5.0])
+        assert np.allclose(result.end, [1.0, 5.0])

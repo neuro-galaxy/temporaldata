@@ -369,8 +369,12 @@ class Interval(ArrayDict):
 
         for i in range(len(self)):
             a, b = self.start[i], self.end[i]
-            left = np.searchsorted(other.end, a, side="right")
-            right = np.searchsorted(other.start, b, side="left")
+            if a == b:
+                left = np.searchsorted(other.end, a, side="left")
+                right = np.searchsorted(other.start, b, side="right")
+            else:
+                left = np.searchsorted(other.end, a, side="right")
+                right = np.searchsorted(other.start, b, side="left")
 
             if left >= right:
                 out_starts.append(np.array([a]))
@@ -764,8 +768,8 @@ class Interval(ArrayDict):
             return Interval(start=_empty, end=_empty)
 
         def _intersect_one(a, b):
-            left = np.searchsorted(self.end, a, side="right")
-            right = np.searchsorted(self.start, b, side="left")
+            left = np.searchsorted(self.end, a, side="left")
+            right = np.searchsorted(self.start, b, side="right")
             if left >= right:
                 return None
 
@@ -837,7 +841,7 @@ class Interval(ArrayDict):
         group_last[-1] = len(all_starts) - 1
         out_ends = running_end[group_last]
 
-        keep = out_starts < out_ends
+        keep = out_starts <= out_ends
         return Interval(start=out_starts[keep], end=out_ends[keep])
 
 
