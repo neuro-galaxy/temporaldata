@@ -1087,13 +1087,6 @@ class TestPointIntervals:
 
     # -- union ---------------------------------------------------------
 
-    def test_union_preserves_standalone_point(self):
-        point = Interval(np.array([5.0]), np.array([5.0]))
-        empty = Interval(np.array([]), np.array([]))
-        result = point | empty
-        assert len(result) == 1
-        assert result.start[0] == 5.0 and result.end[0] == 5.0
-
     def test_union_point_or_empty_is_identity(self):
         point = Interval(np.array([5.0]), np.array([5.0]))
         empty = Interval(np.array([]), np.array([]))
