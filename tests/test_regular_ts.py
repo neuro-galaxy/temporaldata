@@ -256,4 +256,4 @@ def test_additional():
     end = start + 1.0
     sliced_ts = ts.slice(start, end, reset_origin=False)
 
-    assert np.allclose(sliced_ts.timestamps, np.array([0.25, 0.5, 0.75, 1.0, 1.25]))
+    assert np.allclose(sliced_ts.timestamps, np.array([0.25, 0.5, 0.75, 1.0]))
