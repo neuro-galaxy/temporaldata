@@ -6,6 +6,7 @@ from .interval import Interval, LazyInterval
 from .data import Data
 
 from .concat import concat
+from .io import load_nwb
 
 try:
     __version__ = version("temporaldata")
