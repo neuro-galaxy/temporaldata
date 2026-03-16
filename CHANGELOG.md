@@ -11,8 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Added `Data.save` method. ([#88](https://github.com/neuro-galaxy/temporaldata/pull/88))
 - Benchmarking suite for temporaldata. ([#100](https://github.com/neuro-galaxy/temporaldata/pull/100))
 - Enhanced interval operations (difference, intersection, union) with improved performance with vectorized operations and handling of edge cases. ([#102](https://github.com/neuro-galaxy/temporaldata/pull/102))
+- Add eps in slice `RegularTimeSeries.slice` to handle the numerical instability when slicing ([#106](https://github.com/neuro-galaxy/temporaldata/pull/106))
 
 ### Fixed
+- Fixed a bug where `RegularTimeSeries.slice` does not take the last point if the start of the slice is not align with the `RegularTimeSeries` timestamps ([#106](https://github.com/neuro-galaxy/temporaldata/pull/106))
 - Fixed a bug where `RegularTimeSeries.slice` does not update the `domain` attribute and leads to incorrect resolution of `timestamps` after slicing. ([#39](https://github.com/neuro-galaxy/temporaldata/pull/39))
 - Fixed a bug where `data.materialize` would not actually load the domain information from the file which would cause issues when accessing it after file was closed. ([#43] (https://github.com/neuro-galaxy/temporaldata/pull/43))
 - Fixed an issue modifying the domain of an IrregularTimeSeries after initialization by adding proper validation to ensure only valid, non-overlapping, and sorted Interval values are accepted. ([#64](https://github.com/neuro-galaxy/temporaldata/pull/64))
@@ -26,6 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Removed `allow_split_mask_overlap` method from `Interval`. ([#47](https://github.com/neuro-galaxy/temporaldata/pull/47))
 
 ### Changed
+
 - Change minimum python version to 3.10 ([#93](https://github.com/neuro-galaxy/temporaldata/pull/93))
 - Optimized performance of `Interval.coalesce()` ([#97](https://github.com/neuro-galaxy/temporaldata/pull/97))
 
