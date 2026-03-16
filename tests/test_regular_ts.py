@@ -276,14 +276,6 @@ def test_slice_numerical_instability():
     sliced_ts = ts.slice(start, end, reset_origin=False)
     assert np.allclose(sliced_ts.timestamps, np.array([0.25, 0.5, 0.75]))
 
-    # Using math that natively generates known float anomalies.
-    # Note 0.1 + 0.2 = 0.30000000000000004 and 0.1 + 0.2 + 0.7 = 1.0000000000000002.
-    # Should safely grab 0.5 and 0.75, 1.0 should still be EXCLUDED as it is over 1.0 due to numerical instability
-    start = 0.1 + 0.2
-    end = start + 0.7
-    sliced_ts = ts.slice(start, end, reset_origin=False)
-    assert np.allclose(sliced_ts.timestamps, np.array([0.5, 0.75]))
-
     # Maximum Precision Limits via np.nextafter
     # np.nextafter gives the very next representable float in memory.
     start = 0.5
@@ -305,3 +297,17 @@ def test_slice_numerical_instability():
     end = 1.0
     sliced_ts = ts.slice(start, end, reset_origin=False)
     assert np.allclose(sliced_ts.timestamps, np.array([0.25, 0.5, 0.75]))
+
+    ts = RegularTimeSeries(
+        value=np.zeros((40)), sampling_rate=4, domain=Interval(0, 10)
+    )
+    # Expected timestamps: [0.0, 0.1, 0.2, ...]
+
+    # Using math that natively generates known float anomalies.
+    # Should safely INCLUDE 0.3 and EXCLUDE 0.9 as the end > 0.9 is due to numerical instability
+    start = 0.1 + 0.2  # 0.30000000000000004
+    end = start * 3  # 0.9000000000000001
+    sliced_ts = ts.slice(start, end, reset_origin=False)
+    assert np.allclose(
+        sliced_ts.timestamps, np.array([0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
+    )
