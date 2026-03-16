@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Dict
 
 import h5py
@@ -89,29 +90,34 @@ class RegularTimeSeries(ArrayDict):
     def select_by_mask(self, mask: np.ndarray):
         raise NotImplementedError("Not implemented for RegularTimeSeries.")
 
-    def _time_to_idx(self, time: float, is_start: bool) -> tuple[int, float]:
+    def _time_to_idx(
+        self, time: float, is_start: bool, eps: float = 1e-9
+    ) -> tuple[int, float]:
         """Converts a timestamp to a sample index and its exact reconstructed time."""
+        domain_start = self.domain.start[0]
+        domain_end = self.domain.end[0]
+
         # Clamp to domain bounds
-        if is_start and time <= self.domain.start[0]:
-            return 0, self.domain.start[0]
-        if not is_start and time >= self.domain.end[0]:
-            return len(self), self.domain.end[0]
+        if is_start and time <= domain_start:
+            return 0, domain_start
+        if not is_start and time > domain_end:
+            return len(self), domain_end
 
         # Calculate relative index
-        rel_t = time - self.domain.start[0]
+        rel_t = time - domain_start
         sample_float = rel_t * self.sampling_rate
 
         # Precision check: if it's "close enough" to an integer, treat it as that integer
-        rounded = np.round(sample_float)
-        if np.isclose(sample_float, rounded, atol=1e-9, rtol=0):
-            sample_float = rounded
+        rounded = round(sample_float)
+        if abs(sample_float - rounded) < eps:
+            sample_float = float(rounded)
 
         # Determine index and reconstruct the actual timestamp of that sample
-        idx = int(np.ceil(sample_float))
+        idx = math.ceil(sample_float)
 
         # For the end index, the reconstruction logic shifts by 1 sample
         recon_idx = idx if is_start else idx - 1
-        actual_time = self.domain.start[0] + (recon_idx / self.sampling_rate)
+        actual_time = domain_start + (recon_idx / self.sampling_rate)
 
         return idx, actual_time
 
