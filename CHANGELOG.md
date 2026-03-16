@@ -28,7 +28,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Removed `allow_split_mask_overlap` method from `Interval`. ([#47](https://github.com/neuro-galaxy/temporaldata/pull/47))
 
 ### Changed
-
 - Change minimum python version to 3.10 ([#93](https://github.com/neuro-galaxy/temporaldata/pull/93))
 - Optimized performance of `Interval.coalesce()` ([#97](https://github.com/neuro-galaxy/temporaldata/pull/97))
 
