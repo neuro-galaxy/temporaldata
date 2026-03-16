@@ -248,9 +248,7 @@ def test_regular_to_irregular_timeseries():
 
 
 def test_slice_numerical_instability():
-    ts = RegularTimeSeries(
-        value=np.zeros((40)), sampling_rate=4, domain=Interval(0, 10)
-    )
+    ts = RegularTimeSeries(value=np.zeros((40)), sampling_rate=4, domain="auto")
     # Expected timestamps: [0.0, 0.25, 0.5, 0.75, 1.0, 1.25, ...]
 
     eps = 1e-14
@@ -298,9 +296,7 @@ def test_slice_numerical_instability():
     sliced_ts = ts.slice(start, end, reset_origin=False)
     assert np.allclose(sliced_ts.timestamps, np.array([0.25, 0.5, 0.75]))
 
-    ts = RegularTimeSeries(
-        value=np.zeros((40)), sampling_rate=4, domain=Interval(0, 10)
-    )
+    ts = RegularTimeSeries(value=np.zeros((40)), sampling_rate=10, domain="auto")
     # Expected timestamps: [0.0, 0.1, 0.2, ...]
 
     # Using math that natively generates known float anomalies.
@@ -308,6 +304,4 @@ def test_slice_numerical_instability():
     start = 0.1 + 0.2  # 0.30000000000000004
     end = start * 3  # 0.9000000000000001
     sliced_ts = ts.slice(start, end, reset_origin=False)
-    assert np.allclose(
-        sliced_ts.timestamps, np.array([0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9])
-    )
+    assert np.allclose(sliced_ts.timestamps, np.array([0.3, 0.4, 0.5, 0.6, 0.7, 0.8]))
