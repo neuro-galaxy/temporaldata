@@ -1,9 +1,11 @@
-import pytest
 import os
+import tempfile
+
 import h5py
 import numpy as np
-import tempfile
-from temporaldata import RegularTimeSeries, LazyRegularTimeSeries, Interval
+import pytest
+
+from temporaldata import Interval, LazyRegularTimeSeries, RegularTimeSeries
 
 
 @pytest.fixture
@@ -257,3 +259,58 @@ def test_additional():
     sliced_ts = ts.slice(start, end, reset_origin=False)
 
     assert np.allclose(sliced_ts.timestamps, np.array([0.25, 0.5, 0.75, 1.0]))
+
+
+def test_slice_numerical_instability():
+    ts = RegularTimeSeries(
+        value=np.zeros((40)), sampling_rate=4, domain=Interval(0, 10)
+    )
+    # Expected timestamps: [0.0, 0.25, 0.5, 0.75, 1.0, 1.25, ...]
+
+    eps = 1e-14
+
+    # 1. The "Just Shy" End Boundary (The 0.9999999 scenario)
+    # 'end' is infinitesimally smaller than the next timestamp.
+    # If the interval is [start, end), it should still safely include up to 0.75.
+    start = 0.0
+    end = 1.0 - eps
+    sliced_ts = ts.slice(start, end, reset_origin=False)
+    assert np.allclose(sliced_ts.timestamps, np.array([0.0, 0.25, 0.5, 0.75]))
+
+    # 2. The "Slightly Over" Start Boundary
+    # 'start' is computed slightly larger than an exact timestamp.
+    # A robust library should apply a tolerance and INCLUDE 0.25.
+    start = 0.25 + eps
+    end = 1.0
+    sliced_ts = ts.slice(start, end, reset_origin=False)
+    assert np.allclose(sliced_ts.timestamps, np.array([0.25, 0.5, 0.75]))
+
+    # 3. The "Slightly Over" End Boundary
+    # 'end' is infinitesimally larger than an exact timestamp.
+    # Assuming a half-open interval [start, end), 1.0 should still be EXCLUDED.
+    start = 0.25
+    end = 1.0 + eps
+    sliced_ts = ts.slice(start, end, reset_origin=False)
+    assert np.allclose(sliced_ts.timestamps, np.array([0.25, 0.5, 0.75]))
+
+    # 4. The Classic Float Anomaly (0.1 + 0.2 = 0.30000000000000004)
+    # Using math that natively generates known float anomalies.
+    start = 0.1 + 0.2
+    end = start + 0.7  # effectively 1.0000000000000002
+    sliced_ts = ts.slice(start, end, reset_origin=False)
+    # Should safely grab 0.5 and 0.75, strictly excluding 1.0
+    assert np.allclose(sliced_ts.timestamps, np.array([0.5, 0.75]))
+
+    # 5. Maximum Precision Limits via np.nextafter
+    # np.nextafter gives the very next representable float in memory.
+    start = 0.5
+    end = np.nextafter(1.0, 0.0)  # The largest possible float strictly less than 1.0
+    sliced_ts = ts.slice(start, end, reset_origin=False)
+    assert np.allclose(sliced_ts.timestamps, np.array([0.5, 0.75]))
+
+    # start is the smallest possible float strictly greater than 0.25
+    start = np.nextafter(0.25, 1.0)
+    end = 1.0
+    sliced_ts = ts.slice(start, end, reset_origin=False)
+    # Should still treat it as 0.25 and include it due to tolerance
+    assert np.allclose(sliced_ts.timestamps, np.array([0.25, 0.5, 0.75]))
