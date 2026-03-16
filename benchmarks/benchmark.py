@@ -246,7 +246,7 @@ def bench_rts_slice():
     def go():
         rts.slice(500.0, 501.0)
 
-    return _bench("IrregularTimeSeries.slice()", go, number=1_000)
+    return _bench("RegularTimeSeries.slice()", go, number=1_000)
 
 
 def bench_interval_slice():
