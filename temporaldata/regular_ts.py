@@ -89,6 +89,32 @@ class RegularTimeSeries(ArrayDict):
     def select_by_mask(self, mask: np.ndarray):
         raise NotImplementedError("Not implemented for RegularTimeSeries.")
 
+    def _time_to_idx(self, time: float, is_start: bool) -> tuple[int, float]:
+        """Converts a timestamp to a sample index and its exact reconstructed time."""
+        # Clamp to domain bounds
+        if is_start and time <= self.domain.start[0]:
+            return 0, self.domain.start[0]
+        if not is_start and time >= self.domain.end[0]:
+            return len(self), self.domain.end[0]
+
+        # Calculate relative index
+        rel_t = time - self.domain.start[0]
+        sample_float = rel_t * self.sampling_rate
+
+        # Precision check: if it's "close enough" to an integer, treat it as that integer
+        rounded = np.round(sample_float)
+        if np.isclose(sample_float, rounded, atol=1e-9, rtol=0):
+            sample_float = rounded
+
+        # Determine index and reconstruct the actual timestamp of that sample
+        idx = int(np.ceil(sample_float))
+
+        # For the end index, the reconstruction logic shifts by 1 sample
+        recon_idx = idx if is_start else idx - 1
+        actual_time = self.domain.start[0] + (recon_idx / self.sampling_rate)
+
+        return idx, actual_time
+
     def slice(self, start: float, end: float, reset_origin: bool = True):
         r"""Returns a new :obj:`RegularTimeSeries` object that contains the data between
         the start (inclusive) and end (exclusive) times.
@@ -101,20 +127,8 @@ class RegularTimeSeries(ArrayDict):
             reset_origin: If :obj:`True`, all time attributes will be updated to be
                 relative to the new start time. Defaults to :obj:`True`.
         """
-        # we allow the start and end to be outside the domain of the time series
-        if start < self.domain.start[0]:
-            start_id = 0
-            out_start = self.domain.start[0]
-        else:
-            start_id = int(np.ceil((start - self.domain.start[0]) * self.sampling_rate))
-            out_start = self.domain.start[0] + start_id * 1.0 / self.sampling_rate
-
-        if end > self.domain.end[0]:
-            end_id = len(self) + 1
-            out_end = self.domain.end[0]
-        else:
-            end_id = int(np.floor((end - self.domain.start[0]) * self.sampling_rate))
-            out_end = self.domain.start[0] + (end_id - 1) * 1.0 / self.sampling_rate
+        start_id, out_start = self._time_to_idx(start, is_start=True)
+        end_id, out_end = self._time_to_idx(end, is_start=False)
 
         out = self.__class__.__new__(self.__class__)
         out._sampling_rate = self.sampling_rate
@@ -277,19 +291,8 @@ class LazyRegularTimeSeries(RegularTimeSeries):
         r"""Returns a new :obj:`RegularTimeSeries` object that contains the data between
         the start and end times.
         """
-        if start < self.domain.start[0]:
-            start_id = 0
-            out_start = self.domain.start[0]
-        else:
-            start_id = int(np.ceil((start - self.domain.start[0]) * self.sampling_rate))
-            out_start = self.domain.start[0] + start_id * 1.0 / self.sampling_rate
-
-        if end > self.domain.end[0]:
-            end_id = len(self) + 1
-            out_end = self.domain.end[0]
-        else:
-            end_id = int(np.floor((end - self.domain.start[0]) * self.sampling_rate))
-            out_end = self.domain.start[0] + (end_id - 1) * 1.0 / self.sampling_rate
+        start_id, out_start = self._time_to_idx(start, is_start=True)
+        end_id, out_end = self._time_to_idx(end, is_start=False)
 
         out = self.__class__.__new__(self.__class__)
         out._sampling_rate = self.sampling_rate
