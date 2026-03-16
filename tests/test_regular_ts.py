@@ -68,6 +68,14 @@ def test_regulartimeseries(test_filepath):
         assert np.allclose(data_slice.domain.end, data.domain.end)
         assert np.allclose(data_slice.timestamps, data.timestamps)
 
+        # TODO update when we update the domain convention
+        domain_start, domain_end = data.domain.start[0], data.domain.end[-1]
+        data_slice = data.slice(domain_start, domain_end, reset_origin=False)
+        assert np.allclose(data_slice.lfp, data.lfp[:-1])
+        assert np.allclose(data_slice.domain.start, data.domain.start)
+        assert np.allclose(data_slice.domain.end, data.domain.end - 0.1)
+        assert np.allclose(data_slice.timestamps, data.timestamps[:-1])
+
     data = RegularTimeSeries(
         lfp=np.random.random((100, 48)), sampling_rate=10, domain="auto"
     )
