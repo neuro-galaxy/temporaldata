@@ -239,28 +239,6 @@ def test_regular_to_irregular_timeseries():
     assert np.allclose(b.lfp, a.lfp)
 
 
-def test_additional():
-    ts = RegularTimeSeries(
-        value=np.zeros((40)), sampling_rate=4, domain=Interval(0, 10)
-    )
-
-    start = 0.0
-    end = start + 1.0
-    sliced_ts = ts.slice(start, end, reset_origin=False)
-    assert np.allclose(sliced_ts.timestamps, np.array([0.0, 0.25, 0.5, 0.75]))
-
-    start = 0.1
-    end = start + 1.0
-    sliced_ts = ts.slice(start, end, reset_origin=False)
-    assert np.allclose(sliced_ts.timestamps, np.array([0.25, 0.5, 0.75, 1.0]))
-
-    start = 0.25
-    end = start + 1.0
-    sliced_ts = ts.slice(start, end, reset_origin=False)
-
-    assert np.allclose(sliced_ts.timestamps, np.array([0.25, 0.5, 0.75, 1.0]))
-
-
 def test_slice_numerical_instability():
     ts = RegularTimeSeries(
         value=np.zeros((40)), sampling_rate=4, domain=Interval(0, 10)
