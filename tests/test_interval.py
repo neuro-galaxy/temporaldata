@@ -604,7 +604,9 @@ def test_and_edge_cases():
     I1 = Interval.from_list([(0.0, 1.0), (2.0, 3.0), (4.0, 5.0)])
     I2 = Interval.from_list([(1.5, 4.5)])
     Iexp = Interval.from_list([(2.0, 3.0), (4.0, 4.5)])
-    easy_symmetric_check(I1, I2, Iexp, op)
+    easy_check(I1, I2, Iexp, op)
+    Iexp_rev = Interval.from_list([(2.0, 3.0), (4.0, 4.5)])
+    easy_check(I2, I1, Iexp_rev, op)
 
     # point interval intersected with a containing interval
     point = Interval(np.array([2.0]), np.array([2.0]))
