@@ -122,15 +122,15 @@ class RegularTimeSeries(ArrayDict):
 
         # Calculate relative index
         rel_t = time - domain_start
-        sample_float = rel_t * self.sampling_rate
+        idx_float = rel_t * self.sampling_rate
 
         # Precision check: if it's "close enough" to an integer, treat it as that integer
-        rounded = round(sample_float)
-        if abs(sample_float - rounded) < eps:
-            sample_float = float(rounded)
+        rounded = round(idx_float)
+        if abs(idx_float - rounded) < eps:
+            idx_float = float(rounded)
 
         # Determine index and reconstruct the actual timestamp of that sample
-        idx = math.ceil(sample_float)
+        idx = math.ceil(idx_float)
 
         # For the end index, the reconstruction logic shifts by 1 sample
         recon_idx = idx if is_start else idx - 1
