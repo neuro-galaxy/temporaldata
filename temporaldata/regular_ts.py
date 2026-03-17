@@ -109,7 +109,7 @@ class RegularTimeSeries(ArrayDict):
             tuple[int, float]: A tuple containing:
                 * **index**: The calculated integer sample index within the array.
                 * **reconstructed_time**: The exact timestamp in seconds that corresponds
-                  to the selected **index** (e.g., the actual time of the sample).
+                  to the selected **index** (i.e. the actual time of the sample).
         """
         domain_start = self.domain.start[0]
         domain_end = self.domain.end[0]
