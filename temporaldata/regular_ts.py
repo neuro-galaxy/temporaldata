@@ -91,7 +91,10 @@ class RegularTimeSeries(ArrayDict):
         raise NotImplementedError("Not implemented for RegularTimeSeries.")
 
     def _time_to_idx(
-        self, time: float, is_start: bool, eps: float = 1e-9
+        self,
+        time: float,
+        is_start: bool,
+        eps: float = 1e-9,
     ) -> tuple[int, float]:
         """Converts a timestamp to a sample index and its exact reconstructed time.
         Args:
@@ -102,6 +105,11 @@ class RegularTimeSeries(ArrayDict):
                 is within ``eps`` of an integer, it is snapped to that integer.
                 This prevents tiny precision errors (e.g., 3.999999999999999) from
                 causing off-by-one errors when applying ``math.ceil``.
+        Returns:
+            tuple[int, float]: A tuple containing:
+                * **index**: The calculated integer sample index within the array.
+                * **reconstructed_time**: The exact timestamp in seconds that corresponds
+                  to the selected **index** (e.g., the actual time of the sample).
         """
         domain_start = self.domain.start[0]
         domain_end = self.domain.end[0]
@@ -131,7 +139,11 @@ class RegularTimeSeries(ArrayDict):
         return idx, actual_time
 
     def slice(
-        self, start: float, end: float, reset_origin: bool = True, eps: float = 1e-9
+        self,
+        start: float,
+        end: float,
+        reset_origin: bool = True,
+        eps: float = 1e-9,
     ):
         r"""Returns a new :obj:`RegularTimeSeries` object that contains the data between
         the start (inclusive) and end (exclusive) times (i.e., [start, end)]).
@@ -141,9 +153,14 @@ class RegularTimeSeries(ArrayDict):
             end: End time.
             reset_origin: If :obj:`True`, all time attributes will be updated to be
                 relative to the new start time. Defaults to :obj:`True`.
-            eps: A tiny 'rounding buffer' to handle floating-point noise when computing indexes.
+            eps: A tiny 'rounding buffer' to handle floating-point noise when computing indices.
                 If your sampling rate is very high, you may need to increase
                 this (e.g., to 1e-7) to avoid off-by-one errors.
+
+        Returns:
+            RegularTimeSeries: A new instance of the same class
+            containing a subset of the data. The new object will have a modified
+            :obj:`Interval` domain reflecting the actual sampled boundaries.
         """
         start_id, out_start = self._time_to_idx(start, is_start=True, eps=eps)
         end_id, out_end = self._time_to_idx(end, is_start=False, eps=eps)
@@ -306,7 +323,11 @@ class LazyRegularTimeSeries(RegularTimeSeries):
         return super(LazyRegularTimeSeries, self).__getattribute__(name)
 
     def slice(
-        self, start: float, end: float, reset_origin: bool = True, eps: float = 1e-9
+        self,
+        start: float,
+        end: float,
+        reset_origin: bool = True,
+        eps: float = 1e-9,
     ):
         r"""Returns a new :obj:`RegularTimeSeries` object that contains the data between
         the start and end times.
@@ -316,9 +337,13 @@ class LazyRegularTimeSeries(RegularTimeSeries):
             end: End time.
             reset_origin: If :obj:`True`, all time attributes will be updated to be
                 relative to the new start time. Defaults to :obj:`True`.
-            eps: A tiny 'rounding buffer' to handle floating-point noise when computing indexes.
+            eps: A tiny 'rounding buffer' to handle floating-point noise when computing indices.
                 If your sampling rate is very high, you may need to increase
                 this (e.g., to 1e-7) to avoid off-by-one errors.
+        Returns:
+            LazyRegularTimeSeries: A new instance of the same class
+            containing a subset of the data. The new object will have a modified
+            :obj:`Interval` domain reflecting the actual sampled boundaries.
         """
         start_id, out_start = self._time_to_idx(start, is_start=True, eps=eps)
         end_id, out_end = self._time_to_idx(end, is_start=False, eps=eps)
