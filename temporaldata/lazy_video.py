@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 from typing import Sequence
 import logging
 
@@ -75,9 +76,17 @@ class LazyVideo(object):
                     opened_capture.release()
                 raise IOError(f"Error opening video file {path}")
             self.video_captures.append(capture)
-            segment_frame_counts.append(
-                int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
+            result = subprocess.run(
+                [
+                    "ffprobe", "-v", "error",
+                    "-count_packets", "-select_streams", "v:0",
+                    "-show_entries", "stream=nb_read_packets",
+                    "-of", "csv=p=0",
+                    path,
+                ],
+                capture_output=True, text=True, check=True,
             )
+            segment_frame_counts.append(int(result.stdout.strip()))
 
         self.segment_frame_counts = np.asarray(segment_frame_counts, dtype=np.int64)
         self.segment_frame_offsets = np.cumsum(
