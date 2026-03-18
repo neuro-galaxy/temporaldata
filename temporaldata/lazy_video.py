@@ -94,9 +94,10 @@ class LazyVideo(object):
         )
         frame_count = int(self.segment_frame_counts.sum())
         if frame_count != self.timestamps.shape[0]:
-            raise RuntimeError(
-                f"Video frames ({frame_count}) do not match timestamps ({self.timestamps.shape[0]})"
-            )
+            if frame_count > self.timestamps.shape[0]:
+                frame_count = self.timestamps.shape[0] # If we can just drop the extra frames, we should do that.
+            else:
+                raise ValueError(f"Frame count mismatch: {frame_count} != {self.timestamps.shape[0]}") # TODO: check this
         self.frame_count = frame_count
 
         self.frame_indices = np.arange(frame_count, dtype=np.int64)
