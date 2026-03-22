@@ -1,0 +1,21 @@
+name: Type Checking
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "*" ]
+
+permissions:
+  contents: read
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    - name: Install ty
+      uses: astral-sh/setup-uv@v5
+    - run: uv tool install ty@latest
+    - run: ty check
