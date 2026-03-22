@@ -34,7 +34,7 @@ Documentation = "https://temporaldata.readthedocs.io/en/latest/"
 python-version = "3.10"
 
 [tool.ty.rules]
-# Change these to "error" over time
+# Remove these as we fix typecheck issues over time
 possibly-unresolved-reference = "warn"
 unresolved-import = "warn"
 unresolved-attribute = "warn"
