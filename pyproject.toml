@@ -2,6 +2,9 @@
 requires = ["setuptools>=80", "setuptools-scm[simple]>=8"]
 build-backend = "setuptools.build_meta"
 
+[tool.pyrefly]
+project-includes = ["**/*.py*"]
+
 [project]
 name = "temporaldata"
 dynamic = ["version"]

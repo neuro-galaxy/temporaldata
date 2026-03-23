@@ -1,0 +1,13 @@
+project-includes = [
+    "temporaldata/",
+    "tests/",
+]
+python-version = "3.10.0"
+
+[errors]
+missing-attribute = "ignore"
+not-iterable = "ignore"
+bad-override = "ignore"
+unsupported-operation = "ignore"
+read-only = "ignore"
+bad-function-definition = "ignore"
