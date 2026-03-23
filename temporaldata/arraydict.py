@@ -38,7 +38,7 @@ class ArrayDict(object):
         )
     """
 
-    def __init__(self, **kwargs: np.ndarray):
+    def __init__(self, **kwargs: dict[str, np.ndarray]):
         for key, value in kwargs.items():
             self.__setattr__(key, value)
 
