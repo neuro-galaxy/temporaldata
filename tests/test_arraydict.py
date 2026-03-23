@@ -235,6 +235,56 @@ def test_lazy_array_dict_n_lazy_counts_only_datasets(test_filepath):
         assert lazy.__class__ == ArrayDict
 
 
+def test_lazy_array_dict_promotes_after_setattr_replaces_dataset(test_filepath):
+    """Materializing a column via assignment should still allow full promotion.
+
+    Loaded via LazyArrayDict.from_hdf5 (written with ArrayDict.to_hdf5). Replacing an
+    h5py.Dataset with an ndarray through __setattr__ must update _n_lazy the same way
+    __getattribute__ does, or the instance stays LazyArrayDict with a stale _n_lazy.
+    """
+    data = ArrayDict(
+        unit_id=np.array(["unit01", "unit02"]),
+        brain_region=np.array([b"M1", b"M1"]),
+        waveform_mean=np.zeros((2, 48)),
+    )
+    with h5py.File(test_filepath, "w") as f:
+        data.to_hdf5(f)
+
+    with h5py.File(test_filepath, "r") as f:
+        lazy = LazyArrayDict.from_hdf5(f)
+        lazy.unit_id = lazy.__dict__["unit_id"][:]
+        _ = lazy.brain_region
+        _ = lazy.waveform_mean
+
+        assert not any(isinstance(lazy.__dict__[k], h5py.Dataset) for k in lazy.keys())
+        assert lazy.__class__ == ArrayDict
+        assert "_n_lazy" not in lazy.__dict__
+
+
+def test_lazy_array_dict_promotes_after_delattr_removes_dataset(test_filepath):
+    """Removing a lazy column should shrink the lazy count so remaining loads can finish.
+
+    After ``del`` on a dataset-backed field, materializing the rest via __getattribute__
+    should flip to ArrayDict and clear _lazy_ops, _unicode_keys, and _n_lazy.
+    """
+    data = ArrayDict(
+        unit_id=np.array(["unit01", "unit02"]),
+        brain_region=np.array([b"M1", b"M1"]),
+        waveform_mean=np.zeros((2, 48)),
+    )
+    with h5py.File(test_filepath, "w") as f:
+        data.to_hdf5(f)
+
+    with h5py.File(test_filepath, "r") as f:
+        lazy = LazyArrayDict.from_hdf5(f)
+        del lazy.unit_id
+        _ = lazy.brain_region
+        _ = lazy.waveform_mean
+
+        assert lazy.__class__ == ArrayDict
+        assert "_n_lazy" not in lazy.__dict__
+
+
 def test_array_dict_from_dataframe():
     # Create a sample DataFrame
     df = pd.DataFrame(

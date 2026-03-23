@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import copy
-from typing import Dict, List
+from typing import List
 import logging
 
 import h5py
@@ -364,6 +364,13 @@ class LazyArrayDict(ArrayDict):
         for key in self.keys():
             getattr(self, key)
 
+    def _maybe_promote_to_arraydict(self):
+        d = self.__dict__
+        if "_n_lazy" not in d or d["_n_lazy"] != 0:
+            return
+        self.__class__ = ArrayDict
+        del self._lazy_ops, self._unicode_keys, self._n_lazy
+
     def __getattribute__(self, name):
         if name not in ("__dict__", "keys"):
             if name in self.__dict__ and not name.startswith("_"):
@@ -379,14 +386,43 @@ class LazyArrayDict(ArrayDict):
                         out = out.astype("U")
 
                     self.__dict__[name] = out
-                    self._n_lazy -= 1
+                    self.__dict__["_n_lazy"] -= 1
 
-                if self._n_lazy == 0:
-                    self.__class__ = ArrayDict
-                    del self._lazy_ops, self._unicode_keys, self._n_lazy
+                LazyArrayDict._maybe_promote_to_arraydict(self)
                 return out
 
         return super(LazyArrayDict, self).__getattribute__(name)
+
+    def __setattr__(self, name, value):
+        if name.startswith("_"):
+            super().__setattr__(name, value)
+            return
+
+        d = self.__dict__
+        old = d[name] if name in d else None
+        super().__setattr__(name, value)
+
+        if "_n_lazy" in d:
+            old_d = isinstance(old, h5py.Dataset)
+            new_d = isinstance(value, h5py.Dataset)
+            if old_d and not new_d:
+                d["_n_lazy"] -= 1
+            elif new_d and not old_d:
+                d["_n_lazy"] += 1
+        LazyArrayDict._maybe_promote_to_arraydict(self)
+
+    def __delattr__(self, name):
+        if name.startswith("_"):
+            super().__delattr__(name)
+            return
+
+        d = self.__dict__
+        old = d[name]
+        super().__delattr__(name)
+
+        if "_n_lazy" in d and isinstance(old, h5py.Dataset):
+            d["_n_lazy"] -= 1
+        LazyArrayDict._maybe_promote_to_arraydict(self)
 
     def select_by_mask(self, mask: np.ndarray):
         assert mask.ndim == 1, f"mask must be 1D, got {mask.ndim}D mask"
