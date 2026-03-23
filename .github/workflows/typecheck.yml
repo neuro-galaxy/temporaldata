@@ -19,5 +19,8 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v5
 
-      - name: Run type checking
-        run: uvx ty check --output-format github
+      - name: Install project and run ty
+        run: |
+          uv venv venv -p 3.10
+          uv pip install -e ".[dev]"
+          ty check --output-format github
