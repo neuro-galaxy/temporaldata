@@ -210,6 +210,28 @@ def test_lazy_array_dict_n_lazy_counter(test_filepath):
         assert data2.__dict__["_n_lazy"] == 2
 
 
+def test_lazy_array_dict_n_lazy_counts_only_datasets(test_filepath):
+    """Root may contain non-dataset members; _n_lazy must match datasets only."""
+    data = ArrayDict(
+        unit_id=np.array(["unit01", "unit02"]),
+        brain_region=np.array([b"M1", b"M1"]),
+        waveform_mean=np.zeros((2, 48)),
+    )
+    with h5py.File(test_filepath, "w") as f:
+        data.to_hdf5(f)
+    with h5py.File(test_filepath, "a") as f:
+        f.create_group("nested_metadata")
+
+    with h5py.File(test_filepath, "r") as f:
+        assert len(f) == 4
+        lazy = LazyArrayDict.from_hdf5(f)
+        assert lazy.__dict__["_n_lazy"] == 3
+        _ = lazy.unit_id
+        _ = lazy.brain_region
+        _ = lazy.waveform_mean
+        assert lazy.__class__ == ArrayDict
+
+
 def test_array_dict_from_dataframe():
     # Create a sample DataFrame
     df = pd.DataFrame(

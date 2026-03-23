@@ -379,9 +379,9 @@ class LazyArrayDict(ArrayDict):
                         out = out.astype("U")
 
                     self.__dict__[name] = out
-                    self.__dict__["_n_lazy"] -= 1
+                    self._n_lazy -= 1
 
-                if self.__dict__["_n_lazy"] == 0:
+                if self._n_lazy == 0:
                     self.__class__ = ArrayDict
                     del self._lazy_ops, self._unicode_keys, self._n_lazy
                 return out
@@ -451,11 +451,14 @@ class LazyArrayDict(ArrayDict):
         )
 
         obj = cls.__new__(cls)
+        n_lazy = 0
         for key, value in file.items():
             obj.__dict__[key] = value
+            if isinstance(value, h5py.Dataset):
+                n_lazy += 1
 
         obj._unicode_keys = file.attrs["_unicode_keys"].astype(str).tolist()
         obj._lazy_ops = {}
-        obj._n_lazy = len(file)
+        obj._n_lazy = n_lazy
 
         return obj
