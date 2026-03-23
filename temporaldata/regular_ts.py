@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from typing import Dict
+from typing import Dict, Literal
 
 import h5py
 import numpy as np
@@ -54,9 +54,9 @@ class RegularTimeSeries(ArrayDict):
         self,
         *,
         sampling_rate: float,  # in Hz
-        domain: Interval = None,
+        domain: Interval | Literal["auto"] | None = None,
         domain_start=0.0,
-        **kwargs: Dict[str, np.ndarray],
+        **kwargs: np.ndarray,
     ):
         super().__init__(**kwargs)
 

@@ -80,7 +80,7 @@ class IrregularTimeSeries(ArrayDict):
         *,
         timekeys: List[str] = None,
         domain: Union[Interval, str],
-        **kwargs: Dict[str, np.ndarray],
+        **kwargs: np.ndarray,
     ):
         super().__init__(timestamps=timestamps, **kwargs)
 
