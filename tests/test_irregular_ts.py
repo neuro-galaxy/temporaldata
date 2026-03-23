@@ -324,6 +324,58 @@ def test_lazy_irregular_timeseries(test_filepath):
         assert np.allclose(data.values, np.array([1, 3]))
 
 
+def test_lazy_irregular_timeseries_n_lazy_counter(test_filepath):
+    """Verify the _n_lazy counter tracks materialization correctly."""
+    data = IrregularTimeSeries(
+        unit_index=np.array([0, 0, 1, 0, 1, 2]),
+        timestamps=np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6]),
+        values=np.array([0, 1, 2, 3, 4, 5]),
+        waveforms=np.zeros((6, 48)),
+        timekeys=["timestamps"],
+        domain="auto",
+    )
+
+    with h5py.File(test_filepath, "w") as f:
+        data.to_hdf5(f)
+
+    with h5py.File(test_filepath, "r") as f:
+        lazy = LazyIrregularTimeSeries.from_hdf5(f)
+        assert lazy.__dict__["_n_lazy"] == 4
+        _ = lazy.unit_index
+        assert lazy.__dict__["_n_lazy"] == 3
+        _ = lazy.timestamps
+        assert lazy.__dict__["_n_lazy"] == 2
+        _ = lazy.values
+        assert lazy.__dict__["_n_lazy"] == 1
+        _ = lazy.waveforms
+        assert lazy.__class__ == IrregularTimeSeries
+        assert "_n_lazy" not in lazy.__dict__
+
+    with h5py.File(test_filepath, "r") as f:
+        lazy = LazyIrregularTimeSeries.from_hdf5(f)
+        _ = lazy.unit_index
+        assert lazy.__dict__["_n_lazy"] == 3
+        mask = np.array([True] * 3 + [False] * 3)
+        data2 = lazy.select_by_mask(mask)
+        assert data2.__dict__["_n_lazy"] == 3
+
+    with h5py.File(test_filepath, "r") as f:
+        lazy = LazyIrregularTimeSeries.from_hdf5(f)
+        lazy = lazy.slice(0.15, 0.6)
+        assert lazy.__dict__["_n_lazy"] == 4
+
+        _ = lazy.values
+        assert lazy.__dict__["_n_lazy"] == 2
+        assert lazy.__class__ == LazyIrregularTimeSeries
+        assert isinstance(lazy.__dict__["timestamps"], np.ndarray)
+
+        _ = lazy.waveforms
+        assert lazy.__dict__["_n_lazy"] == 1
+        _ = lazy.unit_index
+        assert lazy.__class__ == IrregularTimeSeries
+        assert "_n_lazy" not in lazy.__dict__
+
+
 def test_irregular_set_domain():
     data = IrregularTimeSeries(
         unit_index=np.array([0, 0, 1, 0, 1, 2]),

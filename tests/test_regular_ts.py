@@ -238,6 +238,41 @@ def test_lazy_regular_timeseries(test_filepath):
         assert np.allclose(data.timestamps, np.arange(1.0, 3.0, 1 / 250.0))
 
 
+def test_lazy_regular_timeseries_n_lazy_counter(test_filepath):
+    """Verify the _n_lazy counter tracks materialization correctly."""
+    raw = np.arange(1000 * 128, dtype=np.float64).reshape(1000, 128)
+    gamma = np.ones((1000, 128), dtype=np.float64)
+    data = RegularTimeSeries(
+        raw=raw,
+        gamma=gamma,
+        sampling_rate=250.0,
+        domain="auto",
+    )
+
+    with h5py.File(test_filepath, "w") as f:
+        data.to_hdf5(f)
+
+    with h5py.File(test_filepath, "r") as f:
+        lazy = LazyRegularTimeSeries.from_hdf5(f)
+        assert lazy.__dict__["_n_lazy"] == 2
+        _ = lazy.gamma
+        assert lazy.__dict__["_n_lazy"] == 1
+        _ = lazy.raw
+        assert lazy.__class__ == RegularTimeSeries
+        assert "_n_lazy" not in lazy.__dict__
+
+    with h5py.File(test_filepath, "r") as f:
+        lazy = LazyRegularTimeSeries.from_hdf5(f)
+        lazy = lazy.slice(1.0, 3.0)
+        assert lazy.__dict__["_n_lazy"] == 2
+        _ = lazy.gamma
+        assert lazy.__dict__["_n_lazy"] == 1
+        assert lazy.__class__ == LazyRegularTimeSeries
+        _ = lazy.raw
+        assert lazy.__class__ == RegularTimeSeries
+        assert "_n_lazy" not in lazy.__dict__
+
+
 def test_regular_to_irregular_timeseries():
     a = RegularTimeSeries(
         lfp=np.random.random((100, 48)), sampling_rate=10, domain="auto"
