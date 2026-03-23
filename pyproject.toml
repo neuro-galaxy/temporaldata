@@ -31,7 +31,10 @@ Issues = "https://github.com/neuro-galaxy/temporaldata/issues"
 Documentation = "https://temporaldata.readthedocs.io/en/latest/"
 
 [tool.ty.environment]
-python-version = "3.11"
+python-version = "3.10"
+
+[tool.ty.src]
+include = ["temporaldata", "tests"]
 
 [tool.ty.rules]
 # Change these to "error" over time
@@ -45,4 +48,3 @@ invalid-method-override = "ignore"
 invalid-assignment = "ignore"
 not-iterable = "ignore"
 invalid-parameter-default = "ignore"
-unused-type-ignore-comment = "ignore"
