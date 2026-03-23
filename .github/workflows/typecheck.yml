@@ -18,4 +18,4 @@ jobs:
     - name: Install ty
       uses: astral-sh/setup-uv@v5
     - run: uv tool install ty@latest
-    - run: ty check
+    - run: ty check --output-format github
