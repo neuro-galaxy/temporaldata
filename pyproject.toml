@@ -39,8 +39,6 @@ include = ["temporaldata", "tests"]
 [tool.ty.rules]
 # Change these to "error" over time
 invalid-argument-type = "error"
-possibly-unresolved-reference = "ignore"
-unresolved-import = "ignore"
 unresolved-attribute = "ignore"
 unsupported-operator = "ignore"
 invalid-return-type = "ignore"
