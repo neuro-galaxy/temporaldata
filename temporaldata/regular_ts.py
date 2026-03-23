@@ -21,8 +21,8 @@ class RegularTimeSeries(ArrayDict):
 
     Args:
         sampling_rate: Sampling rate in Hz.
-        domain: an :obj:`Interval` object that defines the domain over which the
-            timeseries is defined. It is not possible to set domain to :obj:`"auto"`.
+        domain: :obj:`"auto"` or an :obj:`Interval` object that defines the domain over which the
+            timeseries is defined.
         **kwargs: Arbitrary keyword arguments where the values are arbitrary
             multi-dimensional (2d, 3d, ..., nd) arrays with shape (N, \*).
 
