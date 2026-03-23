@@ -22,5 +22,6 @@ jobs:
       - name: Install project and run ty
         run: |
           uv venv venv -p 3.10
+          source venv/bin/activate
           uv pip install -e ".[dev]"
           ty check --output-format github
