@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from typing import Dict, Literal
+from typing import Literal
 
 import h5py
 import numpy as np
