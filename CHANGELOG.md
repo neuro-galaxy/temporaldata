@@ -27,7 +27,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Removed `add_split_mask` method from `Data`, `Interval`, `IrregularTimeSeries`, and `RegularTimeSeries` classes. ([#47](https://github.com/neuro-galaxy/temporaldata/pull/47))
 - Removed `allow_split_mask_overlap` method from `Interval`. ([#47](https://github.com/neuro-galaxy/temporaldata/pull/47))
 - Removed `RegularTimeSeries.timekeys()` as it was dead code. ([#112](https://github.com/neuro-galaxy/temporaldata/pull/112))
-- Removed previously defined `LazyArrayDict.load()` and `LazyIrregularTimeSeries.load()` as `.materialize()` is used for that functionality.
+- Removed previously defined `LazyArrayDict.load()` and `LazyIrregularTimeSeries.load()` as `.materialize()` is used for that functionality. ([#114](https://github.com/neuro-galaxy/temporaldata/pull/114))
 
 
 ### Changed
