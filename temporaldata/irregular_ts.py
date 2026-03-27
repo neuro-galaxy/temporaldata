@@ -233,15 +233,23 @@ class IrregularTimeSeries(ArrayDict):
                 out.__dict__[key] = out.__dict__[key] - start
         return out
 
-    def select_by_mask(self, mask: np.ndarray):
+    def select_by_mask(self, mask: np.ndarray):  # ty: ignore[invalid-method-override]
         r"""Return a new :obj:`IrregularTimeSeries` object where all array attributes
         are indexed using the boolean mask.
 
         Note that this will not update the domain, as it is unclear how to resolve the
         domain when the mask is applied. If you wish to update the domain, you should
         do so manually.
+
+        Args:
+            mask: Boolean array used for masking. The mask needs to be 1-dimensional,
+                and of equal length as the first dimension of this object.
         """
-        out = super().select_by_mask(mask, timekeys=self._timekeys, domain=self.domain)
+        out = super().select_by_mask(
+            mask,
+            timekeys=self._timekeys,
+            domain=self.domain,
+        )
         out._sorted = self._sorted
         return out
 
@@ -509,6 +517,17 @@ class LazyIrregularTimeSeries(IrregularTimeSeries):
         return super(LazyIrregularTimeSeries, self).__getattribute__(name)
 
     def select_by_mask(self, mask: np.ndarray):
+        r"""Return a new :obj:`LazyIrregularTimeSeries` object where all array attributes
+        are indexed using the boolean mask.
+
+        Note that this will not update the domain, as it is unclear how to resolve the
+        domain when the mask is applied. If you wish to update the domain, you should
+        do so manually.
+
+        Args:
+            mask: Boolean array used for masking. The mask needs to be 1-dimensional,
+                and of equal length as the first dimension of this object.
+        """
         assert mask.ndim == 1, f"mask must be 1D, got {mask.ndim}D mask"
         assert mask.dtype == bool, f"mask must be boolean, got {mask.dtype}"
 

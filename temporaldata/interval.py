@@ -238,9 +238,13 @@ class Interval(ArrayDict):
                 out.__dict__[key] = out.__dict__[key] - start
         return out
 
-    def select_by_mask(self, mask: np.ndarray):
+    def select_by_mask(self, mask: np.ndarray):  # ty: ignore[invalid-method-override]
         r"""Return a new :obj:`Interval` object where all array attributes
         are indexed using the boolean mask.
+
+        Args:
+            mask: Boolean array used for masking. The mask needs to be 1-dimensional,
+                and of equal length as the first dimension of this object.
         """
         out = super().select_by_mask(mask, timekeys=self._timekeys)
         out._sorted = self._sorted

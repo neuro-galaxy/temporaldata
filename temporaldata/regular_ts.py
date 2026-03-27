@@ -83,7 +83,8 @@ class RegularTimeSeries(ArrayDict):
         r"""Returns the domain of the time series."""
         return self._domain
 
-    def select_by_mask(self, mask: np.ndarray):
+    def select_by_mask(self, mask: np.ndarray):  # ty: ignore[invalid-method-override]
+        r"""Invalid for :obj:`RegularTimeSeries`"""
         raise NotImplementedError("Not implemented for RegularTimeSeries.")
 
     def _time_to_idx(
