@@ -276,6 +276,7 @@ class IrregularTimeSeries(ArrayDict):
         cls,
         df: pd.DataFrame,
         unsigned_to_long: bool = True,
+        *,
         domain: Interval | Literal["auto"] = "auto",
         **kwargs,
     ):
