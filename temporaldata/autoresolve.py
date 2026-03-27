@@ -13,6 +13,9 @@ class autoresolve:
     When autoresolve is disabled, accessing attributes on Lazy* objects
     returns the raw h5py.Dataset instead of loading into a numpy array.
 
+    Args:
+        enabled: Whether to auto-resolve or not
+
     Example::
 
         with temporaldata.autoresolve(False):
