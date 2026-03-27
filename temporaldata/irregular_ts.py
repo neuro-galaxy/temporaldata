@@ -7,7 +7,7 @@ import h5py
 import numpy as np
 import pandas as pd
 
-from .autoresolve import get_autoresolve
+from .autoresolve import get_resolve_on_access
 from .arraydict import ArrayDict
 from .interval import Interval
 
@@ -459,7 +459,7 @@ class LazyIrregularTimeSeries(IrregularTimeSeries):
                 out = self.__dict__[name]
 
                 if isinstance(out, h5py.Dataset):
-                    if not get_autoresolve():
+                    if not get_resolve_on_access():
                         if self._lazy_ops:
                             logging.warning(
                                 f"Returning raw h5py.Dataset for '{name}' but "

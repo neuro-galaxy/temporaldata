@@ -1,24 +1,24 @@
 from contextvars import ContextVar
 
-_AUTORESOLVE = ContextVar("autoresolve", default=True)
+_RESOLVE_ON_ACCESS = ContextVar("resolve_on_access", default=True)
 
 
-def get_autoresolve() -> bool:
-    return _AUTORESOLVE.get()
+def get_resolve_on_access() -> bool:
+    return _RESOLVE_ON_ACCESS.get()
 
 
-class autoresolve:
-    """Context manager to control whether lazy attributes are auto-resolved.
+class resolve_on_access:
+    """Context manager to control whether lazy attributes are resolved on access.
 
-    When autoresolve is disabled, accessing attributes on Lazy* objects
-    returns the raw h5py.Dataset instead of loading into a numpy array.
+    When disabled, accessing attributes on Lazy* objects returns the raw
+    h5py.Dataset instead of loading into a numpy array.
 
     Args:
-        enabled: Whether to auto-resolve or not
+        enabled: Whether to resolve on access or not
 
     Example::
 
-        with temporaldata.autoresolve(False):
+        with temporaldata.resolve_on_access(False):
             ds = data.values  # h5py.Dataset, not np.ndarray
     """
 
@@ -26,9 +26,9 @@ class autoresolve:
         self._enabled = enabled
 
     def __enter__(self):
-        self._token = _AUTORESOLVE.set(self._enabled)
+        self._token = _RESOLVE_ON_ACCESS.set(self._enabled)
         return self
 
     def __exit__(self, *exc):
-        _AUTORESOLVE.reset(self._token)
+        _RESOLVE_ON_ACCESS.reset(self._token)
         return False
