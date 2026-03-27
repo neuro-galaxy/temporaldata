@@ -6,6 +6,7 @@ from .interval import Interval, LazyInterval
 from .data import Data
 
 from .concat import concat
+from .autoresolve import autoresolve
 
 try:
     __version__ = version("temporaldata")

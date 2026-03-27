@@ -295,6 +295,10 @@ class LazyRegularTimeSeries(RegularTimeSeries):
                 out = self.__dict__[name]
 
                 if isinstance(out, h5py.Dataset):
+                    from .autoresolve import get_autoresolve
+
+                    if not get_autoresolve():
+                        return out
                     # convert into numpy array
                     if "slice" in self._lazy_ops:
                         idx_l, idx_r = self._lazy_ops["slice"]

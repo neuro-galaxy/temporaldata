@@ -365,6 +365,10 @@ class LazyArrayDict(ArrayDict):
                 out = self.__dict__[name]
 
                 if isinstance(out, h5py.Dataset):
+                    from .autoresolve import get_autoresolve
+
+                    if not get_autoresolve():
+                        return out
                     # apply any mask, and return the numpy array
                     if "mask" in self._lazy_ops:
                         out = out[self._lazy_ops["mask"]]

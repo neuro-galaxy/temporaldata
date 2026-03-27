@@ -458,6 +458,10 @@ class LazyIrregularTimeSeries(IrregularTimeSeries):
                 out = self.__dict__[name]
 
                 if isinstance(out, h5py.Dataset):
+                    from .autoresolve import get_autoresolve
+
+                    if not get_autoresolve():
+                        return out
                     # convert into numpy array
 
                     # first we check if timestamps was resolved

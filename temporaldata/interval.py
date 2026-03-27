@@ -876,6 +876,10 @@ class LazyInterval(Interval):
                 out = self.__dict__[name]
 
                 if isinstance(out, h5py.Dataset):
+                    from .autoresolve import get_autoresolve
+
+                    if not get_autoresolve():
+                        return out
                     # convert into numpy array
                     if "unresolved_slice" in self._lazy_ops:
                         self._resolve_start_end_after_slice()
