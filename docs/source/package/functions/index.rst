@@ -1,6 +1,6 @@
 .. currentmodule:: temporaldata
 
-Utility functions
+Utilities
 -----------------
 
 .. list-table::
@@ -9,5 +9,9 @@ Utility functions
 
    * - :py:func:`concat`
      - Concatenate multiple data objects into a single object.
+   * - :py:class:`autoresolve`
+     - Context manager to control whether lazy attributes are auto-resolved.
 
 .. autofunction:: concat
+
+.. autoclass:: autoresolve
