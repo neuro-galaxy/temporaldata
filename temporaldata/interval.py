@@ -8,6 +8,7 @@ import h5py
 import numpy as np
 import pandas as pd
 
+from .autoresolve import get_resolve_on_access
 from .arraydict import ArrayDict
 
 
@@ -876,6 +877,15 @@ class LazyInterval(Interval):
                 out = self.__dict__[name]
 
                 if isinstance(out, h5py.Dataset):
+                    if not get_resolve_on_access():
+                        if self._lazy_ops:
+                            logging.warning(
+                                f"Returning raw h5py.Dataset for '{name}' but "
+                                f"there are pending lazy operations "
+                                f"{list(self._lazy_ops.keys())} that have not "
+                                f"been applied."
+                            )
+                        return out
                     # convert into numpy array
                     if "unresolved_slice" in self._lazy_ops:
                         self._resolve_start_end_after_slice()
