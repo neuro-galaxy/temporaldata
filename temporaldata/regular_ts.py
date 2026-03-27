@@ -6,6 +6,7 @@ from typing import Literal
 import h5py
 import numpy as np
 
+from .autoresolve import get_autoresolve
 from .arraydict import ArrayDict
 from .interval import Interval
 from .irregular_ts import IrregularTimeSeries
@@ -295,8 +296,6 @@ class LazyRegularTimeSeries(RegularTimeSeries):
                 out = self.__dict__[name]
 
                 if isinstance(out, h5py.Dataset):
-                    from .autoresolve import get_autoresolve
-
                     if not get_autoresolve():
                         return out
                     # convert into numpy array

@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 
 from .utils import _size_repr
+from .autoresolve import get_autoresolve
 
 
 class ArrayDict(object):
@@ -365,8 +366,6 @@ class LazyArrayDict(ArrayDict):
                 out = self.__dict__[name]
 
                 if isinstance(out, h5py.Dataset):
-                    from .autoresolve import get_autoresolve
-
                     if not get_autoresolve():
                         return out
                     # apply any mask, and return the numpy array
