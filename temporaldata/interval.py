@@ -1043,6 +1043,7 @@ class LazyInterval(Interval):
         return out
 
     def to_hdf5(self, file):
+        r"""Invalid method for :obj:`LazyInterval`"""
         raise NotImplementedError("Cannot save a lazy interval object to hdf5.")
 
     @classmethod

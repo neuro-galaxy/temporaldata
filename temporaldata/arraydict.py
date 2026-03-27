@@ -434,6 +434,7 @@ class LazyArrayDict(ArrayDict):
         raise NotImplementedError("Cannot convert a dataframe to a lazy array dict.")
 
     def to_hdf5(self, file):
+        r"""Invalid method for :obj:`LazyArrayDict`"""
         raise NotImplementedError("Cannot save a lazy array dict to hdf5.")
 
     @classmethod

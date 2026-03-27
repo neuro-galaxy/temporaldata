@@ -39,10 +39,10 @@ include = ["temporaldata", "tests"]
 [tool.ty.rules]
 # Change these to "error" over time
 invalid-argument-type = "error"
+invalid-method-override = "error"
 unresolved-attribute = "ignore"
 unsupported-operator = "ignore"
 invalid-return-type = "ignore"
-invalid-method-override = "ignore"
 invalid-assignment = "ignore"
 not-iterable = "ignore"
 invalid-parameter-default = "ignore"

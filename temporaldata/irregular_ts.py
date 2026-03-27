@@ -689,6 +689,7 @@ class LazyIrregularTimeSeries(IrregularTimeSeries):
         return out
 
     def to_hdf5(self, file):
+        r"""Invalid method for :obj:`LazyIrregularTimeSeries`"""
         raise NotImplementedError("Cannot save a lazy array dict to hdf5.")
 
     @classmethod
