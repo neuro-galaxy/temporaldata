@@ -390,7 +390,7 @@ class LazyArrayDict(ArrayDict):
 
         return super(LazyArrayDict, self).__getattribute__(name)
 
-    def select_by_mask(self, mask: np.ndarray):
+    def select_by_mask(self, mask: np.ndarray):  # ty: ignore[invalid-method-override]
         assert mask.ndim == 1, f"mask must be 1D, got {mask.ndim}D mask"
         assert mask.dtype == bool, f"mask must be boolean, got {mask.dtype}"
 
@@ -429,7 +429,8 @@ class LazyArrayDict(ArrayDict):
         return out
 
     @classmethod
-    def from_dataframe(cls, df, unsigned_to_long=True):
+    def from_dataframe(cls, df, unsigned_to_long=True, **kwargs):
+        r"""Invalid method for :obj:`LazyArrayDict`"""
         raise NotImplementedError("Cannot convert a dataframe to a lazy array dict.")
 
     def to_hdf5(self, file):

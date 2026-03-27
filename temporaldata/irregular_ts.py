@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, List, Union
+from typing import Dict, List, Union, Literal
 import logging
 
 import h5py
@@ -275,8 +275,9 @@ class IrregularTimeSeries(ArrayDict):
     def from_dataframe(
         cls,
         df: pd.DataFrame,
-        domain: Union[str, Interval] = "auto",
         unsigned_to_long: bool = True,
+        domain: Interval | Literal["auto"] = "auto",
+        **kwargs,
     ):
         r"""Create an :obj:`IrregularTimeseries` object from a pandas DataFrame.
         The dataframe must have a timestamps column, with the name :obj:`"timestamps"`
@@ -301,6 +302,7 @@ class IrregularTimeSeries(ArrayDict):
             df,
             unsigned_to_long=unsigned_to_long,
             domain=domain,
+            **kwargs,
         )
 
     def to_hdf5(self, file):
