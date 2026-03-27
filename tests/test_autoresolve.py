@@ -1,3 +1,4 @@
+import logging
 import os
 import tempfile
 
@@ -147,11 +148,20 @@ class TestAutoresolveNoClassUpgrade:
             assert isinstance(data.spikes, IrregularTimeSeries)
 
 
-class TestAutoresolveWithSlicedLazy:
-    """autoresolve(False) on a sliced lazy object still returns raw Dataset."""
+class TestAutoresolveWarnings:
+    """autoresolve(False) warns when there are pending lazy ops."""
 
-    def test_sliced_lazy_returns_dataset(self, saved_data):
+    def test_warns_on_pending_ops(self, saved_data, caplog):
         with Data.load(saved_data) as data:
             sliced = data.slice(0.5, 2.5)
             with autoresolve(False):
-                assert isinstance(sliced.spikes.values, h5py.Dataset)
+                with caplog.at_level(logging.WARNING):
+                    sliced.spikes.values
+                assert "pending lazy operations" in caplog.text
+
+    def test_no_warning_without_ops(self, saved_data, caplog):
+        with Data.load(saved_data) as data:
+            with autoresolve(False):
+                with caplog.at_level(logging.WARNING):
+                    data.spikes.values
+                assert "pending lazy operations" not in caplog.text

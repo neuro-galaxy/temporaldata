@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import math
 from typing import Literal
 
@@ -297,6 +298,13 @@ class LazyRegularTimeSeries(RegularTimeSeries):
 
                 if isinstance(out, h5py.Dataset):
                     if not get_autoresolve():
+                        if self._lazy_ops:
+                            logging.warning(
+                                f"Returning raw h5py.Dataset for '{name}' but "
+                                f"there are pending lazy operations "
+                                f"{list(self._lazy_ops.keys())} that have not "
+                                f"been applied."
+                            )
                         return out
                     # convert into numpy array
                     if "slice" in self._lazy_ops:
