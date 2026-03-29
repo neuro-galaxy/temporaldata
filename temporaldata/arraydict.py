@@ -8,7 +8,7 @@ import h5py
 import numpy as np
 import pandas as pd
 
-from .utils import _size_repr
+from .utils import _size_repr, _tab
 
 
 class ArrayDict(object):
@@ -92,7 +92,7 @@ class ArrayDict(object):
 
     def __repr__(self) -> str:
         cls = self.__class__.__name__
-        info = [_size_repr(k, self.__dict__[k], indent=2) for k in self.keys()]
+        info = [_tab + _size_repr(k, self.__dict__[k]) for k in self.keys()]
         info = ",\n".join(info)
         return f"{cls}(\n{info}\n)"
 

@@ -13,7 +13,7 @@ from .arraydict import ArrayDict, LazyArrayDict
 from .irregular_ts import IrregularTimeSeries, LazyIrregularTimeSeries
 from .regular_ts import RegularTimeSeries, LazyRegularTimeSeries
 from .interval import Interval, LazyInterval
-from .utils import _size_repr
+from .utils import _size_repr, _tab, _indent
 
 
 class Data(object):
@@ -286,15 +286,15 @@ class Data(object):
     def __repr__(self) -> str:
         cls = self.__class__.__name__
 
-        info = ""
-        for key, value in self.__dict__.items():
-            if key in ("_domain", "_file"):
-                pass
-            elif isinstance(value, ArrayDict):
-                info = info + key + "=" + repr(value) + ",\n"
+        info = []
+        for key in self.keys():
+            value = getattr(self, key)
+            if isinstance(value, ArrayDict):
+                info.append(key + "=" + str(value))
             elif value is not None:
-                info = info + _size_repr(key, value) + ",\n"
-        info = info.rstrip()
+                info.append(_size_repr(key, value))
+
+        info = _indent(",\n".join(info))
         return f"{cls}(\n{info}\n)"
 
     def to_dict(self) -> Dict[str, Any]:
