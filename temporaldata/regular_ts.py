@@ -163,7 +163,8 @@ class RegularTimeSeries(ArrayDict):
         out._domain = Interval(start=out_start, end=out_end)
 
         if reset_origin:
-            if out_start == out_end:  # slice outside the domain
+            outside_domain = end <= self.domain.start[0] or start >= self.domain.end[0]
+            if outside_domain:
                 out._domain.start = out._domain.start - out_start
                 out._domain.end = out._domain.end - out_end
 
