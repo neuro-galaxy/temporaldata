@@ -9,6 +9,24 @@ import numpy as np
 
 from .irregular_ts import IrregularTimeSeries
 
+_cv2 = None
+
+
+def _cv2_module():
+    """Lazy-import OpenCV once; do not store the module on LazyVideo instances (breaks copy.deepcopy)."""
+    global _cv2
+    if _cv2 is None:
+        try:
+            import cv2 as _cv2_mod
+
+            _cv2 = _cv2_mod
+        except ImportError:
+            raise ImportError(
+                "OpenCV not installed, you must install temporaldata using "
+                "`pip install -e .[video]`"
+            )
+    return _cv2
+
 
 class LazyVideo(object):
     r"""An object that lazily loads batches of video data using OpenCV.
@@ -30,16 +48,7 @@ class LazyVideo(object):
         colorspace: str = "RGB",
         channel_format: str = "NCHW",
     ):
-
-        try:
-            import cv2
-
-            self.cv2 = cv2  # Store for use in other methods
-        except ImportError:
-            raise ImportError(
-                "OpenCV not installed, you must install temporaldata using "
-                "`pip install -e .[video]`"
-            )
+        cv2 = _cv2_module()
 
         self.timestamps = np.asarray(timestamps, dtype=np.float64)
         if isinstance(video_file, str):
@@ -101,6 +110,20 @@ class LazyVideo(object):
         self.frame_count = frame_count
 
         self.frame_indices = np.arange(frame_count, dtype=np.int64)
+
+    def __deepcopy__(self, memo):
+        if id(self) in memo:
+            return memo[id(self)]
+        vf = self.video_files[0] if len(self.video_files) == 1 else list(self.video_files)
+        dup = self.__class__(
+            timestamps=self.timestamps.copy(),
+            video_file=vf,
+            resize=self.resize,
+            colorspace=self.colorspace,
+            channel_format=self.channel_format,
+        )
+        memo[id(self)] = dup
+        return dup
 
     def __del__(self):
         r"""Close video capture upon object destruction"""
@@ -184,6 +207,7 @@ class LazyVideo(object):
         return timestamps_sliced
 
     def _load_frames(self, frame_indices: np.ndarray):
+        cv2 = _cv2_module()
 
         is_contiguous = np.sum(np.diff(frame_indices)) == (len(frame_indices) - 1)
         n_frames = len(frame_indices)
@@ -203,7 +227,7 @@ class LazyVideo(object):
                 or local_index != previous_local_idx + 1
             )
             if should_seek:
-                video_capture.set(self.cv2.CAP_PROP_POS_FRAMES, local_index)
+                video_capture.set(cv2.CAP_PROP_POS_FRAMES, local_index)
             ret, frame = video_capture.read()
             if ret:
                 # create frames array for first frame
@@ -224,14 +248,14 @@ class LazyVideo(object):
 
                 # modify frame data
                 if self.resize is not None:
-                    frame = self.cv2.resize(frame, self.resize)
+                    frame = cv2.resize(frame, self.resize)
 
                 if self.colorspace == "RGB":
-                    frame = self.cv2.cvtColor(frame, self.cv2.COLOR_BGR2RGB)
+                    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 elif self.colorspace == "G":
                     # keep color channel
                     frame = np.expand_dims(
-                        self.cv2.cvtColor(frame, self.cv2.COLOR_BGR2GRAY), axis=-1
+                        cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), axis=-1
                     )
 
                 if self.channel_format == "NCHW":
