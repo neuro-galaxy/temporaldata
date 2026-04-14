@@ -352,8 +352,13 @@ class LazyRegularTimeSeries(RegularTimeSeries):
         out._domain = Interval(start=out_start, end=out_end)
 
         if reset_origin:
-            out._domain.start = out._domain.start - start
-            out._domain.end = out._domain.end - start
+            outside_domain = end <= self.domain.start[0] or start >= self.domain.end[0]
+            if outside_domain:
+                out._domain.start = out._domain.start - out_start
+                out._domain.end = out._domain.end - out_end
+            else:
+                out._domain.start = out._domain.start - start
+                out._domain.end = out._domain.end - start
 
         for key in self.keys():
             if isinstance(self.__dict__[key], h5py.Dataset):
