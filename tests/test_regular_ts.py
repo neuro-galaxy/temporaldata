@@ -318,23 +318,37 @@ def test_slice_numerical_instability():
     assert sliced_ts.domain.end[-1] == 0.9
 
 
-def test_slice_outside_domain():
+def test_slice_outside_domain(test_filepath):
     ts = RegularTimeSeries(
         value=np.zeros((100)), sampling_rate=10, domain="auto", domain_start=10.0
     )
 
-    sliced_ts = ts.slice(0, 5, reset_origin=False)
-    assert len(sliced_ts) == 0
-    assert sliced_ts.domain.start[0] == sliced_ts.domain.end[-1] == ts.domain.start[0]
+    def _assert_slice_outside_domain(ts):
+        sliced_ts = ts.slice(0, 5, reset_origin=False)
+        assert len(sliced_ts) == 0
+        assert (
+            sliced_ts.domain.start[0] == sliced_ts.domain.end[-1] == ts.domain.start[0]
+        )
 
-    sliced_ts = ts.slice(0, 5, reset_origin=True)
-    assert len(sliced_ts) == 0
-    assert sliced_ts.domain.start[0] == sliced_ts.domain.end[-1] == 0.0
+        sliced_ts = ts.slice(0, 5, reset_origin=True)
+        assert len(sliced_ts) == 0
+        assert sliced_ts.domain.start[0] == sliced_ts.domain.end[-1] == 0.0
 
-    sliced_ts = ts.slice(30, 45, reset_origin=False)
-    assert len(sliced_ts) == 0
-    assert sliced_ts.domain.start[0] == sliced_ts.domain.end[-1] == ts.domain.end[-1]
+        sliced_ts = ts.slice(30, 45, reset_origin=False)
+        assert len(sliced_ts) == 0
+        assert (
+            sliced_ts.domain.start[0] == sliced_ts.domain.end[-1] == ts.domain.end[-1]
+        )
 
-    sliced_ts = ts.slice(30, 45, reset_origin=True)
-    assert len(sliced_ts) == 0
-    assert sliced_ts.domain.start[0] == sliced_ts.domain.end[-1] == 0.0
+        sliced_ts = ts.slice(30, 45, reset_origin=True)
+        assert len(sliced_ts) == 0
+        assert sliced_ts.domain.start[0] == sliced_ts.domain.end[-1] == 0.0
+
+    _assert_slice_outside_domain(ts)
+
+    with h5py.File(test_filepath, "w") as f:
+        ts.to_hdf5(f)
+
+    with h5py.File(test_filepath, "r") as f:
+        lazy_ts = LazyRegularTimeSeries.from_hdf5(f)
+        _assert_slice_outside_domain(lazy_ts)
