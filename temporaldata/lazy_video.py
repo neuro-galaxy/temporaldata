@@ -111,6 +111,15 @@ class LazyVideo(object):
 
         self.frame_indices = np.arange(frame_count, dtype=np.int64)
 
+        if frame_count > 1 and np.any(np.diff(self.timestamps[:frame_count]) < 0):
+            sort_idx = np.argsort(self.timestamps[:frame_count])
+            self.timestamps[:frame_count] = self.timestamps[sort_idx]
+            self.frame_indices = sort_idx.astype(np.int64)
+            logging.info(
+                "LazyVideo: sorted %d timestamps that were not monotonically increasing",
+                frame_count,
+            )
+
     def __deepcopy__(self, memo):
         if id(self) in memo:
             return memo[id(self)]
