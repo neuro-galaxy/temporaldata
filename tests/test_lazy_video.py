@@ -179,3 +179,44 @@ def test_lazyvideo_slice_time_window_and_frames():
     finally:
         if os.path.exists(path):
             os.remove(path)
+
+
+@pytest.mark.skipif(shutil.which("ffprobe") is None, reason="ffprobe required for LazyVideo")
+def test_lazyvideo_concat_propagates_cached_segment_frame_counts():
+    """LazyVideo.concat() must concatenate cached segment_frame_counts so the
+    resulting object never has to re-probe via ffprobe. Regression for the
+    case where torch_brain Dataset wraps cached single-segment videos.
+    """
+    paths = []
+    try:
+        # Build two single-segment LazyVideos with cached counts, then concat.
+        videos = []
+        for n in (3, 4):
+            fd, path = tempfile.mkstemp(suffix=".mp4")
+            os.close(fd)
+            paths.append(path)
+            _write_tiny_mp4(path, n)
+            videos.append(
+                LazyVideo(
+                    timestamps=np.linspace(0.0, n * 0.2, n, dtype=np.float64),
+                    video_file=path,
+                    segment_frame_counts=np.array([n], dtype=np.int64),
+                    channel_format="NHWC",
+                )
+            )
+
+        with patch("temporaldata.lazy_video._probe_segment_frame_count") as probe:
+            probe.side_effect = AssertionError(
+                "concat must not call ffprobe when inputs have cached counts"
+            )
+            merged = LazyVideo.concat(videos)
+            probe.assert_not_called()
+
+        np.testing.assert_array_equal(
+            merged.segment_frame_counts, np.array([3, 4], dtype=np.int64)
+        )
+        assert merged.frame_count == 7
+    finally:
+        for p in paths:
+            if os.path.exists(p):
+                os.remove(p)

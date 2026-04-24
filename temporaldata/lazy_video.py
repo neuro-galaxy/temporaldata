@@ -194,12 +194,21 @@ class LazyVideo(object):
         video_files = [
             video_file for video in videos for video_file in video.video_files
         ]
+        # Concatenate the cached per-segment frame counts so the new LazyVideo
+        # never has to call ffprobe. Without this, building a multi-segment
+        # LazyVideo from cached single-segment ones (e.g. torch_brain Dataset's
+        # standard wrapping) discards the cache and re-probes every file.
+        segment_frame_counts = np.concatenate(
+            [np.asarray(video.segment_frame_counts, dtype=np.int64) for video in videos],
+            axis=0,
+        )
         return cls(
             timestamps=timestamps,
             video_file=video_files,
             resize=first.resize,
             colorspace=first.colorspace,
             channel_format=first.channel_format,
+            segment_frame_counts=segment_frame_counts,
         )
 
     def _segment_for_frame(self, frame_index: int):
