@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import copyreg
 from typing import Dict, List
 import logging
 
@@ -324,6 +325,22 @@ class ArrayDict(object):
             getattr(self, key)
 
         return self
+
+    def __reduce__(self):
+        r"""Pickle hook: materialize all h5py-backed attributes first.
+
+            Only necessary if default_collate is not being used (loudly fails if passing a lazy).
+        """
+        self.materialize()
+        for k, v in list(self.__dict__.items()):
+            if isinstance(v, (h5py.Dataset, h5py.Group, h5py.File)):
+                raise TypeError(
+                    f"{type(self).__name__}.__reduce__: attribute {k!r} is "
+                    f"still an h5py object after materialize(); cannot pickle. "
+                    f"The HDF5 file may have been closed or moved."
+                )
+        cls = type(self)
+        return (copyreg.__newobj__, (cls,), self.__dict__)
 
 
 class LazyArrayDict(ArrayDict):
