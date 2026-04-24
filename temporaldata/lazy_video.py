@@ -107,6 +107,7 @@ class LazyVideo(object):
             # the entire packet stream and can take seconds-to-minutes per file.
             # Prefer caching counts at ingest (`to_hdf5` writes them) so this
             # branch is only taken for legacy data or fresh in-memory construction.
+            print(f"[WARNING] cache miss for segment frame counts for {self.video_files}")
             segment_frame_counts = [
                 _probe_segment_frame_count(path) for path in self.video_files
             ]
