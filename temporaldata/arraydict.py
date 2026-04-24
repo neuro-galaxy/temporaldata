@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 
 from .utils import _size_repr
+from .autoresolve import get_resolve_on_access
 
 
 class ArrayDict(object):
@@ -365,6 +366,15 @@ class LazyArrayDict(ArrayDict):
                 out = self.__dict__[name]
 
                 if isinstance(out, h5py.Dataset):
+                    if not get_resolve_on_access():
+                        if self._lazy_ops:
+                            logging.warning(
+                                f"Returning raw h5py.Dataset for '{name}' but "
+                                f"there are pending lazy operations "
+                                f"{list(self._lazy_ops.keys())} that have not "
+                                f"been applied."
+                            )
+                        return out
                     # apply any mask, and return the numpy array
                     if "mask" in self._lazy_ops:
                         out = out[self._lazy_ops["mask"]]
