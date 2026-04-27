@@ -1,62 +1,77 @@
 from __future__ import annotations
 
-import subprocess
-from typing import Sequence
 import logging
+from typing import Sequence
 
 import h5py
 import numpy as np
 
 from .irregular_ts import IrregularTimeSeries
 
-_cv2 = None
+_av = None
 
 
-def _cv2_module():
-    """Lazy-import OpenCV once; do not store the module on LazyVideo instances (breaks copy.deepcopy)."""
-    global _cv2
-    if _cv2 is None:
+def _av_module():
+    """Lazy-import PyAV once; do not store the module on LazyVideo instances."""
+    global _av
+    if _av is None:
         try:
-            import cv2 as _cv2_mod
-
-            _cv2 = _cv2_mod
-        except ImportError:
+            import av as _av_mod
+        except ImportError as exc:  # pragma: no cover - exercised only without PyAV
             raise ImportError(
-                "OpenCV not installed, you must install temporaldata using "
+                "PyAV not installed, you must install temporaldata using "
                 "`pip install -e .[video]`"
-            )
-    return _cv2
+            ) from exc
+        _av = _av_mod
+    return _av
 
 
-def _probe_segment_frame_count(path: str) -> int:
-    """Run `ffprobe -count_packets` to get an exact video frame count.
-
-    This is expensive (full demux pass) and should only be called when a
-    cached count is not available.
+def _probe_segment(path: str) -> tuple[int, np.ndarray]:
+    """Open `path` with PyAV and walk the video stream's packets to gather every
+    PTS. No frames are decoded. Returns ``(frame_count, pts_sorted_ascending)``,
+    where ``pts_sorted_ascending[i]`` is the PTS of the i-th frame in
+    presentation order (PyAV's ``container.decode()`` yields PTS-ordered
+    frames).
     """
-    result = subprocess.run(
-        [
-            "ffprobe", "-v", "error",
-            "-count_packets", "-select_streams", "v:0",
-            "-show_entries", "stream=nb_read_packets",
-            "-of", "csv=p=0",
-            path,
-        ],
-        capture_output=True, text=True, check=True,
-    )
-    return int(result.stdout.strip())
+    av = _av_module()
+    container = av.open(path)
+    try:
+        stream = container.streams.video[0]
+        ptses: list[int] = []
+        for packet in container.demux(stream):
+            if packet.pts is not None:
+                ptses.append(int(packet.pts))
+        ptses_arr = np.asarray(sorted(ptses), dtype=np.int64)
+        return len(ptses_arr), ptses_arr
+    finally:
+        container.close()
 
 
 class LazyVideo(object):
-    r"""An object that lazily loads batches of video data using OpenCV.
+    r"""An object that lazily loads batches of video data using PyAV.
+
+    Frames are decoded on demand inside :meth:`slice` / :meth:`_load_frames`.
+    Seeks are keyframe-aligned (``container.seek(pts, any_frame=False,
+    backward=True)``) and the decoder is then advanced frame-by-frame to the
+    requested PTS, so frames returned mid-GOP are bit-correct (no
+    ``mmco: unref short failure`` corruption).
 
     Args:
-        timestamps: array of camera timestamps
-        video_file: absolute path to video file
-        resize: (height, width) to resize the frames to (or None to keep original size)
-        colorspace: "RGB" | "G"
-        channel_format: "NCHW" | "NHWC"
-
+        timestamps: array of camera timestamps, one per frame in presentation
+            order.
+        video_file: absolute path to a single video file, or a sequence of
+            paths to be treated as concatenated segments.
+        resize: ``(height, width)`` to resize frames to, or ``None`` to keep
+            original dimensions.
+        colorspace: ``"RGB"`` or ``"G"``.
+        channel_format: ``"NCHW"`` or ``"NHWC"``.
+        segment_frame_counts: optional cached per-segment frame counts. When
+            absent, PyAV is used to demux packets and count them.
+        segment_pts_indices: optional cached per-segment PTS arrays. Each entry
+            is a presentation-ordered ``int64`` ndarray of length matching the
+            corresponding segment's frame count (``None`` is allowed for
+            individual entries; missing ones are demuxed lazily on first use).
+            Caching these avoids a second packet-walk per segment per process.
     """
 
     def __init__(
@@ -67,14 +82,14 @@ class LazyVideo(object):
         colorspace: str = "RGB",
         channel_format: str = "NCHW",
         segment_frame_counts: np.ndarray | Sequence[int] | None = None,
+        segment_pts_indices: Sequence[np.ndarray | None] | None = None,
     ):
-        # Validate cv2 is importable, but do not actually open captures here.
-        # Captures are opened lazily per-slice in `_load_frames` so that:
+        # Validate PyAV is importable but do not actually open any container
+        # here. Containers are opened per-slice in `_load_frames` so that:
         #   * objects are picklable (multi-worker DataLoader-friendly),
         #   * file descriptors don't pile up across many sessions,
-        #   * a long-running job self-heals from transient I/O / decoder
-        #     state corruption (e.g. matroska "Read error at pos." cascades).
-        _cv2_module()
+        #   * decoder state is fresh for each window.
+        _av_module()
 
         self.timestamps = np.asarray(timestamps, dtype=np.float64)
         if isinstance(video_file, str):
@@ -84,51 +99,103 @@ class LazyVideo(object):
         if len(video_files) == 0:
             raise ValueError("At least one video file must be provided.")
         self.video_files = video_files
-        # Backward-compatible public attribute used in older code paths.
-        self.video_file = video_files[0] if len(video_files) == 1 else list(video_files)
+        self.video_file = (
+            video_files[0] if len(video_files) == 1 else list(video_files)
+        )
 
         if (resize is None) or (isinstance(resize, tuple) and len(resize) == 2):
             self.resize = resize
         else:
             raise ValueError('"resize" arg must be None or a tuple (height, width)')
 
-        if colorspace == "RGB" or colorspace == "G":
-            self.colorspace = colorspace
-        else:
+        if colorspace not in ("RGB", "G"):
             raise ValueError('"colorspace" arg must be "RGB" or "G"')
+        self.colorspace = colorspace
 
-        if channel_format == "NCHW" or channel_format == "NHWC":
-            self.channel_format = channel_format
-        else:
+        if channel_format not in ("NCHW", "NHWC"):
             raise ValueError('"channel_format" arg must be "NCHW" or "NHWC"')
+        self.channel_format = channel_format
 
-        if segment_frame_counts is None:
-            # Slow path: probe each segment for an exact frame count. This walks
-            # the entire packet stream and can take seconds-to-minutes per file.
-            # Prefer caching counts at ingest (`to_hdf5` writes them) so this
-            # branch is only taken for legacy data or fresh in-memory construction.
-            print(f"[WARNING] cache miss for segment frame counts for {self.video_files}")
-            segment_frame_counts = [
-                _probe_segment_frame_count(path) for path in self.video_files
-            ]
-        else:
-            segment_frame_counts = list(segment_frame_counts)
-            if len(segment_frame_counts) != len(self.video_files):
+        # Resolve segment_frame_counts and the per-segment PTS cache. There are
+        # three cases:
+        #   1. Both supplied: validate consistency, accept both.
+        #   2. Counts supplied, PTS not: build PTS lazily on first decode.
+        #   3. Neither supplied: walk every segment with PyAV (slow path).
+        n_seg = len(video_files)
+
+        if segment_pts_indices is not None:
+            raw_pts = list(segment_pts_indices)
+            if len(raw_pts) != n_seg:
                 raise ValueError(
-                    f"segment_frame_counts has length {len(segment_frame_counts)} "
-                    f"but there are {len(self.video_files)} video files."
+                    f"segment_pts_indices has length {len(raw_pts)} but there "
+                    f"are {n_seg} video files."
                 )
+            pts_cache: list[np.ndarray | None] = [
+                None if p is None else np.asarray(p, dtype=np.int64) for p in raw_pts
+            ]
+            if all(p is not None for p in pts_cache):
+                counts_from_pts = np.array(
+                    [len(p) for p in pts_cache], dtype=np.int64
+                )
+                if segment_frame_counts is None:
+                    segment_frame_counts = counts_from_pts
+                else:
+                    counts_arr = np.asarray(
+                        list(segment_frame_counts), dtype=np.int64
+                    )
+                    if not np.array_equal(counts_arr, counts_from_pts):
+                        raise ValueError(
+                            "segment_frame_counts disagrees with the lengths "
+                            "of segment_pts_indices."
+                        )
+                    segment_frame_counts = counts_arr
+            else:
+                if segment_frame_counts is None:
+                    raise ValueError(
+                        "segment_pts_indices contains None entries; "
+                        "segment_frame_counts must also be provided."
+                    )
+        elif segment_frame_counts is not None:
+            pts_cache = [None] * n_seg
+        else:
+            print(
+                f"[WARNING] cache miss for segment frame counts for "
+                f"{self.video_files}"
+            )
+            counts: list[int] = []
+            pts_cache = []
+            for path in self.video_files:
+                count, pts_arr = _probe_segment(path)
+                counts.append(count)
+                pts_cache.append(pts_arr)
+            segment_frame_counts = np.asarray(counts, dtype=np.int64)
 
-        self.segment_frame_counts = np.asarray(segment_frame_counts, dtype=np.int64)
+        segment_frame_counts = np.asarray(
+            list(segment_frame_counts), dtype=np.int64
+        )
+        if len(segment_frame_counts) != n_seg:
+            raise ValueError(
+                f"segment_frame_counts has length {len(segment_frame_counts)} "
+                f"but there are {n_seg} video files."
+            )
+
+        self.segment_frame_counts = segment_frame_counts
         self.segment_frame_offsets = np.cumsum(
             np.concatenate(([0], self.segment_frame_counts[:-1]))
         )
+        self._pts_cache = pts_cache
+
         frame_count = int(self.segment_frame_counts.sum())
         if frame_count != self.timestamps.shape[0]:
             if frame_count > self.timestamps.shape[0]:
-                frame_count = self.timestamps.shape[0] # If we can just drop the extra frames, we should do that.
+                # If the video has trailing frames past the timestamp series we
+                # can safely ignore them.
+                frame_count = self.timestamps.shape[0]
             else:
-                raise ValueError(f"Frame count mismatch: {frame_count} != {self.timestamps.shape[0]}") # TODO: check this
+                raise ValueError(
+                    f"Frame count mismatch: {frame_count} != "
+                    f"{self.timestamps.shape[0]}"
+                )
         self.frame_count = frame_count
 
         self.frame_indices = np.arange(frame_count, dtype=np.int64)
@@ -138,7 +205,8 @@ class LazyVideo(object):
             self.timestamps[:frame_count] = self.timestamps[sort_idx]
             self.frame_indices = sort_idx.astype(np.int64)
             logging.info(
-                "LazyVideo: sorted %d timestamps that were not monotonically increasing",
+                "LazyVideo: sorted %d timestamps that were not monotonically "
+                "increasing",
                 frame_count,
             )
 
@@ -146,6 +214,13 @@ class LazyVideo(object):
         if id(self) in memo:
             return memo[id(self)]
         vf = self.video_files[0] if len(self.video_files) == 1 else list(self.video_files)
+        # Carry the PTS cache through so the copy doesn't re-walk packets on
+        # first decode. Pass-through of `None` entries is supported.
+        pts_arg: list[np.ndarray | None] | None
+        if any(p is not None for p in self._pts_cache):
+            pts_arg = [None if p is None else p.copy() for p in self._pts_cache]
+        else:
+            pts_arg = None
         dup = self.__class__(
             timestamps=self.timestamps.copy(),
             video_file=vf,
@@ -153,6 +228,7 @@ class LazyVideo(object):
             colorspace=self.colorspace,
             channel_format=self.channel_format,
             segment_frame_counts=self.segment_frame_counts.copy(),
+            segment_pts_indices=pts_arg,
         )
         memo[id(self)] = dup
         return dup
@@ -194,14 +270,16 @@ class LazyVideo(object):
         video_files = [
             video_file for video in videos for video_file in video.video_files
         ]
-        # Concatenate the cached per-segment frame counts so the new LazyVideo
-        # never has to call ffprobe. Without this, building a multi-segment
-        # LazyVideo from cached single-segment ones (e.g. torch_brain Dataset's
-        # standard wrapping) discards the cache and re-probes every file.
         segment_frame_counts = np.concatenate(
             [np.asarray(video.segment_frame_counts, dtype=np.int64) for video in videos],
             axis=0,
         )
+        # Propagate PTS caches so the merged video doesn't re-demux any segment
+        # that was already cached on its source.
+        merged_pts: list[np.ndarray | None] = []
+        for video in videos:
+            merged_pts.extend(video._pts_cache)
+        pts_arg = merged_pts if any(p is not None for p in merged_pts) else None
         return cls(
             timestamps=timestamps,
             video_file=video_files,
@@ -209,6 +287,7 @@ class LazyVideo(object):
             colorspace=first.colorspace,
             channel_format=first.channel_format,
             segment_frame_counts=segment_frame_counts,
+            segment_pts_indices=pts_arg,
         )
 
     def _segment_for_frame(self, frame_index: int):
@@ -218,6 +297,27 @@ class LazyVideo(object):
         segment_start = int(self.segment_frame_offsets[segment_idx])
         local_index = int(frame_index - segment_start)
         return segment_idx, local_index
+
+    def _ensure_pts_table(self, segment_idx: int) -> np.ndarray:
+        cached = self._pts_cache[segment_idx]
+        if cached is not None:
+            return cached
+        _, pts_arr = _probe_segment(self.video_files[segment_idx])
+        expected = int(self.segment_frame_counts[segment_idx])
+        if len(pts_arr) != expected:
+            # Tolerate a small overshoot (we already do this for total frame
+            # counts in __init__): the LazyVideo only addresses the first
+            # `expected` frames in presentation order.
+            if len(pts_arr) > expected:
+                pts_arr = pts_arr[:expected]
+            else:
+                raise ValueError(
+                    f"Segment {segment_idx} ({self.video_files[segment_idx]}) "
+                    f"reports {expected} frames in segment_frame_counts but "
+                    f"PyAV demuxed only {len(pts_arr)} packets with PTS."
+                )
+        self._pts_cache[segment_idx] = pts_arr
+        return pts_arr
 
     def slice(self, start: float, end: float):
         r"""Returns a new :obj:`IrregularTimeSeries` object that contains the data
@@ -229,7 +329,6 @@ class LazyVideo(object):
             end: End time.
 
         """
-
         timestamps = IrregularTimeSeries(
             timestamps=np.asarray(self.timestamps, dtype=np.float64),
             frame_indices=self.frame_indices,
@@ -237,132 +336,186 @@ class LazyVideo(object):
         )
         timestamps_sliced = timestamps.slice(start=start, end=end)
         frames_sliced = self._load_frames(timestamps_sliced.frame_indices)
-
         timestamps_sliced.frames = frames_sliced
-
         return timestamps_sliced
 
+    def _empty_frames_array(self) -> np.ndarray:
+        n_channels = 3 if self.colorspace == "RGB" else 1
+        if self.channel_format == "NCHW":
+            return np.zeros((0, n_channels, 1, 1), dtype="uint8")
+        return np.zeros((0, 1, 1, n_channels), dtype="uint8")
+
     def _load_frames(self, frame_indices: np.ndarray):
-        cv2 = _cv2_module()
+        """Decode the requested presentation-ordered frames.
+
+        Implementation notes (speed):
+          * Indices are sorted by ``(segment, local_index)`` so each segment is
+            walked forward in presentation order; the only seeks issued are at
+            segment boundaries (or when the caller passes a non-monotonic
+            sequence). For a typical 10s window this is one seek per slice.
+          * ``stream.thread_type = "AUTO"`` enables FFmpeg frame+slice threading
+            (~2-4x H.264 decode speedup on multi-core hosts).
+          * A single ``av.video.reformatter.VideoReformatter`` does
+            colorspace + resize via libswscale; the per-frame ndarray is the
+            already-formatted output (no extra colorspace copy).
+        """
+        av = _av_module()
 
         n_frames = len(frame_indices)
+        if n_frames == 0:
+            return self._empty_frames_array()
+
         n_channels = 3 if self.colorspace == "RGB" else 1
 
-        if n_frames == 0:
-            if self.channel_format == "NCHW":
-                return np.zeros((0, n_channels, 1, 1), dtype="uint8")
-            return np.zeros((0, 1, 1, n_channels), dtype="uint8")
+        # Resolve every requested frame to a (segment, local_index) tuple.
+        seg_arr = np.empty(n_frames, dtype=np.int64)
+        local_arr = np.empty(n_frames, dtype=np.int64)
+        for i, fidx in enumerate(frame_indices):
+            s, l = self._segment_for_frame(int(fidx))
+            seg_arr[i] = s
+            local_arr[i] = l
 
-        is_contiguous = bool(
-            np.sum(np.diff(frame_indices)) == (len(frame_indices) - 1)
-        )
+        # Sort by (segment, local_index) ascending. `order[k]` = original index
+        # of the k-th element in sorted order; we'll scatter decoded frames
+        # back to their original output position via this map.
+        order = np.lexsort((local_arr, seg_arr))
 
-        # Open each touched segment once for the duration of this call, and
-        # release everything at the end (success or failure). Captures are not
-        # cached across calls -- this gives us a fresh decoder state each
-        # slice, which avoids long-running ffmpeg state corruption (e.g. the
-        # matroska "Read error at pos." cascade) and keeps the object
-        # picklable for multi-worker DataLoaders.
-        open_captures: dict[int, "cv2.VideoCapture"] = {}
+        target_format = "rgb24" if self.colorspace == "RGB" else "gray8"
 
-        def _get_capture(segment_idx: int) -> "cv2.VideoCapture":
-            cap = open_captures.get(segment_idx)
-            if cap is None:
-                path = self.video_files[segment_idx]
-                cap = cv2.VideoCapture(path)
-                if not cap.isOpened():
-                    raise IOError(f"Error opening video file {path}")
-                open_captures[segment_idx] = cap
-            return cap
+        frames: np.ndarray | None = None
+        out_h: int | None = None
+        out_w: int | None = None
 
-        frames = None
-        previous_segment_idx = None
-        previous_local_idx = None
+        container = None
+        stream = None
+        decode_iter = None
+        last_pts: int | None = None
+        cur_seg = -1
+        pts_table: np.ndarray | None = None
+        reformatter = None
 
         try:
-            for fr, frame_index in enumerate(frame_indices):
-                segment_idx, local_index = self._segment_for_frame(int(frame_index))
-                video_capture = _get_capture(segment_idx)
-                should_seek = (
-                    fr == 0
-                    or not is_contiguous
-                    or previous_segment_idx != segment_idx
-                    or previous_local_idx is None
-                    or local_index != previous_local_idx + 1
+            for k, sorted_i in enumerate(order):
+                sorted_i = int(sorted_i)
+                seg_idx = int(seg_arr[sorted_i])
+                local_idx = int(local_arr[sorted_i])
+
+                if seg_idx != cur_seg:
+                    if container is not None:
+                        container.close()
+                    container = av.open(self.video_files[seg_idx])
+                    stream = container.streams.video[0]
+                    # Multi-threaded decode. Must be set before any decode call.
+                    stream.thread_type = "AUTO"
+                    pts_table = self._ensure_pts_table(seg_idx)
+                    cur_seg = seg_idx
+                    decode_iter = None
+                    last_pts = None
+
+                target_pts = int(pts_table[local_idx])
+
+                # Seek when:
+                #   * we just opened the container,
+                #   * the caller asked for a frame earlier than the decoder's
+                #     current position (would otherwise overshoot),
+                # otherwise we keep iterating the existing decode generator.
+                need_seek = (
+                    decode_iter is None
+                    or last_pts is None
+                    or target_pts < last_pts
                 )
-                if should_seek:
-                    video_capture.set(cv2.CAP_PROP_POS_FRAMES, local_index)
-                ret, frame = video_capture.read()
-                if not ret:
-                    if fr == 0:
-                        # Caller is responsible for handling this; we do NOT
-                        # silently return a 0-length array because that
-                        # produces a confusing shape mismatch downstream
-                        # (frames first-dim 0 vs timestamps first-dim N).
-                        raise RuntimeError(
-                            f"VideoCapture.read() returned False on first frame "
-                            f"of slice (segment={segment_idx} "
-                            f"path={self.video_files[segment_idx]} "
-                            f"local_index={local_index})."
+                if need_seek:
+                    container.seek(
+                        target_pts,
+                        any_frame=False,
+                        backward=True,
+                        stream=stream,
+                    )
+                    decode_iter = container.decode(video=0)
+                    last_pts = None
+
+                # Allocate the output array on the first frame of any segment
+                # (first iteration overall, in practice).
+                if frames is None:
+                    if self.resize is not None:
+                        out_h, out_w = self.resize
+                    else:
+                        out_h = stream.codec_context.height
+                        out_w = stream.codec_context.width
+                    if self.channel_format == "NCHW":
+                        frames = np.zeros(
+                            (n_frames, n_channels, out_h, out_w), dtype="uint8"
                         )
+                    else:
+                        frames = np.zeros(
+                            (n_frames, out_h, out_w, n_channels), dtype="uint8"
+                        )
+
+                # Pull frames from the decoder until we land on target_pts.
+                # `container.decode()` yields presentation-ordered frames, so a
+                # PTS strictly greater than target means our target wasn't in
+                # the stream (mismatched cache) -- accept the next available.
+                collected = None
+                while True:
+                    try:
+                        frame = next(decode_iter)
+                    except StopIteration:
+                        break
+                    if frame.pts is None:
+                        continue
+                    last_pts = int(frame.pts)
+                    if last_pts < target_pts:
+                        continue
+                    collected = frame
+                    break
+
+                if collected is None:
                     logging.warning(
-                        "LazyVideo: reached end of video early at frame %d/%d; "
-                        "returning blank frames for the remainder.",
-                        fr,
+                        "LazyVideo: end of segment %d reached early at "
+                        "frame %d/%d (target pts=%d); leaving remaining "
+                        "frames zero-filled.",
+                        seg_idx,
+                        k,
                         n_frames,
+                        target_pts,
                     )
                     break
 
-                if fr == 0:
-                    if self.resize is None:
-                        height, width, _ = frame.shape
-                    else:
-                        height, width = self.resize
+                if reformatter is None:
+                    reformatter = av.video.reformatter.VideoReformatter()
 
-                    if self.channel_format == "NCHW":
-                        frames = np.zeros(
-                            (n_frames, n_channels, height, width), dtype="uint8"
-                        )
-                    else:  # NHWC
-                        frames = np.zeros(
-                            (n_frames, height, width, n_channels), dtype="uint8"
-                        )
-
-                if self.resize is not None:
-                    frame = cv2.resize(frame, self.resize)
-
-                if self.colorspace == "RGB":
-                    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                else:  # "G"
-                    frame = np.expand_dims(
-                        cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), axis=-1
-                    )
+                out_frame = reformatter.reformat(
+                    collected,
+                    width=out_w,
+                    height=out_h,
+                    format=target_format,
+                )
+                arr = out_frame.to_ndarray()
+                if self.colorspace == "G":
+                    # gray8 returns HxW; promote to HxWx1 to match channels.
+                    if arr.ndim == 2:
+                        arr = np.expand_dims(arr, axis=-1)
 
                 if self.channel_format == "NCHW":
-                    frame = np.transpose(frame, (2, 0, 1))
+                    arr = np.transpose(arr, (2, 0, 1))
 
-                frames[fr] = frame
-                previous_segment_idx = segment_idx
-                previous_local_idx = local_index
+                frames[sorted_i] = arr
         finally:
-            for cap in open_captures.values():
-                cap.release()
+            if container is not None:
+                container.close()
 
         if frames is None:
-            if self.channel_format == "NCHW":
-                frames = np.zeros((0, n_channels, 1, 1), dtype="uint8")
-            else:
-                frames = np.zeros((0, 1, 1, n_channels), dtype="uint8")
+            return self._empty_frames_array()
         return frames
 
     def to_hdf5(self, file: h5py.Group):
         r"""Save LazyVideo metadata and timestamps to an HDF5 group.
 
         The video file itself is not stored; only the path, timestamps,
-        per-segment frame counts (so loaders don't have to re-probe with
-        ffprobe), and display options are saved. On load, the same video
-        file path is used to open the video again (path may be relative
-        or absolute).
+        per-segment frame counts, optional per-segment PTS indices (so the
+        decoder can do keyframe-aligned seeks without re-demuxing), and display
+        options are saved. On load, the same video file path is used to open
+        the video again.
         """
         file.attrs["object"] = self.__class__.__name__
         file.create_dataset("timestamps", data=self.timestamps)
@@ -370,13 +523,32 @@ class LazyVideo(object):
             file.attrs["video_file"] = str(self.video_files[0])
         else:
             dt = h5py.string_dtype(encoding="utf-8")
-            file.create_dataset("video_files", data=np.asarray(self.video_files, dtype=dt))
-        # Cache per-segment frame counts. Avoids the multi-second
-        # `ffprobe -count_packets` pass on every load / every worker.
+            file.create_dataset(
+                "video_files", data=np.asarray(self.video_files, dtype=dt)
+            )
         file.create_dataset(
             "segment_frame_counts",
             data=np.asarray(self.segment_frame_counts, dtype=np.int64),
         )
+        # Persist any cached per-segment PTS arrays so a fresh process can
+        # decode without re-walking packets. Stored as a vlen int64 dataset
+        # plus a boolean "present" mask (so we can distinguish a genuinely
+        # empty segment from a missing cache).
+        if any(p is not None for p in self._pts_cache):
+            vlen_dt = h5py.vlen_dtype(np.int64)
+            ds = file.create_dataset(
+                "segment_pts_indices",
+                shape=(len(self._pts_cache),),
+                dtype=vlen_dt,
+            )
+            present = np.zeros(len(self._pts_cache), dtype=bool)
+            for i, p in enumerate(self._pts_cache):
+                if p is None:
+                    ds[i] = np.empty(0, dtype=np.int64)
+                else:
+                    ds[i] = np.asarray(p, dtype=np.int64)
+                    present[i] = True
+            file.create_dataset("segment_pts_present", data=present)
         file.attrs["colorspace"] = self.colorspace
         file.attrs["channel_format"] = self.channel_format
         if self.resize is None:
@@ -408,12 +580,23 @@ class LazyVideo(object):
             resize = None
         else:
             resize = tuple(np.asarray(r).tolist())
-        # Legacy files written before segment_frame_counts caching was added
-        # will fall back to running ffprobe in __init__.
         if "segment_frame_counts" in file:
             segment_frame_counts = file["segment_frame_counts"][:]
         else:
             segment_frame_counts = None
+        if "segment_pts_indices" in file:
+            raw = file["segment_pts_indices"][:]
+            if "segment_pts_present" in file:
+                present = file["segment_pts_present"][:]
+            else:
+                # Legacy: no present mask. Treat empty entries as missing.
+                present = np.array([len(r_i) > 0 for r_i in raw], dtype=bool)
+            segment_pts_indices: list[np.ndarray | None] | None = [
+                np.asarray(raw[i], dtype=np.int64) if present[i] else None
+                for i in range(len(raw))
+            ]
+        else:
+            segment_pts_indices = None
         return cls(
             timestamps=timestamps,
             video_file=video_file,
@@ -421,5 +604,5 @@ class LazyVideo(object):
             colorspace=colorspace,
             channel_format=channel_format,
             segment_frame_counts=segment_frame_counts,
+            segment_pts_indices=segment_pts_indices,
         )
-

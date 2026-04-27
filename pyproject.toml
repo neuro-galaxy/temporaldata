@@ -24,6 +24,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest<9", "black==24.2.0", "pre-commit>=3.5.0", "flake8", "pytest-cov"]
+# LazyVideo decodes H.264 via PyAV so seeks are keyframe-aligned (avoids the
+# `mmco: unref short failure` corruption that OpenCV's CAP_PROP_POS_FRAMES
+# silently produced on mid-GOP seeks). PyAV bundles its own ffmpeg.
+video = ["av>=14"]
 
 [project.urls]
 Homepage = "https://github.com/neuro-galaxy/temporaldata"
