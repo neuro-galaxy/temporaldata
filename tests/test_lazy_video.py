@@ -13,6 +13,7 @@ import pytest
 pytest.importorskip("av")
 
 from temporaldata import Data, Interval, LazyVideo
+from temporaldata.lazy_video import _probe_segment
 
 
 def _write_tiny_mp4(path: str, n_frames: int, w: int = 16, h: int = 16) -> None:
@@ -288,6 +289,83 @@ def _decode_all_frames_av(path: str) -> np.ndarray:
     return np.stack(out, axis=0)
 
 
+def _decode_all_frames_opencv_sequential(path: str) -> np.ndarray:
+    """Pre-PyAV baseline: OpenCV sequential ``VideoCapture.read()``, RGB NHWC.
+
+    This matches how older code obtained frames when reading the file from the
+    beginning (reliable). Random access used ``CAP_PROP_POS_FRAMES`` and could
+    return corrupted pixels mid-GOP; see ``test_lazyvideo_midgop_seek_*``.
+    """
+    import cv2
+
+    cap = cv2.VideoCapture(path)
+    out: list[np.ndarray] = []
+    try:
+        while True:
+            ok, frame_bgr = cap.read()
+            if not ok:
+                break
+            out.append(cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB))
+    finally:
+        cap.release()
+    return np.stack(out, axis=0)
+
+
+def test_lazyvideo_matches_opencv_sequential_decode():
+    """LazyVideo (PyAV) must agree with the old OpenCV *sequential* read path.
+
+    Before PyAV, stacks often used ``cv2.VideoCapture`` and pulled frames with
+    repeated ``read()`` (or full linear scans). That output should match
+    :meth:`LazyVideo._load_frames` for the same indices.
+
+    This does **not** apply to ``VideoCapture.set(cv2.CAP_PROP_POS_FRAMES, k)``
+    followed by ``read()`` for arbitrary ``k``; that path disagreed with true
+    decode mid-GOP and is why PyAV + keyframe-aligned seeks replaced it.
+    """
+    pytest.importorskip("cv2")
+
+    fd, path = tempfile.mkstemp(suffix=".mp4")
+    os.close(fd)
+    try:
+        gop = 10
+        n = 35
+        _write_h264_mp4_with_gop(path, n, gop_size=gop, fps=30)
+
+        opencv_rgb = _decode_all_frames_opencv_sequential(path)
+        assert opencv_rgb.shape[0] == n, "OpenCV sequential frame count mismatch"
+
+        timestamps = np.arange(n, dtype=np.float64) / 30.0
+        video = LazyVideo(
+            timestamps=timestamps,
+            video_file=path,
+            resize=None,
+            colorspace="RGB",
+            channel_format="NHWC",
+        )
+
+        # Full linear batch — same as scanning the file with read() in a loop.
+        linear = video._load_frames(np.arange(n, dtype=np.int64))
+        np.testing.assert_array_equal(
+            linear,
+            opencv_rgb,
+            err_msg="LazyVideo must match OpenCV sequential decode (RGB NHWC)",
+        )
+
+        # Random order in one call — old stacks rarely did this via CAP_PROP;
+        # still must index the same underlying RGB rows as OpenCV's ordered scan.
+        indices = np.array([n - 1, 0, 11, 11, 7], dtype=np.int64)
+        scrambled = video._load_frames(indices)
+        for row, fi in enumerate(indices):
+            np.testing.assert_array_equal(
+                scrambled[row],
+                opencv_rgb[fi],
+                err_msg=f"frame index {fi} vs OpenCV reference",
+            )
+    finally:
+        if os.path.exists(path):
+            os.remove(path)
+
+
 def test_lazyvideo_midgop_seek_returns_correct_frames():
     """Regression: ``LazyVideo._load_frames`` must return frames bit-correct
     with sequential decode even when the slice starts mid-GOP.
@@ -452,7 +530,7 @@ def test_lazyvideo_pts_index_persists_through_hdf5(tmp_path):
             assert "segment_pts_indices" in f["video"]
             with patch("temporaldata.lazy_video._probe_segment") as probe:
                 probe.side_effect = AssertionError(
-                    "PTS cache must be loaded from HDF5, not re-demuxed"
+                    "PTS cache must be loaded from HDF5, not re-probed"
                 )
                 loaded = LazyVideo.from_hdf5(f["video"])
                 # First decode shouldn't trigger _probe_segment either.
@@ -462,6 +540,70 @@ def test_lazyvideo_pts_index_persists_through_hdf5(tmp_path):
         np.testing.assert_array_equal(
             loaded._pts_cache[0], video._pts_cache[0]
         )
+    finally:
+        if os.path.exists(path):
+            os.remove(path)
+
+
+def test_probe_segment_pts_matches_decode_enumeration():
+    """`_probe_segment` must list PTS in the same order as ``container.decode``.
+
+    Regression: packet demux + sorted PTS can diverge from the decoder for some
+    files; the probe uses the decode path so `_load_frames` targets the same
+    presentation frames.
+    """
+    import av
+
+    fd, path = tempfile.mkstemp(suffix=".mp4")
+    os.close(fd)
+    try:
+        n = 40
+        _write_h264_mp4_with_gop(path, n, gop_size=10, fps=30)
+        count, pts_probe = _probe_segment(path)
+        pts_dec: list[int] = []
+        c = av.open(path)
+        try:
+            for f in c.decode(c.streams.video[0]):
+                if f.pts is not None:
+                    pts_dec.append(int(f.pts))
+        finally:
+            c.close()
+        assert count == n == len(pts_dec)
+        np.testing.assert_array_equal(pts_probe, np.asarray(pts_dec, dtype=np.int64))
+    finally:
+        if os.path.exists(path):
+            os.remove(path)
+
+
+def test_lazyvideo_duplicate_frame_indices_in_one_batch():
+    """Duplicate entries in `frame_indices` must not advance the decoder twice.
+
+    Regression: with duplicate indices, `last_pts == target_pts` suppressed
+    seeks but the iterator had already moved past the frame, yielding the wrong
+    pixels for later duplicate slots (spurious decorrelation vs other modalities).
+    """
+    fd, path = tempfile.mkstemp(suffix=".mp4")
+    os.close(fd)
+    try:
+        n = 20
+        _write_h264_mp4_with_gop(path, n, gop_size=8, fps=30)
+        reference = _decode_all_frames_av(path)
+        timestamps = np.arange(n, dtype=np.float64) / 30.0
+        video = LazyVideo(
+            timestamps=timestamps,
+            video_file=path,
+            resize=None,
+            colorspace="RGB",
+            channel_format="NHWC",
+        )
+        indices = np.array([3, 3, 15, 15, 15, 7], dtype=np.int64)
+        frames = video._load_frames(indices)
+        for k, fi in enumerate(indices):
+            np.testing.assert_array_equal(
+                frames[k],
+                reference[fi],
+                err_msg=f"duplicate-index batch: slot {k} frame {fi}",
+            )
     finally:
         if os.path.exists(path):
             os.remove(path)

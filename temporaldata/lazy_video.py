@@ -27,21 +27,23 @@ def _av_module():
 
 
 def _probe_segment(path: str) -> tuple[int, np.ndarray]:
-    """Open `path` with PyAV and walk the video stream's packets to gather every
-    PTS. No frames are decoded. Returns ``(frame_count, pts_sorted_ascending)``,
-    where ``pts_sorted_ascending[i]`` is the PTS of the i-th frame in
-    presentation order (PyAV's ``container.decode()`` yields PTS-ordered
-    frames).
+    """Open `path` with PyAV and decode once to collect each frame's PTS in
+    presentation order.
+
+    Packet demux + ``sorted(packet.pts)`` can disagree with the decoder for some
+    real-world files (e.g. multi-packet access units, container quirks). The
+    PTS table must match :meth:`LazyVideo._load_frames`, which walks
+    ``container.decode()``, so we derive indices from the same decode path.
     """
     av = _av_module()
     container = av.open(path)
     try:
         stream = container.streams.video[0]
         ptses: list[int] = []
-        for packet in container.demux(stream):
-            if packet.pts is not None:
-                ptses.append(int(packet.pts))
-        ptses_arr = np.asarray(sorted(ptses), dtype=np.int64)
+        for frame in container.decode(stream):
+            if frame.pts is not None:
+                ptses.append(int(frame.pts))
+        ptses_arr = np.asarray(ptses, dtype=np.int64)
         return len(ptses_arr), ptses_arr
     finally:
         container.close()
@@ -393,6 +395,10 @@ class LazyVideo(object):
         cur_seg = -1
         pts_table: np.ndarray | None = None
         reformatter = None
+        # Same (segment, local_idx) can appear twice in one batch (duplicate
+        # frame_indices). After the first decode the iterator has advanced past
+        # that PTS; re-use the ndarray instead of calling next(decode_iter).
+        seg_frame_cache: dict[int, np.ndarray] = {}
 
         try:
             for k, sorted_i in enumerate(order):
@@ -411,6 +417,11 @@ class LazyVideo(object):
                     cur_seg = seg_idx
                     decode_iter = None
                     last_pts = None
+                    seg_frame_cache = {}
+
+                if local_idx in seg_frame_cache:
+                    frames[sorted_i] = seg_frame_cache[local_idx]
+                    continue
 
                 target_pts = int(pts_table[local_idx])
 
@@ -433,6 +444,7 @@ class LazyVideo(object):
                     )
                     decode_iter = container.decode(video=0)
                     last_pts = None
+                    seg_frame_cache.clear()
 
                 # Allocate the output array on the first frame of any segment
                 # (first iteration overall, in practice).
@@ -499,6 +511,7 @@ class LazyVideo(object):
                 if self.channel_format == "NCHW":
                     arr = np.transpose(arr, (2, 0, 1))
 
+                seg_frame_cache[local_idx] = arr
                 frames[sorted_i] = arr
         finally:
             if container is not None:
