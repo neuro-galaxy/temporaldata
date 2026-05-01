@@ -410,8 +410,20 @@ class LazyVideo(object):
             walked forward in presentation order; the only seeks issued are at
             segment boundaries (or when the caller passes a non-monotonic
             sequence). For a typical 10s window this is one seek per slice.
-          * ``stream.thread_type = "AUTO"`` enables FFmpeg frame+slice threading
-            (~2-4x H.264 decode speedup on multi-core hosts).
+          * Decoding runs **single-threaded** (``stream.thread_count = 1``,
+            ``stream.thread_type = "NONE"``). FFmpeg's frame/slice threading is
+            ~2-4x faster on a single decode pass, but its worker threads
+            interact catastrophically with ``os.fork()``: the child inherits a
+            CodecContext whose helper threads only exist in the parent, and
+            ``avcodec_free_context`` then deadlocks in ``pthread_cond_wait``
+            during normal cleanup of every per-call decode iterator. This
+            shows up in any consumer that loads ``LazyVideo`` from a forked
+            child (PyTorch ``DataLoader(num_workers>0)`` defaults to fork on
+            Linux; Python ``multiprocessing`` and ``ProcessPoolExecutor``
+            default to fork on Linux too). Single-threaded decode side-steps
+            the issue entirely. If you are sure you will never decode from a
+            forked child, set ``stream.thread_type = "AUTO"`` here for the
+            speedup.
           * A single ``av.video.reformatter.VideoReformatter`` does
             colorspace + resize via libswscale; the per-frame ndarray is the
             already-formatted output (no extra colorspace copy).
@@ -466,8 +478,12 @@ class LazyVideo(object):
                         container.close()
                     container = av.open(self.video_files[seg_idx])
                     stream = container.streams.video[0]
-                    # Multi-threaded decode. Must be set before any decode call.
-                    stream.thread_type = "AUTO"
+                    # Single-threaded decode: avoids the libavcodec frame/slice
+                    # thread + os.fork() deadlock during avcodec_free_context
+                    # cleanup. See _load_frames docstring for details. Must be
+                    # set before any decode call.
+                    stream.thread_count = 1
+                    stream.thread_type = "NONE"
                     pts_table = self._ensure_pts_table(seg_idx)
                     cur_seg = seg_idx
                     decode_iter = None
