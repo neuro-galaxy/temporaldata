@@ -697,6 +697,10 @@ class Interval(ArrayDict):
                     )
                 # keep track of the keys of the arrays that were originally unicode
                 _unicode_keys.append(key)
+            elif value.dtype.kind == "O" and len(value) == 0:
+                # HDF5 cannot infer a type from an empty object array (no elements
+                # to inspect), so store it as an empty fixed-length byte string array.
+                value = np.array([], dtype="S")
             file.create_dataset(key, data=value)
 
         file.attrs["_unicode_keys"] = np.array(_unicode_keys, dtype="S")

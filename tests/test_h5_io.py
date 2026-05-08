@@ -262,3 +262,23 @@ class TestNestedDataLazyPropagation:
             assert not isinstance(
                 loaded.nested.domain, LazyInterval
             ), "Level 1: domain should NOT be LazyInterval after materialize()"
+
+
+def test_interval_to_hdf5_empty_object_dtype(test_filepath):
+    # Regression test for: Interval.to_hdf5 raises TypeError on empty object-dtype arrays.
+    # HDF5 cannot infer a type from a zero-length object array; the fix stores it as
+    # an empty fixed-length byte-string array instead.
+    interval = Interval(
+        start=np.array([]),
+        end=np.array([]),
+        split_indicator=np.array([], dtype=object),
+    )
+    with h5py.File(test_filepath, "w") as f:
+        interval.to_hdf5(f)
+
+    with h5py.File(test_filepath, "r") as f:
+        loaded = Interval.from_hdf5(f)
+
+    assert len(loaded.start) == 0
+    assert len(loaded.end) == 0
+    assert len(loaded.split_indicator) == 0
