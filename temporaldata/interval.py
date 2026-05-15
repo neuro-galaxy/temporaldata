@@ -76,6 +76,8 @@ class Interval(ArrayDict):
 
     _sorted = None
     _timekeys = None
+    start: np.ndarray
+    end: np.ndarray
 
     def __init__(
         self,
