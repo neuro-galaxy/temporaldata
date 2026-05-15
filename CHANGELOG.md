@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Fixed "unresolved-attribute" type-checking errors ([#120](https://github.com/neuro-galaxy/temporaldata/pull/120))
 
 ### Changed
-- Default `domain` argument in `RegularTimeSeries` constructor changed to `"auto"` ([#120](https://github.com/neuro-galaxy/temporaldata/pull/120)).
+- Default `domain` argument in `RegularTimeSeries` constructor changed from `None` to `"auto"` ([#120](https://github.com/neuro-galaxy/temporaldata/pull/120)).
 
 ### Removed
 
