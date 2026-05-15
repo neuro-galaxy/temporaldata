@@ -74,8 +74,8 @@ class Interval(ArrayDict):
 
     """
 
-    _sorted = None
-    _timekeys = None
+    _sorted: bool | None = None
+    _timekeys: list[str]
     start: np.ndarray
     end: np.ndarray
 
