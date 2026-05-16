@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from typing import Dict, List, Union
+from typing import Dict, List, Union, Literal
 import logging
+import copy
 
 import h5py
 import numpy as np
@@ -79,7 +80,7 @@ class IrregularTimeSeries(ArrayDict):
         timestamps: np.ndarray,
         *,
         timekeys: List[str] | None = None,
-        domain: Union[Interval, str],
+        domain: Interval | Literal["auto"],
         **kwargs: np.ndarray,
     ):
         super().__init__(timestamps=timestamps, **kwargs)
@@ -237,13 +238,39 @@ class IrregularTimeSeries(ArrayDict):
         r"""Return a new :obj:`IrregularTimeSeries` object where all array attributes
         are indexed using the boolean mask.
 
-        Note that this will not update the domain, as it is unclear how to resolve the
-        domain when the mask is applied. If you wish to update the domain, you should
-        do so manually.
+        Args:
+            mask: Boolean array used for masking. The mask needs to be 1-dimensional,
+                and of equal length as the first dimension of the :obj:`ArrayDict`.
+
+        Note:
+            This will not update the domain, as it is unclear how to resolve the
+            domain when the mask is applied. If you wish to update the domain, you
+            should do so manually.
         """
-        out = super().select_by_mask(mask, timekeys=self._timekeys, domain=self.domain)
-        out._sorted = self._sorted
-        return out
+        # Cannot use super().select_by_mask() because we need to handle
+        # `domain` and `timekeys` properly
+
+        assert mask.ndim == 1, f"mask must be 1D, got {mask.ndim}D mask"
+        assert mask.dtype == bool, f"mask must be boolean, got {mask.dtype}"
+
+        first_dim = len(self)
+        if mask.shape[0] != first_dim:
+            raise ValueError(
+                f"mask length {mask.shape[0]} does not match first dimension of arrays "
+                f"({first_dim})."
+            )
+
+        new_data = {
+            k: (
+                self.__dict__[k][mask].copy()
+                if not k.startswith("_")
+                else copy.deepcopy(self.__dict__[k])
+            )
+            for k in self.__dict__.keys()
+        }
+        new_data["domain"] = new_data.pop("_domain")
+        new_data["timekeys"] = new_data.pop("_timekeys")
+        return self.__class__(**new_data)
 
     def select_by_interval(self, interval: Interval):
         r"""Return a new :obj:`IrregularTimeSeries` object where all timestamps are

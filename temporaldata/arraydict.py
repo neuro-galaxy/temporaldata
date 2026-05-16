@@ -99,15 +99,13 @@ class ArrayDict(object):
         info = ",\n".join(info)
         return f"{cls}(\n{info}\n)"
 
-    def select_by_mask(self, mask: np.ndarray, **kwargs):
+    def select_by_mask(self, mask: np.ndarray):
         r"""Return a new :obj:`ArrayDict` object where all array attributes are indexed
         using the boolean mask.
 
         Args:
             mask: Boolean array used for masking. The mask needs to be 1-dimensional,
                 and of equal length as the first dimension of the :obj:`ArrayDict`.
-            **kwargs: Private attributes that will not be masked will need to be passed
-                as arguments.
 
         Example ::
 
@@ -132,18 +130,22 @@ class ArrayDict(object):
         assert mask.ndim == 1, f"mask must be 1D, got {mask.ndim}D mask"
         assert mask.dtype == bool, f"mask must be boolean, got {mask.dtype}"
 
-        first_dim = self._maybe_first_dim()
+        first_dim = len(self)
         if mask.shape[0] != first_dim:
             raise ValueError(
                 f"mask length {mask.shape[0]} does not match first dimension of arrays "
                 f"({first_dim})."
             )
 
-        # kwargs are other private attributes
-        # TODO automatically add private attributes
-        return self.__class__(
-            **{k: getattr(self, k)[mask].copy() for k in self.keys()}, **kwargs
-        )
+        new_data = {
+            k: (
+                self.__dict__[k][mask].copy()
+                if not k.startswith("_")
+                else copy.deepcopy(self.__dict__[k])
+            )
+            for k in self.__dict__.keys()
+        }
+        return self.__class__(**new_data)
 
     @classmethod
     def from_dataframe(cls, df, unsigned_to_long=True, **kwargs):
