@@ -269,7 +269,7 @@ class Interval(ArrayDict):
             k: (
                 self.__dict__[k][mask].copy()
                 if not k.startswith("_")
-                else copy.deepcopy(self.__dict__[k])
+                else copy.copy(self.__dict__[k])
             )
             for k in self.__dict__.keys()
         }
