@@ -127,8 +127,10 @@ class ArrayDict(object):
             )
 
         """
-        assert mask.ndim == 1, f"mask must be 1D, got {mask.ndim}D mask"
-        assert mask.dtype == bool, f"mask must be boolean, got {mask.dtype}"
+        if mask.ndim != 1:
+            raise ValueError(f"mask must be 1D, got {mask.ndim}D mask")
+        if mask.dtype != bool:
+            raise ValueError(f"mask must be boolean, got {mask.dtype}")
 
         first_dim = len(self)
         if mask.shape[0] != first_dim:
@@ -396,8 +398,10 @@ class LazyArrayDict(ArrayDict):
         return super(LazyArrayDict, self).__getattribute__(name)
 
     def select_by_mask(self, mask: np.ndarray):
-        assert mask.ndim == 1, f"mask must be 1D, got {mask.ndim}D mask"
-        assert mask.dtype == bool, f"mask must be boolean, got {mask.dtype}"
+        if mask.ndim != 1:
+            raise ValueError(f"mask must be 1D, got {mask.ndim}D mask")
+        if mask.dtype != bool:
+            raise ValueError(f"mask must be boolean, got {mask.dtype}")
 
         first_dim = len(self)
         if mask.shape[0] != first_dim:
