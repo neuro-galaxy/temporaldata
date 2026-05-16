@@ -271,12 +271,6 @@ class Interval(ArrayDict):
         new_data["timekeys"] = new_data.pop("_timekeys")
         return self.__class__(**new_data)
 
-    def select_by_mask(self, mask: np.ndarray):
-        r"""Return a new :obj:`Interval` object where all array attributes
-        are indexed using the boolean mask.
-        """
-        return super().select_by_mask(mask)
-
     def select_by_interval(self, interval: Interval):
         r"""Return a new :obj:`IrregularTimeSeries` object where all timestamps are
         within the interval.
