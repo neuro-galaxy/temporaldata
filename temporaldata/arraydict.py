@@ -399,36 +399,31 @@ class LazyArrayDict(ArrayDict):
         assert mask.ndim == 1, f"mask must be 1D, got {mask.ndim}D mask"
         assert mask.dtype == bool, f"mask must be boolean, got {mask.dtype}"
 
-        first_dim = self._maybe_first_dim()
+        first_dim = len(self)
         if mask.shape[0] != first_dim:
             raise ValueError(
                 f"mask length {mask.shape[0]} does not match first dimension of arrays "
                 f"({first_dim})."
             )
 
-        # make a copy
         out = self.__class__.__new__(self.__class__)
-        # private attributes
-        out._unicode_keys = self._unicode_keys
-        out._lazy_ops = {}
-
-        # array attributes
-        for key in self.keys():
-            value = self.__dict__[key]
-            if isinstance(value, h5py.Dataset):
-                # the mask will be applied when the getattr is called for this key
-                # the details of the mask operation are stored in _lazy_ops
+        for key, value in self.__dict__.items():
+            if key == "_lazy_ops":
+                continue
+            if key.startswith("_"):
+                out.__dict__[key] = copy.copy(value)
+            elif isinstance(value, h5py.Dataset):
+                # mask will be applied lazily on attribute access via _lazy_ops
                 out.__dict__[key] = value
             else:
-                # this is a numpy array that is already loaded in memory, apply the mask
                 out.__dict__[key] = value[mask].copy()
 
-        # store the mask operation in _lazy_ops for differed execution
-        if "mask" not in self._lazy_ops:
+        # combine mask with any pre-existing lazy mask
+        out._lazy_ops = copy.copy(self._lazy_ops)
+        if "mask" not in out._lazy_ops:
             out._lazy_ops["mask"] = mask
         else:
-            # if a mask was already applied, we need to combine the masks
-            out._lazy_ops["mask"] = self._lazy_ops["mask"].copy()
+            out._lazy_ops["mask"] = out._lazy_ops["mask"].copy()
             out._lazy_ops["mask"][out._lazy_ops["mask"]] = mask
 
         return out
