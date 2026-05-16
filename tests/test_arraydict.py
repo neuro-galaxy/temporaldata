@@ -73,6 +73,7 @@ def test_array_dict_select_by_mask():
         brain_region=np.array(["PMd", "M1", "PMd", "M1"]),
         waveform_mean=np.ones((4, 48)),
     )
+    data._private_attr = "test"
 
     mask = data.brain_region == "PMd"
 
@@ -87,6 +88,7 @@ def test_array_dict_select_by_mask():
     assert len(data) == 0
     assert data.unit_id.size == 0
     assert data.waveform_mean.shape == (0, 48)
+    assert data._private_attr == "test"
 
 
 def test_lazy_array_dict(test_filepath):
