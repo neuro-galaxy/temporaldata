@@ -86,6 +86,13 @@ class RegularTimeSeries(ArrayDict):
         return self._domain
 
     def select_by_mask(self, mask: np.ndarray):
+        """Raises a NotImplementedError as this method is not supported
+        for :obj:`RegularTimeSeries`.
+
+        Raises:
+            NotImplementedError: Always, because this method cannot
+                be implemented for this class.
+        """
         raise NotImplementedError("Not implemented for RegularTimeSeries.")
 
     def _time_to_idx(
