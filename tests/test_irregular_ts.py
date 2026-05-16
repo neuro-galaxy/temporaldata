@@ -324,13 +324,35 @@ def test_lazy_irregular_timeseries(test_filepath):
         assert np.allclose(data.values, np.array([1, 3]))
 
 
-def test_lazy_irregular_select_by_mask_preserves_private_attrs(test_filepath):
-    # `select_by_mask` on a Lazy object must auto-propagate private attrs set
-    # by from_hdf5 (e.g. `_sorted`), not just the hand-listed ones.
+def test_irregular_select_by_mask_preserves_private_attrs():
+    domain = Interval(start=np.array([0.0]), end=np.array([1.0]))
     data = IrregularTimeSeries(
         unit_index=np.array([0, 0, 1, 0, 1, 2]),
         timestamps=np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6]),
-        domain="auto",
+        go_cue_time=np.array([0.15, 0.25, 0.35, 0.45, 0.55, 0.65]),
+        timekeys=["timestamps", "go_cue_time"],
+        domain=domain,
+    )
+    assert data.is_sorted()
+
+    result = data.select_by_mask(data.unit_index != 1)
+
+    assert result.timekeys() == ["timestamps", "go_cue_time"]
+    assert result._sorted is True
+    assert np.array_equal(result.domain.start, domain.start)
+    assert np.array_equal(result.domain.end, domain.end)
+
+
+def test_lazy_irregular_select_by_mask_preserves_private_attrs(test_filepath):
+    # `select_by_mask` on a Lazy object must auto-propagate private attrs set
+    # by from_hdf5 (e.g. `_sorted`), not just the hand-listed ones.
+    domain = Interval(start=np.array([0.0]), end=np.array([1.0]))
+    data = IrregularTimeSeries(
+        unit_index=np.array([0, 0, 1, 0, 1, 2]),
+        timestamps=np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6]),
+        go_cue_time=np.array([0.15, 0.25, 0.35, 0.45, 0.55, 0.65]),
+        timekeys=["timestamps", "go_cue_time"],
+        domain=domain,
     )
 
     with h5py.File(test_filepath, "w") as f:
@@ -344,6 +366,9 @@ def test_lazy_irregular_select_by_mask_preserves_private_attrs(test_filepath):
         result = data.select_by_mask(mask)
 
         assert result._sorted is True
+        assert result.timekeys() == ["timestamps", "go_cue_time"]
+        assert np.array_equal(result.domain.start, domain.start)
+        assert np.array_equal(result.domain.end, domain.end)
 
 
 def test_irregular_set_domain():

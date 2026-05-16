@@ -180,6 +180,30 @@ def test_lazy_array_dict(test_filepath):
         assert np.array_equal(data.unit_id, np.array(["unit01", "unit03"]))
 
 
+def test_lazy_array_dict_select_by_mask_preserves_unicode_keys(test_filepath):
+    # `_unicode_keys` tracks which attrs were originally unicode (stored as bytes
+    # in HDF5). It must survive select_by_mask so that on materialization the
+    # affected attrs are restored to unicode dtype rather than left as bytes.
+    data = ArrayDict(
+        unit_id=np.array(["unit01", "unit02", "unit03"]),
+        brain_region=np.array([b"PMd", b"M1", b"PMd"]),
+    )
+
+    with h5py.File(test_filepath, "w") as f:
+        data.to_hdf5(f)
+
+    with h5py.File(test_filepath, "r") as f:
+        data = LazyArrayDict.from_hdf5(f)
+        assert data._unicode_keys == ["unit_id"]
+
+        result = data.select_by_mask(np.array([True, False, True]))
+
+        assert result._unicode_keys == ["unit_id"]
+        # materialize and confirm dtype is restored to unicode
+        assert result.unit_id.dtype.kind == "U"
+        assert np.array_equal(result.unit_id, np.array(["unit01", "unit03"]))
+
+
 def test_array_dict_from_dataframe():
     # Create a sample DataFrame
     df = pd.DataFrame(
