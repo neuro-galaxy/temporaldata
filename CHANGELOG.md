@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Default `domain` argument in `RegularTimeSeries` constructor changed from `None` to `"auto"` ([#120](https://github.com/neuro-galaxy/temporaldata/pull/120)).
 
 ### Removed
+- `ArrayDict.select_by_mask()`: removed `**kwargs` input parameter (was meant for internal use) ([#121](https://github.com/neuro-galaxy/temporaldata/pull/121))
 
 
 ## [0.1.4] - 2026-03-25
