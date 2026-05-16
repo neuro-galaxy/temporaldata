@@ -247,11 +247,6 @@ class Interval(ArrayDict):
         Args:
             mask: Boolean array used for masking. The mask needs to be 1-dimensional,
                 and of equal length as the first dimension of the :obj:`ArrayDict`.
-
-        Note:
-            This will not update the domain, as it is unclear how to resolve the
-            domain when the mask is applied. If you wish to update the domain, you
-            should do so manually.
         """
         # Cannot use super().select_by_mask() because we need to handle `timekeys` properly
 
