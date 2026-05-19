@@ -916,6 +916,15 @@ class LazyInterval(Interval):
         return super(LazyInterval, self).__getattribute__(name)
 
     def select_by_mask(self, mask: np.ndarray):
+        r"""Index all arrays with a boolean mask and return a copy.
+
+        Lazy attributes will remain lazy, and masking will be applied
+        to them upon access.
+
+        Args:
+            mask: Boolean array used for masking. The mask needs to be 1-dimensional,
+                and of equal length as the object itself.
+        """
 
         _validate_select_by_mask_input(mask, len(self))
 
