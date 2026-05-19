@@ -256,10 +256,10 @@ class Interval(ArrayDict):
             raise ValueError(f"mask must be boolean, got {mask.dtype}")
 
         first_dim = len(self)
-        if mask.shape[0] != first_dim:
+        if len(mask) != first_dim:
             raise ValueError(
-                f"mask length {mask.shape[0]} does not match first dimension of arrays "
-                f"({first_dim})."
+                f"mask length {len(mask)} does not match"
+                f" first dimension of arrays ({first_dim})."
             )
 
         new_data = {
@@ -942,10 +942,10 @@ class LazyInterval(Interval):
             raise ValueError(f"mask must be boolean, got {mask.dtype}")
 
         first_dim = len(self)
-        if mask.shape[0] != first_dim:
+        if len(mask) != first_dim:
             raise ValueError(
-                f"mask length {mask.shape[0]} does not match first dimension of arrays "
-                f"({first_dim})."
+                f"mask length {len(mask)} does not match"
+                f" first dimension of arrays ({first_dim})."
             )
 
         out = self.__class__.__new__(self.__class__)
