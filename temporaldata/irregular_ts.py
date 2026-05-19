@@ -12,8 +12,6 @@ from .arraydict import ArrayDict
 from .interval import Interval
 from .utils import _validate_select_by_mask_input
 
-_SPECIAL_PRIVATE_ATTRIBS = ("_domain", "_timekeys", "_sorted", "_lazy_ops")
-
 
 class IrregularTimeSeries(ArrayDict):
     r"""An irregular time series is defined by a set of timestamps and a set of
@@ -238,12 +236,11 @@ class IrregularTimeSeries(ArrayDict):
         return out
 
     def select_by_mask(self, mask: np.ndarray):
-        r"""Return a new :obj:`IrregularTimeSeries` object where all array attributes
-        are indexed using the boolean mask.
+        r"""Index all arrays with a boolean mask and return a copy.
 
         Args:
             mask: Boolean array used for masking. The mask needs to be 1-dimensional,
-                and of equal length as the first dimension of the :obj:`ArrayDict`.
+                and of equal length as the object itself.
 
         Note:
             This will not update the domain, as it is unclear how to resolve the
@@ -251,7 +248,7 @@ class IrregularTimeSeries(ArrayDict):
             should do so manually.
         """
         out = super().select_by_mask(mask)
-        # Un-sorted interval can become sorted after masking
+        # Un-sorted arrays can become sorted after masking
         out._sorted = True if self._sorted is True else None
         return out
 
