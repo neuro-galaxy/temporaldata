@@ -31,7 +31,7 @@ def _size_repr(key: Any, value: Any, indent: int = 0) -> str:
 
 def _validate_select_by_mask_input(mask, length):
     if not isinstance(mask, np.ndarray):
-        raise ValueError(f"mask must be a numpy array (bool, 1D)")
+        raise ValueError("mask must be a numpy array (bool, 1D)")
     if mask.ndim != 1:
         raise ValueError(f"mask must be 1D, got {mask.ndim}D mask")
     if mask.dtype != bool:
