@@ -425,7 +425,7 @@ class LazyArrayDict(ArrayDict):
         # combine mask with any pre-existing lazy mask
         out._lazy_ops = copy.copy(self._lazy_ops)
         if "mask" not in out._lazy_ops:
-            out._lazy_ops["mask"] = mask
+            out._lazy_ops["mask"] = mask.copy()
         else:
             out._lazy_ops["mask"] = out._lazy_ops["mask"].copy()
             out._lazy_ops["mask"][out._lazy_ops["mask"]] = mask

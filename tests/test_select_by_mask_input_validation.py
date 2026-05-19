@@ -109,3 +109,36 @@ def test_select_by_mask_rejects_non_bool_mask(obj):
 def test_select_by_mask_rejects_length_mismatch(obj):
     with pytest.raises(ValueError, match="does not match first dimension"):
         obj.select_by_mask(np.array([True, False]))
+
+
+class TestLazyMaskIsCopied:
+
+    def test_lazy_arraydict(self, test_filepath):
+        data, f = _make_lazy(_make_array_dict(), LazyArrayDict, test_filepath)
+
+        mask = np.array([True, False, True])
+        masked = data.select_by_mask(mask)
+
+        # modify mask. `masked` should NOT care about this
+        mask[0] = False
+        assert len(masked.x) == 2
+
+    def test_lazy_irregular_ts(self, test_filepath):
+        data, f = _make_lazy(_make_irregular(), LazyIrregularTimeSeries, test_filepath)
+
+        mask = np.array([True, False, True])
+        masked = data.select_by_mask(mask)
+
+        # modify mask. `masked` should NOT care about this
+        mask[0] = False
+        assert len(masked.timestamps) == 2
+
+    def test_lazy_interval(self, test_filepath):
+        data, f = _make_lazy(_make_interval(), LazyInterval, test_filepath)
+
+        mask = np.array([True, False, True])
+        masked = data.select_by_mask(mask)
+
+        # modify mask. `masked` should NOT care about this
+        mask[0] = False
+        assert len(masked.start) == 2
