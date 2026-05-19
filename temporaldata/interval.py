@@ -260,9 +260,14 @@ class Interval(ArrayDict):
                 else copy.copy(self.__dict__[k])
             )
             for k in self.__dict__.keys()
+            if k != "_sorted"
         }
         new_data["timekeys"] = new_data.pop("_timekeys")
-        return self.__class__(**new_data)
+        out = self.__class__(**new_data)
+
+        # An un-sorted interval can become sorted after masking
+        out._sorted = True if self._sorted is True else None
+        return out
 
     def select_by_interval(self, interval: Interval):
         r"""Return a new :obj:`IrregularTimeSeries` object where all timestamps are
@@ -933,6 +938,8 @@ class LazyInterval(Interval):
         for key, value in self.__dict__.items():
             if key == "_lazy_ops":
                 continue
+            if key == "_sorted":
+                continue
             if key.startswith("_"):
                 out.__dict__[key] = copy.copy(value)
             elif isinstance(value, h5py.Dataset):
@@ -949,6 +956,8 @@ class LazyInterval(Interval):
             out._lazy_ops["mask"] = out._lazy_ops["mask"].copy()
             out._lazy_ops["mask"][out._lazy_ops["mask"]] = mask
 
+        # Masking an un-sorted array can make it sorted
+        out._sorted = True if self._sorted is True else None
         return out
 
     def _resolve_start_end_after_slice(self):
