@@ -115,30 +115,51 @@ class TestLazyMaskIsCopied:
 
     def test_lazy_arraydict(self, test_filepath):
         data, f = _make_lazy(_make_array_dict(), LazyArrayDict, test_filepath)
-
         mask = np.array([True, False, True])
         masked = data.select_by_mask(mask)
-
         # modify mask. `masked` should NOT care about this
         mask[0] = False
         assert len(masked.x) == 2
 
+    def test_lazy_arraydict_doublemask(self, test_filepath):
+        data, f = _make_lazy(_make_array_dict(), LazyArrayDict, test_filepath)
+        mask1 = np.array([True, False, True])
+        masked = data.select_by_mask(mask1)
+        mask2 = np.array([True, False])
+        masked2 = masked.select_by_mask(mask2)
+        mask1[0] = False
+        assert len(masked2.x) == 1
+
     def test_lazy_irregular_ts(self, test_filepath):
         data, f = _make_lazy(_make_irregular(), LazyIrregularTimeSeries, test_filepath)
-
         mask = np.array([True, False, True])
         masked = data.select_by_mask(mask)
-
         # modify mask. `masked` should NOT care about this
         mask[0] = False
         assert len(masked.timestamps) == 2
 
+    def test_lazy_irregular_ts_doublemask(self, test_filepath):
+        data, f = _make_lazy(_make_irregular(), LazyIrregularTimeSeries, test_filepath)
+        mask1 = np.array([True, False, True])
+        masked = data.select_by_mask(mask1)
+        mask2 = np.array([True, False])
+        masked2 = masked.select_by_mask(mask2)
+        mask1[0] = False
+        assert len(masked2.timestamps) == 1
+
     def test_lazy_interval(self, test_filepath):
         data, f = _make_lazy(_make_interval(), LazyInterval, test_filepath)
-
         mask = np.array([True, False, True])
         masked = data.select_by_mask(mask)
-
         # modify mask. `masked` should NOT care about this
         mask[0] = False
         assert len(masked.start) == 2
+
+    def test_lazy_interval_doublemask(self, test_filepath):
+        data, f = _make_lazy(_make_interval(), LazyInterval, test_filepath)
+        mask1 = np.array([True, False, True])
+        masked = data.select_by_mask(mask1)
+        mask2 = np.array([True, False])
+        masked2 = masked.select_by_mask(mask2)
+        mask1[0] = False
+        assert len(masked2.start) == 1
