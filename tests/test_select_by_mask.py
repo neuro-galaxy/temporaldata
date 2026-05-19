@@ -1,11 +1,3 @@
-"""Parametrized tests for the input-validation failure modes of
-``select_by_mask`` across all four data classes and their Lazy variants.
-
-Each ``select_by_mask`` implementation re-asserts the same three invariants:
-mask must be 1D, mask must be boolean, mask length must match the first
-dimension. These tests verify the exception is raised on every class.
-"""
-
 import os
 import tempfile
 
@@ -62,53 +54,51 @@ def _make_lazy(non_lazy, lazy_cls, test_filepath):
     return lazy_cls.from_hdf5(f), f
 
 
-@pytest.fixture(
-    params=[
-        "ArrayDict",
-        "Interval",
-        "IrregularTimeSeries",
-        "LazyArrayDict",
-        "LazyInterval",
-        "LazyIrregularTimeSeries",
-    ]
-)
-def obj(request, test_filepath):
-    name = request.param
-    if name == "ArrayDict":
-        yield _make_array_dict()
-    elif name == "Interval":
-        yield _make_interval()
-    elif name == "IrregularTimeSeries":
-        yield _make_irregular()
-    elif name == "LazyArrayDict":
-        instance, f = _make_lazy(_make_array_dict(), LazyArrayDict, test_filepath)
-        yield instance
-        f.close()
-    elif name == "LazyInterval":
-        instance, f = _make_lazy(_make_interval(), LazyInterval, test_filepath)
-        yield instance
-        f.close()
-    elif name == "LazyIrregularTimeSeries":
-        instance, f = _make_lazy(
-            _make_irregular(), LazyIrregularTimeSeries, test_filepath
-        )
-        yield instance
-        f.close()
+class TestInputValidation:
+    @pytest.fixture(
+        params=[
+            "ArrayDict",
+            "Interval",
+            "IrregularTimeSeries",
+            "LazyArrayDict",
+            "LazyInterval",
+            "LazyIrregularTimeSeries",
+        ]
+    )
+    def obj(self, request, test_filepath):
+        name = request.param
+        if name == "ArrayDict":
+            yield _make_array_dict()
+        elif name == "Interval":
+            yield _make_interval()
+        elif name == "IrregularTimeSeries":
+            yield _make_irregular()
+        elif name == "LazyArrayDict":
+            instance, f = _make_lazy(_make_array_dict(), LazyArrayDict, test_filepath)
+            yield instance
+            f.close()
+        elif name == "LazyInterval":
+            instance, f = _make_lazy(_make_interval(), LazyInterval, test_filepath)
+            yield instance
+            f.close()
+        elif name == "LazyIrregularTimeSeries":
+            instance, f = _make_lazy(
+                _make_irregular(), LazyIrregularTimeSeries, test_filepath
+            )
+            yield instance
+            f.close()
 
+    def test_select_by_mask_rejects_2d_mask(self, obj):
+        with pytest.raises(ValueError, match="mask must be 1D"):
+            obj.select_by_mask(np.array([[True, False, True]]))
 
-def test_select_by_mask_rejects_2d_mask(obj):
-    with pytest.raises(ValueError, match="mask must be 1D"):
-        obj.select_by_mask(np.array([[True, False, True]]))
+    def test_select_by_mask_rejects_non_bool_mask(self, obj):
+        with pytest.raises(ValueError, match="mask must be boolean"):
+            obj.select_by_mask(np.array([0, 1, 1]))
 
-
-def test_select_by_mask_rejects_non_bool_mask(obj):
-    with pytest.raises(ValueError, match="mask must be boolean"):
-        obj.select_by_mask(np.array([0, 1, 1]))
-
-
-def test_select_by_mask_rejects_length_mismatch(obj):
-    with pytest.raises(ValueError, match="does not match first dimension"):
-        obj.select_by_mask(np.array([True, False]))
+    def test_select_by_mask_rejects_length_mismatch(self, obj):
+        with pytest.raises(ValueError, match="does not match first dimension"):
+            obj.select_by_mask(np.array([True, False]))
 
 
 class TestLazyMaskIsCopied:
