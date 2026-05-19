@@ -12,6 +12,8 @@ from .arraydict import ArrayDict
 from .interval import Interval
 from .utils import _validate_select_by_mask_input
 
+_SPECIAL_PRIVATE_ATTRIBS = ("_domain", "_timekeys", "_sorted", "_lazy_ops")
+
 
 class IrregularTimeSeries(ArrayDict):
     r"""An irregular time series is defined by a set of timestamps and a set of
@@ -248,22 +250,10 @@ class IrregularTimeSeries(ArrayDict):
             domain when the mask is applied. If you wish to update the domain, you
             should do so manually.
         """
-        # Cannot use super().select_by_mask() because we need to handle
-        # `domain` and `timekeys` properly
-
-        _validate_select_by_mask_input(mask, len(self))
-
-        new_data = {
-            k: (
-                self.__dict__[k][mask].copy()
-                if not k.startswith("_")
-                else copy.copy(self.__dict__[k])
-            )
-            for k in self.__dict__.keys()
-        }
-        new_data["domain"] = new_data.pop("_domain")
-        new_data["timekeys"] = new_data.pop("_timekeys")
-        return self.__class__(**new_data)
+        out = super().select_by_mask(mask)
+        # Un-sorted interval can become sorted after masking
+        out._sorted = True if self._sorted is True else None
+        return out
 
     def select_by_interval(self, interval: Interval):
         r"""Return a new :obj:`IrregularTimeSeries` object where all timestamps are
@@ -534,10 +524,8 @@ class LazyIrregularTimeSeries(IrregularTimeSeries):
 
         out = self.__class__.__new__(self.__class__)
         for key, value in self.__dict__.items():
-            if key == "_lazy_ops":
-                continue
             if key.startswith("_"):
-                out.__dict__[key] = copy.copy(value)
+                out.__dict__[key] = copy.deepcopy(value)
             elif isinstance(value, h5py.Dataset):
                 # mask will be applied lazily on attribute access via _lazy_ops
                 out.__dict__[key] = value
@@ -545,13 +533,14 @@ class LazyIrregularTimeSeries(IrregularTimeSeries):
                 out.__dict__[key] = value[mask].copy()
 
         # combine mask with any pre-existing lazy mask
-        out._lazy_ops = copy.copy(self._lazy_ops)
         if "mask" not in out._lazy_ops:
             out._lazy_ops["mask"] = mask.copy()
         else:
             out._lazy_ops["mask"] = out._lazy_ops["mask"].copy()
             out._lazy_ops["mask"][out._lazy_ops["mask"]] = mask
 
+        # Masking an un-sorted array can make it sorted
+        out._sorted = True if self._sorted is True else None
         return out
 
     def _resolve_timestamps_after_slice(self):

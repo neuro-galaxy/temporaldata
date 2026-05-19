@@ -249,23 +249,8 @@ class Interval(ArrayDict):
             mask: Boolean array used for masking. The mask needs to be 1-dimensional,
                 and of equal length as the first dimension of the :obj:`ArrayDict`.
         """
-        # Cannot use super().select_by_mask() because we need to handle `timekeys` properly
-
-        _validate_select_by_mask_input(mask, len(self))
-
-        new_data = {
-            k: (
-                self.__dict__[k][mask].copy()
-                if not k.startswith("_")
-                else copy.copy(self.__dict__[k])
-            )
-            for k in self.__dict__.keys()
-            if k != "_sorted"
-        }
-        new_data["timekeys"] = new_data.pop("_timekeys")
-        out = self.__class__(**new_data)
-
-        # An un-sorted interval can become sorted after masking
+        out = super().select_by_mask(mask)
+        # Un-sorted interval can become sorted after masking
         out._sorted = True if self._sorted is True else None
         return out
 
@@ -932,16 +917,13 @@ class LazyInterval(Interval):
         return super(LazyInterval, self).__getattribute__(name)
 
     def select_by_mask(self, mask: np.ndarray):
+
         _validate_select_by_mask_input(mask, len(self))
 
         out = self.__class__.__new__(self.__class__)
         for key, value in self.__dict__.items():
-            if key == "_lazy_ops":
-                continue
-            if key == "_sorted":
-                continue
             if key.startswith("_"):
-                out.__dict__[key] = copy.copy(value)
+                out.__dict__[key] = copy.deepcopy(value)
             elif isinstance(value, h5py.Dataset):
                 # mask will be applied lazily on attribute access via _lazy_ops
                 out.__dict__[key] = value
@@ -949,7 +931,6 @@ class LazyInterval(Interval):
                 out.__dict__[key] = value[mask].copy()
 
         # combine mask with any pre-existing lazy mask
-        out._lazy_ops = copy.copy(self._lazy_ops)
         if "mask" not in out._lazy_ops:
             out._lazy_ops["mask"] = mask.copy()
         else:

@@ -129,15 +129,14 @@ class ArrayDict(object):
         """
         _validate_select_by_mask_input(mask, len(self))
 
-        new_data = {
-            k: (
-                self.__dict__[k][mask].copy()
-                if not k.startswith("_")
-                else copy.copy(self.__dict__[k])
-            )
-            for k in self.__dict__.keys()
-        }
-        return self.__class__(**new_data)
+        out = self.__class__.__new__(self.__class__)
+        for key, value in self.__dict__.items():
+            if key.startswith("_"):
+                out.__dict__[key] = copy.deepcopy(value)
+            else:
+                out.__dict__[key] = value[mask].copy()
+
+        return out
 
     @classmethod
     def from_dataframe(cls, df, unsigned_to_long=True, **kwargs):
@@ -393,10 +392,8 @@ class LazyArrayDict(ArrayDict):
 
         out = self.__class__.__new__(self.__class__)
         for key, value in self.__dict__.items():
-            if key == "_lazy_ops":
-                continue
             if key.startswith("_"):
-                out.__dict__[key] = copy.copy(value)
+                out.__dict__[key] = copy.deepcopy(value)
             elif isinstance(value, h5py.Dataset):
                 # mask will be applied lazily on attribute access via _lazy_ops
                 out.__dict__[key] = value
@@ -404,7 +401,6 @@ class LazyArrayDict(ArrayDict):
                 out.__dict__[key] = value[mask].copy()
 
         # combine mask with any pre-existing lazy mask
-        out._lazy_ops = copy.copy(self._lazy_ops)
         if "mask" not in out._lazy_ops:
             out._lazy_ops["mask"] = mask.copy()
         else:

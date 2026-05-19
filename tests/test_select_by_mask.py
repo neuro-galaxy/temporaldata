@@ -153,3 +153,13 @@ class TestLazyMaskIsCopied:
         masked2 = masked.select_by_mask(mask2)
         mask1[0] = False
         assert len(masked2.start) == 1
+
+
+class TestNewDomainIsNotShallowCopy:
+
+    def test_irregular_ts(self):
+        data = _make_irregular()
+        masked = data.select_by_mask(np.array([True, False, True]))
+        assert id(masked.domain) != id(data.domain)
+        assert id(masked.domain.start) != id(data.domain.start)
+        assert id(masked.domain.end) != id(data.domain.end)
