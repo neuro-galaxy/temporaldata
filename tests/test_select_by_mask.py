@@ -27,9 +27,9 @@ from temporaldata import (
 def test_filepath(request):
     tmpfile = tempfile.NamedTemporaryFile(suffix=".h5", delete=False)
     filepath = tmpfile.name
+    tmpfile.close()
 
     def finalizer():
-        tmpfile.close()
         if os.path.exists(filepath):
             os.remove(filepath)
 
