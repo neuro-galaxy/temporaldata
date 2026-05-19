@@ -10,6 +10,7 @@ import pandas as pd
 
 from .arraydict import ArrayDict
 from .interval import Interval
+from .utils import _validate_select_by_mask_input
 
 
 class IrregularTimeSeries(ArrayDict):
@@ -250,17 +251,7 @@ class IrregularTimeSeries(ArrayDict):
         # Cannot use super().select_by_mask() because we need to handle
         # `domain` and `timekeys` properly
 
-        if mask.ndim != 1:
-            raise ValueError(f"mask must be 1D, got {mask.ndim}D mask")
-        if mask.dtype != bool:
-            raise ValueError(f"mask must be boolean, got {mask.dtype}")
-
-        first_dim = len(self)
-        if len(mask) != first_dim:
-            raise ValueError(
-                f"mask length {len(mask)} does not match"
-                f" first dimension of arrays ({first_dim})."
-            )
+        _validate_select_by_mask_input(mask, len(self))
 
         new_data = {
             k: (
@@ -538,17 +529,8 @@ class LazyIrregularTimeSeries(IrregularTimeSeries):
         return super(LazyIrregularTimeSeries, self).__getattribute__(name)
 
     def select_by_mask(self, mask: np.ndarray):
-        if mask.ndim != 1:
-            raise ValueError(f"mask must be 1D, got {mask.ndim}D mask")
-        if mask.dtype != bool:
-            raise ValueError(f"mask must be boolean, got {mask.dtype}")
 
-        first_dim = len(self)
-        if len(mask) != first_dim:
-            raise ValueError(
-                f"mask length {len(mask)} does not match"
-                f" first dimension of arrays ({first_dim})."
-            )
+        _validate_select_by_mask_input(mask, len(self))
 
         out = self.__class__.__new__(self.__class__)
         for key, value in self.__dict__.items():

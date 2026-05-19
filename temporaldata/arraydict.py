@@ -8,7 +8,7 @@ import h5py
 import numpy as np
 import pandas as pd
 
-from .utils import _size_repr
+from .utils import _size_repr, _validate_select_by_mask_input
 
 
 class ArrayDict(object):
@@ -127,17 +127,7 @@ class ArrayDict(object):
             )
 
         """
-        if mask.ndim != 1:
-            raise ValueError(f"mask must be 1D, got {mask.ndim}D mask")
-        if mask.dtype != bool:
-            raise ValueError(f"mask must be boolean, got {mask.dtype}")
-
-        first_dim = len(self)
-        if len(mask) != first_dim:
-            raise ValueError(
-                f"mask length {len(mask)} does not match"
-                f" first dimension of arrays ({first_dim})."
-            )
+        _validate_select_by_mask_input(mask, len(self))
 
         new_data = {
             k: (
@@ -398,17 +388,8 @@ class LazyArrayDict(ArrayDict):
         return super(LazyArrayDict, self).__getattribute__(name)
 
     def select_by_mask(self, mask: np.ndarray):
-        if mask.ndim != 1:
-            raise ValueError(f"mask must be 1D, got {mask.ndim}D mask")
-        if mask.dtype != bool:
-            raise ValueError(f"mask must be boolean, got {mask.dtype}")
 
-        first_dim = len(self)
-        if len(mask) != first_dim:
-            raise ValueError(
-                f"mask length {len(mask)} does not match"
-                f" first dimension of arrays ({first_dim})."
-            )
+        _validate_select_by_mask_input(mask, len(self))
 
         out = self.__class__.__new__(self.__class__)
         for key, value in self.__dict__.items():

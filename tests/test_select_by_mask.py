@@ -97,7 +97,7 @@ class TestInputValidation:
             obj.select_by_mask(np.array([0, 1, 1]))
 
     def test_select_by_mask_rejects_length_mismatch(self, obj):
-        with pytest.raises(ValueError, match="does not match first dimension"):
+        with pytest.raises(ValueError, match="does not match object length"):
             obj.select_by_mask(np.array([True, False]))
 
 
