@@ -13,6 +13,8 @@ from temporaldata import (
     LazyArrayDict,
     LazyInterval,
     LazyIrregularTimeSeries,
+    LazyRegularTimeSeries,
+    RegularTimeSeries,
 )
 
 
@@ -201,6 +203,24 @@ class TestPrivateAttribsAreDeepCopied:
         masked = data.select_by_mask(np.array([True, False, True]))
         assert id(masked._private) != id(data._private)
         assert np.array_equal(masked._private, data._private)
+
+
+class TestRegularTimeSeriesNotImplemented:
+
+    def test_raises_not_implemented(self):
+        data = RegularTimeSeries(
+            value=np.zeros(4), sampling_rate=1.0, domain="auto"
+        )
+        with pytest.raises(NotImplementedError):
+            data.select_by_mask(np.array([True, False, True, False]))
+
+    def test_lazy_raises_not_implemented(self, test_filepath):
+        data = RegularTimeSeries(
+            value=np.zeros(4), sampling_rate=1.0, domain="auto"
+        )
+        with _make_lazy(data, LazyRegularTimeSeries, test_filepath) as lazy:
+            with pytest.raises(NotImplementedError):
+                lazy.select_by_mask(np.array([True, False, True, False]))
 
 
 class TestCachedSorted:
