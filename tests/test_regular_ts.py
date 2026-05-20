@@ -399,15 +399,6 @@ def test_from_gappy_integer_gap_preserves_dtype():
     np.testing.assert_array_equal(rts.raw, [7, 8, -1, 9])
 
 
-def test_from_gappy_explicit_domain_rejected():
-    ts = np.array([0.0, 0.1, 0.2])
-    raw = np.array([1.0, 2.0, 3.0])
-    explicit = Interval(start=np.array([0.0]), end=np.array([1.0]))
-
-    with pytest.raises(ValueError, match="domain must be 'auto'"):
-        RegularTimeSeries.from_gappy(ts, sampling_rate=10.0, domain=explicit, raw=raw)
-
-
 def test_from_gappy_validation():
     ts = np.array([0.0, 0.1, 0.2])
     raw = np.array([1.0, 2.0, 3.0])
