@@ -329,8 +329,9 @@ class RegularTimeSeries(ArrayDict):
             raise ValueError(
                 f"timestamps deviate from a regular grid at sampling_rate="
                 f"{sampling_rate} Hz by up to {max_dev:.3g} samples, "
-                f"exceeding rtol={rtol}. Pick a different sampling_rate or "
-                f"increase rtol."
+                f"exceeding rtol={rtol}. Pick a different sampling_rate, "
+                f"increase rtol, or use IrregularTimeSeries if this signal "
+                f"is inherently irregular."
             )
 
         min_idx_gap = int(np.min(np.diff(grid_idx)))
