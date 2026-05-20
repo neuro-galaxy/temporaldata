@@ -354,12 +354,12 @@ def test_slice_outside_domain(test_filepath):
         _assert_slice_outside_domain(lazy_ts)
 
 
-def test_from_gappy_basic():
+def test_from_gappy_timeseries_basic():
     # 5 grid points at 100Hz, the 0.02s sample is missing.
     ts = np.array([0.0, 0.01, 0.03, 0.04])
     raw = np.array([1.0, 2.0, 3.0, 4.0])
 
-    rts = RegularTimeSeries.from_gappy(ts, sampling_rate=100.0, raw=raw)
+    rts = RegularTimeSeries.from_gappy_timeseries(ts, sampling_rate=100.0, raw=raw)
 
     assert isinstance(rts, RegularTimeSeries)
     assert rts.sampling_rate == 100.0
@@ -370,12 +370,12 @@ def test_from_gappy_basic():
     assert rts.domain.end[0] == pytest.approx(0.05)
 
 
-def test_from_gappy_multiple_arrays_and_multidim():
+def test_from_gappy_timeseries_multiple_arrays_and_multidim():
     ts = np.array([10.0, 10.5, 11.5])  # missing 11.0 at sr=2Hz
     a = np.array([1.0, 2.0, 3.0])
     b = np.arange(12).reshape(3, 4).astype(float)
 
-    rts = RegularTimeSeries.from_gappy(ts, sampling_rate=2.0, a=a, b=b)
+    rts = RegularTimeSeries.from_gappy_timeseries(ts, sampling_rate=2.0, a=a, b=b)
 
     assert len(rts) == 4
     np.testing.assert_array_equal(np.isnan(rts.a), [False, False, True, False])
@@ -387,30 +387,34 @@ def test_from_gappy_multiple_arrays_and_multidim():
     assert rts.domain.end[0] == pytest.approx(10.0 + 4 / 2.0)
 
 
-def test_from_gappy_integer_gap_preserves_dtype():
+def test_from_gappy_timeseries_integer_gap_preserves_dtype():
     ts = np.array([0.0, 0.1, 0.3])  # missing 0.2 at sr=10Hz
     vals = np.array([7, 8, 9], dtype=np.int32)
 
-    rts = RegularTimeSeries.from_gappy(ts, sampling_rate=10.0, gap_value=-1, raw=vals)
+    rts = RegularTimeSeries.from_gappy_timeseries(
+        ts, sampling_rate=10.0, gap_value=-1, raw=vals
+    )
 
     assert rts.raw.dtype == np.int64
     np.testing.assert_array_equal(rts.raw, [7, 8, -1, 9])
 
 
-def test_from_gappy_validation():
+def test_from_gappy_timeseries_validation():
     ts = np.array([0.0, 0.1, 0.2])
     raw = np.array([1.0, 2.0, 3.0])
 
     with pytest.raises(ValueError, match="1-D"):
-        RegularTimeSeries.from_gappy(ts.reshape(-1, 1), sampling_rate=10.0, raw=raw)
+        RegularTimeSeries.from_gappy_timeseries(
+            ts.reshape(-1, 1), sampling_rate=10.0, raw=raw
+        )
 
     with pytest.raises(ValueError, match="at least 2"):
-        RegularTimeSeries.from_gappy(
+        RegularTimeSeries.from_gappy_timeseries(
             np.array([0.0]), sampling_rate=10.0, raw=np.array([1.0])
         )
 
     with pytest.raises(ValueError, match="strictly increasing"):
-        RegularTimeSeries.from_gappy(
+        RegularTimeSeries.from_gappy_timeseries(
             np.array([0.0, 0.0, 0.1]),
             sampling_rate=10.0,
             raw=np.array([1.0, 2.0, 3.0]),
@@ -418,7 +422,7 @@ def test_from_gappy_validation():
 
     # timestamps off the grid beyond rtol.
     with pytest.raises(ValueError, match="deviate from a regular grid"):
-        RegularTimeSeries.from_gappy(
+        RegularTimeSeries.from_gappy_timeseries(
             np.array([0.0, 0.1, 0.205]),
             sampling_rate=10.0,
             raw=raw,
@@ -427,7 +431,7 @@ def test_from_gappy_validation():
     # sub-sample-spaced (two timestamps round to the same grid index).
     # rtol relaxed so the off-grid check doesn't fire first.
     with pytest.raises(ValueError, match="duplicate or sub-sample-spaced"):
-        RegularTimeSeries.from_gappy(
+        RegularTimeSeries.from_gappy_timeseries(
             np.array([0.0, 0.04, 0.1]),
             sampling_rate=10.0,
             rtol=0.5,
@@ -436,12 +440,14 @@ def test_from_gappy_validation():
 
     # mismatched length.
     with pytest.raises(ValueError, match="length"):
-        RegularTimeSeries.from_gappy(ts, sampling_rate=10.0, raw=np.array([1.0, 2.0]))
+        RegularTimeSeries.from_gappy_timeseries(
+            ts, sampling_rate=10.0, raw=np.array([1.0, 2.0])
+        )
 
     # sampling_rate too high: every gap is multiple grid steps wide.
     # Data is truly at 10 Hz but caller passes 20 Hz.
     with pytest.raises(ValueError, match="appears too high"):
-        RegularTimeSeries.from_gappy(
+        RegularTimeSeries.from_gappy_timeseries(
             np.array([0.0, 0.1, 0.2, 0.3]),
             sampling_rate=20.0,
             raw=np.array([1.0, 2.0, 3.0, 4.0]),

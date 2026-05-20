@@ -258,7 +258,7 @@ class RegularTimeSeries(ArrayDict):
         return obj
 
     @staticmethod
-    def from_gappy(
+    def from_gappy_timeseries(
         timestamps: np.ndarray,
         *,
         sampling_rate: float,
@@ -305,7 +305,7 @@ class RegularTimeSeries(ArrayDict):
             >>> # 4 samples at 100 Hz, the 0.02s sample is missing.
             >>> ts = np.array([0.0, 0.01, 0.03, 0.04])
             >>> raw = np.array([1.0, 2.0, 3.0, 4.0])
-            >>> rts = RegularTimeSeries.from_gappy(
+            >>> rts = RegularTimeSeries.from_gappy_timeseries(
             ...     ts, sampling_rate=100.0, raw=raw,
             ... )
             >>> rts.raw
