@@ -352,3 +352,97 @@ def test_slice_outside_domain(test_filepath):
     with h5py.File(test_filepath, "r") as f:
         lazy_ts = LazyRegularTimeSeries.from_hdf5(f)
         _assert_slice_outside_domain(lazy_ts)
+
+
+def test_from_gappy_basic():
+    # 5 grid points at 100Hz, the 0.02s sample is missing.
+    ts = np.array([0.0, 0.01, 0.03, 0.04])
+    raw = np.array([1.0, 2.0, 3.0, 4.0])
+
+    rts = RegularTimeSeries.from_gappy(ts, sampling_rate=100.0, raw=raw)
+
+    assert isinstance(rts, RegularTimeSeries)
+    assert rts.sampling_rate == 100.0
+    assert len(rts) == 5
+    np.testing.assert_array_equal(np.isnan(rts.raw), [False, False, True, False, False])
+    np.testing.assert_array_equal(rts.raw[~np.isnan(rts.raw)], raw)
+    assert rts.domain.start[0] == 0.0
+    assert rts.domain.end[0] == pytest.approx(0.05)
+
+
+def test_from_gappy_multiple_arrays_and_multidim():
+    ts = np.array([10.0, 10.5, 11.5])  # missing 11.0 at sr=2Hz
+    a = np.array([1.0, 2.0, 3.0])
+    b = np.arange(12).reshape(3, 4).astype(float)
+
+    rts = RegularTimeSeries.from_gappy(ts, sampling_rate=2.0, a=a, b=b)
+
+    assert len(rts) == 4
+    np.testing.assert_array_equal(np.isnan(rts.a), [False, False, True, False])
+    assert rts.b.shape == (4, 4)
+    assert np.isnan(rts.b[2]).all()
+    np.testing.assert_array_equal(rts.b[[0, 1, 3]], b)
+    # Domain starts at timestamps[0].
+    assert rts.domain.start[0] == 10.0
+    assert rts.domain.end[0] == pytest.approx(10.0 + 4 / 2.0)
+
+
+def test_from_gappy_integer_gap_preserves_dtype():
+    ts = np.array([0.0, 0.1, 0.3])  # missing 0.2 at sr=10Hz
+    vals = np.array([7, 8, 9], dtype=np.int32)
+
+    rts = RegularTimeSeries.from_gappy(ts, sampling_rate=10.0, gap_value=-1, raw=vals)
+
+    assert rts.raw.dtype == np.int32
+    np.testing.assert_array_equal(rts.raw, [7, 8, -1, 9])
+
+
+def test_from_gappy_explicit_domain():
+    ts = np.array([0.0, 0.1, 0.2])
+    raw = np.array([1.0, 2.0, 3.0])
+    explicit = Interval(start=np.array([0.0]), end=np.array([1.0]))
+
+    rts = RegularTimeSeries.from_gappy(ts, sampling_rate=10.0, domain=explicit, raw=raw)
+
+    assert rts.domain.start[0] == 0.0
+    assert rts.domain.end[0] == 1.0
+
+
+def test_from_gappy_validation():
+    ts = np.array([0.0, 0.1, 0.2])
+    raw = np.array([1.0, 2.0, 3.0])
+
+    with pytest.raises(ValueError, match="1-D"):
+        RegularTimeSeries.from_gappy(ts.reshape(-1, 1), sampling_rate=10.0, raw=raw)
+
+    with pytest.raises(ValueError, match="at least 2"):
+        RegularTimeSeries.from_gappy(
+            np.array([0.0]), sampling_rate=10.0, raw=np.array([1.0])
+        )
+
+    with pytest.raises(ValueError, match="strictly increasing"):
+        RegularTimeSeries.from_gappy(
+            np.array([0.0, 0.0, 0.1]),
+            sampling_rate=10.0,
+            raw=np.array([1.0, 2.0, 3.0]),
+        )
+
+    # timestamps off the grid beyond rtol.
+    with pytest.raises(ValueError, match="deviate from a regular grid"):
+        RegularTimeSeries.from_gappy(
+            np.array([0.0, 0.1, 0.205]),
+            sampling_rate=10.0,
+            raw=raw,
+        )
+
+    # sub-sample-spaced (two timestamps round to the same grid index).
+    with pytest.raises(ValueError, match="duplicate or sub-sample-spaced"):
+        RegularTimeSeries.from_gappy(
+            np.array([0.0, 0.001, 0.1]),
+            sampling_rate=10.0,
+            raw=raw,
+        )
+
+    # mismatched length.
+    with pytest.raises(ValueError, match="length"):
+        RegularTimeSeries.from_gappy(ts, sampling_rate=10.0, raw=np.array([1.0, 2.0]))
