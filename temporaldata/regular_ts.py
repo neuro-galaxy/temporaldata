@@ -279,11 +279,12 @@ class RegularTimeSeries(ArrayDict):
 
         Args:
             timestamps: 1-D array of timestamps, strictly increasing. Each
-                entry must lie within :obj:`rtol` samples of a grid point
-                at :obj:`sampling_rate`.
+                entry must lie within :obj:`rtol` samples of a regular grid
+                at :obj:`sampling_rate`, anchored at :obj:`timestamps[0]`.
             sampling_rate: Sampling rate in Hz.
-            domain: :obj:`"auto"` derives the domain from :obj:`timestamps[0]`
-                and the number of filled samples. Otherwise, an :obj:`Interval`.
+            domain: Only :obj:`"auto"` is currently supported. The domain is
+                derived from :obj:`timestamps[0]` and the number of filled
+                samples (``end = timestamps[0] + num_timesteps / sampling_rate``).
             gap_value: Value used to fill missing samples. Defaults to
                 :obj:`numpy.nan`; integer arrays passed with the default get
                 promoted to float in the output.
