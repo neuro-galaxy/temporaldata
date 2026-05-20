@@ -263,7 +263,7 @@ class RegularTimeSeries(ArrayDict):
         *,
         sampling_rate: float,
         domain: Interval | Literal["auto"] = "auto",
-        gap_value: float = np.nan,
+        gap_value: int | float = np.nan,
         rtol: float = 1e-3,
         **kwargs: np.ndarray,
     ) -> RegularTimeSeries:
