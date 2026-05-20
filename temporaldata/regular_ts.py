@@ -257,6 +257,115 @@ class RegularTimeSeries(ArrayDict):
 
         return obj
 
+    @staticmethod
+    def from_gappy(
+        timestamps: np.ndarray,
+        *,
+        sampling_rate: float,
+        domain: Interval | Literal["auto"] = "auto",
+        gap_value: float = np.nan,
+        rtol: float = 1e-3,
+        **kwargs: np.ndarray,
+    ) -> RegularTimeSeries:
+        r"""Construct a :obj:`RegularTimeSeries` from approximately-regular but
+        gappy timestamps and value arrays by snapping each sample to a regular
+        grid at :obj:`sampling_rate` and filling missing samples with
+        :obj:`gap_value`.
+
+        Useful for signals that are nominally regular (e.g. behavioral streams
+        at a fixed sampling rate) but contain missing samples, which would
+        otherwise have to be carried as an :obj:`IrregularTimeSeries` and would
+        suffer numerical-precision issues during slicing.
+
+        Args:
+            timestamps: 1-D array of timestamps, strictly increasing. Each
+                entry must lie within :obj:`rtol` samples of a grid point
+                at :obj:`sampling_rate`.
+            sampling_rate: Sampling rate in Hz.
+            domain: :obj:`"auto"` derives the domain from :obj:`timestamps[0]`
+                and the number of filled samples. Otherwise, an :obj:`Interval`.
+            gap_value: Value used to fill missing samples. Defaults to
+                :obj:`numpy.nan`; integer arrays passed with the default get
+                promoted to float in the output.
+            rtol: Maximum allowed deviation, in samples, of any input timestamp
+                from the regular grid.
+            **kwargs: Named value arrays whose first dimension equals
+                ``len(timestamps)``.
+
+        Returns:
+            RegularTimeSeries: A regular time series with the same named
+            arrays, gaps filled with :obj:`gap_value`.
+
+        Example ::
+
+            >>> import numpy as np
+            >>> from temporaldata import RegularTimeSeries
+
+            >>> # 4 samples at 100 Hz, the 0.02s sample is missing.
+            >>> ts = np.array([0.0, 0.01, 0.03, 0.04])
+            >>> raw = np.array([1.0, 2.0, 3.0, 4.0])
+            >>> rts = RegularTimeSeries.from_gappy(
+            ...     ts, sampling_rate=100.0, raw=raw,
+            ... )
+            >>> rts.raw
+            array([ 1.,  2., nan,  3.,  4.])
+        """
+        if timestamps.ndim != 1:
+            raise ValueError(f"timestamps must be 1-D, got shape {timestamps.shape}")
+        if len(timestamps) < 2:
+            raise ValueError(
+                f"timestamps must have at least 2 entries, got {len(timestamps)}"
+            )
+        if not (np.diff(timestamps) > 0).all():
+            raise ValueError("timestamps must be strictly increasing")
+
+        start_time = float(timestamps[0])
+        rel_idx = (timestamps - start_time) * sampling_rate
+        grid_idx = np.round(rel_idx).astype(np.int64)
+
+        max_dev = float(np.max(np.abs(rel_idx - grid_idx)))
+        if max_dev > rtol:
+            raise ValueError(
+                f"timestamps deviate from a regular grid at sampling_rate="
+                f"{sampling_rate} Hz by up to {max_dev:.3g} samples, "
+                f"exceeding rtol={rtol}. Pick a different sampling_rate or "
+                f"increase rtol."
+            )
+
+        if int(np.min(np.diff(grid_idx))) < 1:
+            raise ValueError(
+                f"timestamps contain duplicate or sub-sample-spaced entries "
+                f"at sampling_rate={sampling_rate} Hz"
+            )
+
+        num_timesteps = int(grid_idx[-1]) + 1
+
+        gap_dtype = np.asarray(gap_value).dtype
+        filled: dict[str, np.ndarray] = {}
+        for key, arr in kwargs.items():
+            if not isinstance(arr, np.ndarray):
+                raise ValueError(
+                    f"{key!r} must be an ndarray, got {type(arr).__name__}"
+                )
+            if len(arr) != len(timestamps):
+                raise ValueError(
+                    f"{key!r} has length {len(arr)}, expected "
+                    f"{len(timestamps)} to match timestamps"
+                )
+            out_dtype = np.result_type(arr.dtype, gap_dtype)
+            out = np.full((num_timesteps, *arr.shape[1:]), gap_value, dtype=out_dtype)
+            out[grid_idx] = arr
+            filled[key] = out
+
+        if isinstance(domain, str) and domain == "auto":
+            return RegularTimeSeries(
+                sampling_rate=sampling_rate,
+                domain="auto",
+                domain_start=start_time,
+                **filled,
+            )
+        return RegularTimeSeries(sampling_rate=sampling_rate, domain=domain, **filled)
+
 
 class LazyRegularTimeSeries(RegularTimeSeries):
     r"""Lazy variant of :obj:`RegularTimeSeries`. The data is not loaded until it is
