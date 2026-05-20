@@ -112,7 +112,7 @@ class TestLazyMaskIsCopied:
     cached within the lazy objects (i.e. they should store a copy).
 
     We check this by actually modifying the original mask object and seeing
-    if that effects the lazy attribute lookup process (it should not).
+    if that affects the lazy attribute lookup process (it should not).
     """
 
     def test_lazy_arraydict(self, test_filepath):
