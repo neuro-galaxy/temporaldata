@@ -263,6 +263,7 @@ class RegularTimeSeries(ArrayDict):
         *,
         sampling_rate: float,
         domain: Interval | Literal["auto"] = "auto",
+        domain_start=0.0,
         gap_value: float = np.nan,
         rtol: float = 1e-3,
         **kwargs: np.ndarray,
@@ -364,7 +365,6 @@ class RegularTimeSeries(ArrayDict):
                 domain_start=start_time,
                 **filled,
             )
-        return RegularTimeSeries(sampling_rate=sampling_rate, domain=domain, **filled)
 
 
 class LazyRegularTimeSeries(RegularTimeSeries):
