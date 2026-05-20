@@ -262,7 +262,7 @@ class RegularTimeSeries(ArrayDict):
         timestamps: np.ndarray,
         *,
         sampling_rate: float,
-        domain: Interval | Literal["auto"] = "auto",
+        domain: Literal["auto"] = "auto",
         gap_value: float = np.nan,
         rtol: float = 1e-3,
         **kwargs: np.ndarray,
@@ -358,13 +358,18 @@ class RegularTimeSeries(ArrayDict):
             out[grid_idx] = arr
             filled[key] = out
 
-        if isinstance(domain, str) and domain == "auto":
-            return RegularTimeSeries(
-                sampling_rate=sampling_rate,
-                domain="auto",
-                domain_start=start_time,
-                **filled,
+        if domain != "auto":
+            raise ValueError(
+                f"domain must be 'auto', got {domain!r}. Explicit Interval "
+                "domains are not supported by from_gappy yet."
             )
+
+        return RegularTimeSeries(
+            sampling_rate=sampling_rate,
+            domain="auto",
+            domain_start=start_time,
+            **filled,
+        )
 
 
 class LazyRegularTimeSeries(RegularTimeSeries):
