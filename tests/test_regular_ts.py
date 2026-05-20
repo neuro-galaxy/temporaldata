@@ -448,3 +448,12 @@ def test_from_gappy_validation():
     # mismatched length.
     with pytest.raises(ValueError, match="length"):
         RegularTimeSeries.from_gappy(ts, sampling_rate=10.0, raw=np.array([1.0, 2.0]))
+
+    # sampling_rate too high: every gap is multiple grid steps wide.
+    # Data is truly at 10 Hz but caller passes 20 Hz.
+    with pytest.raises(ValueError, match="appears too high"):
+        RegularTimeSeries.from_gappy(
+            np.array([0.0, 0.1, 0.2, 0.3]),
+            sampling_rate=20.0,
+            raw=np.array([1.0, 2.0, 3.0, 4.0]),
+        )
