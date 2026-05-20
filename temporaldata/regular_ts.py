@@ -282,9 +282,8 @@ class RegularTimeSeries(ArrayDict):
                 entry must lie within :obj:`rtol` samples of a regular grid
                 at :obj:`sampling_rate`, anchored at :obj:`timestamps[0]`.
             sampling_rate: Sampling rate in Hz.
-            domain: Only :obj:`"auto"` is currently supported. The domain is
-                derived from :obj:`timestamps[0]` and the number of filled
-                samples (``end = timestamps[0] + num_timesteps / sampling_rate``).
+            domain: :obj:`"auto"` or an :obj:`Interval` object that defines
+                the domain over which the timeseries is defined.
             gap_value: Value used to fill missing samples. Defaults to
                 :obj:`numpy.nan`; integer arrays passed with the default get
                 promoted to float in the output.
