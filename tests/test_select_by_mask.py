@@ -88,6 +88,10 @@ class TestInputValidation:
             ) as data:
                 yield data
 
+    def test_select_by_mask_rejects_not_np_array(self, obj):
+        with pytest.raises(ValueError, match="mask must be a numpy array"):
+            obj.select_by_mask([True, False, True])
+
     def test_select_by_mask_rejects_2d_mask(self, obj):
         with pytest.raises(ValueError, match="mask must be 1D"):
             obj.select_by_mask(np.array([[True, False, True]]))
