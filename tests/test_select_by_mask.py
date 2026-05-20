@@ -191,3 +191,44 @@ class TestPrivateAttribsAreDeepCopied:
         masked = data.select_by_mask(np.array([True, False, True]))
         assert id(masked._private) != id(data._private)
         assert np.array_equal(masked._private, data._private)
+
+
+class TestCachedSorted:
+    """_sorted is a private attrib to maintain a cache of whether
+    this object is sorted or not. This should be set to None when we
+    it was originally False, and we do select_by_mask(), since masking
+    can convert an unsorted timeseries to a sorted timeseries.
+    If the original data is sored
+    """
+
+    def test_irregular_ts(self):
+        data = IrregularTimeSeries(
+            timestamps=np.array([0.0, 1.0, 0.5, 2.0]),
+            domain="auto",
+        )
+        assert data.is_sorted() == False
+
+        # If original data is unsorted
+        masked = data.select_by_mask(np.array([True, False, True, True]))
+        assert masked._sorted == None
+        assert masked.is_sorted() == True
+
+        # If original data is sorted
+        masked2 = masked.select_by_mask(np.array([True, False, True]))
+        assert masked2._sorted == True
+
+    def test_interval(self):
+        data = Interval(
+            start=np.array([0.0, 1.0, 0.5, 2.0]),
+            end=np.array([0.1, 1.1, 0.6, 2.1]),
+        )
+        assert data.is_sorted() == False
+
+        # If original data is unsorted
+        masked = data.select_by_mask(np.array([True, False, True, True]))
+        assert masked._sorted == None
+        assert masked.is_sorted() == True
+
+        # If original data is sorted
+        masked2 = masked.select_by_mask(np.array([True, False, True]))
+        assert masked2._sorted == True
