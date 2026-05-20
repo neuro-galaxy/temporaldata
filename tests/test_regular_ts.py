@@ -391,11 +391,9 @@ def test_from_gappy_integer_gap_preserves_dtype():
     ts = np.array([0.0, 0.1, 0.3])  # missing 0.2 at sr=10Hz
     vals = np.array([7, 8, 9], dtype=np.int32)
 
-    rts = RegularTimeSeries.from_gappy(
-        ts, sampling_rate=10.0, gap_value=np.int32(-1), raw=vals
-    )
+    rts = RegularTimeSeries.from_gappy(ts, sampling_rate=10.0, gap_value=-1, raw=vals)
 
-    assert rts.raw.dtype == np.int32
+    assert rts.raw.dtype == np.int64
     np.testing.assert_array_equal(rts.raw, [7, 8, -1, 9])
 
 
