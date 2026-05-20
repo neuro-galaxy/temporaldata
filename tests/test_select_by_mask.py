@@ -1,5 +1,6 @@
 import os
 import tempfile
+from contextlib import contextmanager
 
 import h5py
 import numpy as np
@@ -47,11 +48,13 @@ def _make_irregular():
     )
 
 
+@contextmanager
 def _make_lazy(non_lazy, lazy_cls, test_filepath):
     with h5py.File(test_filepath, "w") as f:
         non_lazy.to_hdf5(f)
     f = h5py.File(test_filepath, "r")
-    return lazy_cls.from_hdf5(f), f
+    yield lazy_cls.from_hdf5(f)
+    f.close()
 
 
 class TestInputValidation:
@@ -74,19 +77,16 @@ class TestInputValidation:
         elif name == "IrregularTimeSeries":
             yield _make_irregular()
         elif name == "LazyArrayDict":
-            instance, f = _make_lazy(_make_array_dict(), LazyArrayDict, test_filepath)
-            yield instance
-            f.close()
+            with _make_lazy(_make_array_dict(), LazyArrayDict, test_filepath) as data:
+                yield data
         elif name == "LazyInterval":
-            instance, f = _make_lazy(_make_interval(), LazyInterval, test_filepath)
-            yield instance
-            f.close()
+            with _make_lazy(_make_interval(), LazyInterval, test_filepath) as data:
+                yield data
         elif name == "LazyIrregularTimeSeries":
-            instance, f = _make_lazy(
+            with _make_lazy(
                 _make_irregular(), LazyIrregularTimeSeries, test_filepath
-            )
-            yield instance
-            f.close()
+            ) as data:
+                yield data
 
     def test_select_by_mask_rejects_2d_mask(self, obj):
         with pytest.raises(ValueError, match="mask must be 1D"):
@@ -104,55 +104,59 @@ class TestInputValidation:
 class TestLazyMaskIsCopied:
 
     def test_lazy_arraydict(self, test_filepath):
-        data, f = _make_lazy(_make_array_dict(), LazyArrayDict, test_filepath)
-        mask = np.array([True, False, True])
-        masked = data.select_by_mask(mask)
-        # modify mask. `masked` should NOT care about this
-        mask[0] = False
-        assert len(masked.x) == 2
+        with _make_lazy(_make_array_dict(), LazyArrayDict, test_filepath) as data:
+            mask = np.array([True, False, True])
+            masked = data.select_by_mask(mask)
+            # modify mask. `masked` should NOT care about this
+            mask[0] = False
+            assert len(masked.x) == 2
 
     def test_lazy_arraydict_doublemask(self, test_filepath):
-        data, f = _make_lazy(_make_array_dict(), LazyArrayDict, test_filepath)
-        mask1 = np.array([True, False, True])
-        masked = data.select_by_mask(mask1)
-        mask2 = np.array([True, False])
-        masked2 = masked.select_by_mask(mask2)
-        mask1[0] = False
-        assert len(masked2.x) == 1
+        with _make_lazy(_make_array_dict(), LazyArrayDict, test_filepath) as data:
+            mask1 = np.array([True, False, True])
+            masked = data.select_by_mask(mask1)
+            mask2 = np.array([True, False])
+            masked2 = masked.select_by_mask(mask2)
+            mask1[0] = False
+            assert len(masked2.x) == 1
 
     def test_lazy_irregular_ts(self, test_filepath):
-        data, f = _make_lazy(_make_irregular(), LazyIrregularTimeSeries, test_filepath)
-        mask = np.array([True, False, True])
-        masked = data.select_by_mask(mask)
-        # modify mask. `masked` should NOT care about this
-        mask[0] = False
-        assert len(masked.timestamps) == 2
+        with _make_lazy(
+            _make_irregular(), LazyIrregularTimeSeries, test_filepath
+        ) as data:
+            mask = np.array([True, False, True])
+            masked = data.select_by_mask(mask)
+            # modify mask. `masked` should NOT care about this
+            mask[0] = False
+            assert len(masked.timestamps) == 2
 
     def test_lazy_irregular_ts_doublemask(self, test_filepath):
-        data, f = _make_lazy(_make_irregular(), LazyIrregularTimeSeries, test_filepath)
-        mask1 = np.array([True, False, True])
-        masked = data.select_by_mask(mask1)
-        mask2 = np.array([True, False])
-        masked2 = masked.select_by_mask(mask2)
-        mask1[0] = False
-        assert len(masked2.timestamps) == 1
+        with _make_lazy(
+            _make_irregular(), LazyIrregularTimeSeries, test_filepath
+        ) as data:
+            mask1 = np.array([True, False, True])
+            masked = data.select_by_mask(mask1)
+            mask2 = np.array([True, False])
+            masked2 = masked.select_by_mask(mask2)
+            mask1[0] = False
+            assert len(masked2.timestamps) == 1
 
     def test_lazy_interval(self, test_filepath):
-        data, f = _make_lazy(_make_interval(), LazyInterval, test_filepath)
-        mask = np.array([True, False, True])
-        masked = data.select_by_mask(mask)
-        # modify mask. `masked` should NOT care about this
-        mask[0] = False
-        assert len(masked.start) == 2
+        with _make_lazy(_make_interval(), LazyInterval, test_filepath) as data:
+            mask = np.array([True, False, True])
+            masked = data.select_by_mask(mask)
+            # modify mask. `masked` should NOT care about this
+            mask[0] = False
+            assert len(masked.start) == 2
 
     def test_lazy_interval_doublemask(self, test_filepath):
-        data, f = _make_lazy(_make_interval(), LazyInterval, test_filepath)
-        mask1 = np.array([True, False, True])
-        masked = data.select_by_mask(mask1)
-        mask2 = np.array([True, False])
-        masked2 = masked.select_by_mask(mask2)
-        mask1[0] = False
-        assert len(masked2.start) == 1
+        with _make_lazy(_make_interval(), LazyInterval, test_filepath) as data:
+            mask1 = np.array([True, False, True])
+            masked = data.select_by_mask(mask1)
+            mask2 = np.array([True, False])
+            masked2 = masked.select_by_mask(mask2)
+            mask1[0] = False
+            assert len(masked2.start) == 1
 
 
 class TestNewDomainIsNotShallowCopy:
