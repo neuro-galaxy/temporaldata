@@ -277,7 +277,12 @@ class LazyRegularTimeSeries(RegularTimeSeries):
         array as well as apply any outstanding masks.
     """
 
-    _lazy_ops = dict()
+    _lazy_ops: dict
+
+    def __init__(self, **kwargs):
+        raise NotImplementedError(
+            f"{self.__class__.__name__} cannot be constructed directly; use from_hdf5."
+        )
 
     def _maybe_first_dim(self):
         if len(self.keys()) == 0:

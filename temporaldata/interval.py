@@ -863,8 +863,13 @@ class LazyInterval(Interval):
         array as well as apply any outstanding masks.
     """
 
-    _lazy_ops = dict()
-    _unicode_keys = []
+    _lazy_ops: dict
+    _unicode_keys: list[str]
+
+    def __init__(self, **kwargs):
+        raise NotImplementedError(
+            f"{self.__class__.__name__} cannot be constructed directly; use from_hdf5."
+        )
 
     def _maybe_first_dim(self):
         if "unresolved_slice" in self._lazy_ops:
