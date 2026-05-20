@@ -167,3 +167,27 @@ class TestNewDomainIsNotShallowCopy:
         assert id(masked.domain) != id(data.domain)
         assert id(masked.domain.start) != id(data.domain.start)
         assert id(masked.domain.end) != id(data.domain.end)
+
+
+class TestPrivateAttribsAreDeepCopied:
+
+    def test_array_dict(self):
+        data = _make_array_dict()
+        data._private = np.array([0, 1])
+        masked = data.select_by_mask(np.array([True, False, True]))
+        assert id(masked._private) != id(data._private)
+        assert np.array_equal(masked._private, data._private)
+
+    def test_irregular_ts(self):
+        data = _make_irregular()
+        data._private = np.array([0, 1])
+        masked = data.select_by_mask(np.array([True, False, True]))
+        assert id(masked._private) != id(data._private)
+        assert np.array_equal(masked._private, data._private)
+
+    def test_interval(self):
+        data = _make_interval()
+        data._private = np.array([0, 1])
+        masked = data.select_by_mask(np.array([True, False, True]))
+        assert id(masked._private) != id(data._private)
+        assert np.array_equal(masked._private, data._private)
