@@ -106,6 +106,12 @@ class TestInputValidation:
 
 
 class TestLazyMaskIsCopied:
+    """Changing the the mask numpy array should not change the mask
+    cached within the lazy objects (i.e. they should store a copy).
+
+    We check this by actually modifying the original mask object and seeing
+    if that effects the lazy attribute lookup process (it should not).
+    """
 
     def test_lazy_arraydict(self, test_filepath):
         with _make_lazy(_make_array_dict(), LazyArrayDict, test_filepath) as data:
