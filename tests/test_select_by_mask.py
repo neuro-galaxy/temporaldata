@@ -205,7 +205,7 @@ class TestPrivateAttribsAreDeepCopied:
 
 class TestCachedSorted:
     """_sorted is a private attrib to maintain a cache of whether
-    this object is sorted or not. This should be set to None when we
+    this object is sorted or not. This should be set to None when
     it was originally False, and we do select_by_mask(), i.e. the cache
     should be invalidated. This is because masking can convert an
     unsorted timeseries to a sorted timeseries.
