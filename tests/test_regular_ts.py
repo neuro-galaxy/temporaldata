@@ -391,7 +391,9 @@ def test_from_gappy_integer_gap_preserves_dtype():
     ts = np.array([0.0, 0.1, 0.3])  # missing 0.2 at sr=10Hz
     vals = np.array([7, 8, 9], dtype=np.int32)
 
-    rts = RegularTimeSeries.from_gappy(ts, sampling_rate=10.0, gap_value=-1, raw=vals)
+    rts = RegularTimeSeries.from_gappy(
+        ts, sampling_rate=10.0, gap_value=np.int32(-1), raw=vals
+    )
 
     assert rts.raw.dtype == np.int32
     np.testing.assert_array_equal(rts.raw, [7, 8, -1, 9])
@@ -436,10 +438,12 @@ def test_from_gappy_validation():
         )
 
     # sub-sample-spaced (two timestamps round to the same grid index).
+    # rtol relaxed so the off-grid check doesn't fire first.
     with pytest.raises(ValueError, match="duplicate or sub-sample-spaced"):
         RegularTimeSeries.from_gappy(
-            np.array([0.0, 0.001, 0.1]),
+            np.array([0.0, 0.04, 0.1]),
             sampling_rate=10.0,
+            rtol=0.5,
             raw=raw,
         )
 
