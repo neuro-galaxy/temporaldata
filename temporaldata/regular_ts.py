@@ -333,10 +333,18 @@ class RegularTimeSeries(ArrayDict):
                 f"increase rtol."
             )
 
-        if int(np.min(np.diff(grid_idx))) < 1:
+        min_idx_gap = int(np.min(np.diff(grid_idx)))
+        if min_idx_gap < 1:
             raise ValueError(
                 f"timestamps contain duplicate or sub-sample-spaced entries "
                 f"at sampling_rate={sampling_rate} Hz"
+            )
+        if min_idx_gap > 1:
+            raise ValueError(
+                f"sampling_rate={sampling_rate} appears too high: the smallest "
+                f"gap between consecutive timestamps is {min_idx_gap} grid "
+                f"steps (expected 1). The true sampling rate may be closer to "
+                f"{sampling_rate / min_idx_gap}."
             )
 
         num_timesteps = int(grid_idx[-1]) + 1
