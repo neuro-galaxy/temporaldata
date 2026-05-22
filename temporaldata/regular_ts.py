@@ -291,7 +291,9 @@ class RegularTimeSeries(ArrayDict):
 
         Returns:
             RegularTimeSeries: A regular time series with the same named
-            arrays, gaps filled with :obj:`gap_value`.
+            arrays, gaps filled with :obj:`gap_value`. The returned domain has
+            one ``(start, end)`` segment per contiguous run of present
+            samples, so gap regions are excluded from the domain.
 
         Example ::
 
@@ -306,6 +308,8 @@ class RegularTimeSeries(ArrayDict):
             ... )
             >>> rts.raw
             array([ 1.,  2., nan,  3.,  4.])
+            >>> rts.domain.start, rts.domain.end
+            (array([0.  , 0.03]), array([0.02, 0.05]))
         """
         if timestamps.ndim != 1:
             raise ValueError(f"timestamps must be 1-D, got shape {timestamps.shape}")
