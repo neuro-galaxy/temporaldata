@@ -262,7 +262,6 @@ class RegularTimeSeries(ArrayDict):
         timestamps: np.ndarray,
         *,
         sampling_rate: float,
-        domain: Interval | Literal["auto"] = "auto",
         gap_value: int | float = np.nan,
         rtol: float = 1e-3,
         **kwargs: np.ndarray,
@@ -282,8 +281,6 @@ class RegularTimeSeries(ArrayDict):
                 entry must lie within :obj:`rtol` samples of a regular grid
                 at :obj:`sampling_rate`, anchored at :obj:`timestamps[0]`.
             sampling_rate: Sampling rate in Hz.
-            domain: :obj:`"auto"` or an :obj:`Interval` object that defines
-                the domain over which the timeseries is defined.
             gap_value: Value used to fill missing samples. Defaults to
                 :obj:`numpy.nan`; integer arrays passed with the default get
                 promoted to float in the output.
