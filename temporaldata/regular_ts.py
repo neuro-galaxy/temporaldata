@@ -363,10 +363,17 @@ class RegularTimeSeries(ArrayDict):
             out[grid_idx] = arr
             filled[key] = out
 
+        gap_positions = np.where(np.diff(grid_idx) > 1)[0]
+        seg_start_grid = grid_idx[np.concatenate([[0], gap_positions + 1])]
+        seg_end_grid = grid_idx[np.concatenate([gap_positions, [len(grid_idx) - 1]])]
+        domain = Interval(
+            start=start_time + seg_start_grid / sampling_rate,
+            end=start_time + (seg_end_grid + 1) / sampling_rate,
+        )
+
         return RegularTimeSeries(
             sampling_rate=sampling_rate,
-            domain="auto",
-            domain_start=start_time,
+            domain=domain,
             **filled,
         )
 
