@@ -266,7 +266,7 @@ class RegularTimeSeries(ArrayDict):
         **kwargs: np.ndarray,
     ) -> RegularTimeSeries:
         r"""Regularize an approximately-regular but gappy timeseries.
-        
+
         Construct a :obj:`RegularTimeSeries` from approximately-regular but
         gappy timestamps and value arrays by snapping each sample to a regular
         grid at :obj:`sampling_rate` and filling missing samples with
@@ -292,7 +292,7 @@ class RegularTimeSeries(ArrayDict):
         Returns:
             RegularTimeSeries: A regular time series with the same named
             arrays, gaps filled with :obj:`gap_value`.
-        
+
         Raises:
             ValueError: If timestamps deviate from the regular grid by more than :obj:`rtol`
         Example ::
