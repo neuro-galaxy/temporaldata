@@ -535,6 +535,17 @@ class LazyRegularTimeSeries(RegularTimeSeries):
         raise NotImplementedError("Cannot save a lazy array dict to hdf5.")
 
     @classmethod
+    def from_gappy_timeseries(cls, *_args, **_kwargs):
+        r"""Not implemented for :obj:`LazyRegularTimeSeries`.
+
+        Use :meth:`RegularTimeSeries.from_gappy_timeseries` instead.
+        """
+        raise NotImplementedError(
+            "from_gappy_timeseries is not available on LazyRegularTimeSeries; "
+            "use RegularTimeSeries.from_gappy_timeseries instead."
+        )
+
+    @classmethod
     def from_hdf5(cls, file):
         r"""Loads the data object from an HDF5 file.
 
