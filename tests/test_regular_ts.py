@@ -517,6 +517,62 @@ class TestFromGappyTimeseries:
                 raw=np.array([1.0, 2.0, 3.0], dtype=np.float64),
             )
 
+    def test_default_gap_value_passess_validation(self):
+        from temporaldata.regular_ts import _DEFAULT_GAP_VALUE, _validate_gap_value_dict
+
+        _validate_gap_value_dict(_DEFAULT_GAP_VALUE)
+
+    def test_gap_value_dict_validation(self):
+        ts = np.array([0.0, 0.1, 0.3])
+        raw = np.array([1.0, 2.0, 3.0])
+
+        # Unknown key.
+        with pytest.raises(ValueError, match="unsupported key"):
+            RegularTimeSeries.from_gappy_timeseries(
+                ts, sampling_rate=10.0, gap_value={"int": -1}, raw=raw
+            )
+
+        # 'i' must be an integer, not a float.
+        with pytest.raises(ValueError, match=r"gap_value\['i'\] must be an integer"):
+            RegularTimeSeries.from_gappy_timeseries(
+                ts, sampling_rate=10.0, gap_value={"i": 2.5}, raw=raw
+            )
+
+        # 'b' must be a bool, not an int.
+        with pytest.raises(ValueError, match=r"gap_value\['b'\] must be a bool"):
+            RegularTimeSeries.from_gappy_timeseries(
+                ts, sampling_rate=10.0, gap_value={"b": 1}, raw=raw
+            )
+
+        # 'u' must be non-negative.
+        with pytest.raises(ValueError, match=r"gap_value\['u'\] must be non-negative"):
+            RegularTimeSeries.from_gappy_timeseries(
+                ts, sampling_rate=10.0, gap_value={"u": -1}, raw=raw
+            )
+
+        # 'u' must be an integer, not a float.
+        with pytest.raises(ValueError, match=r"gap_value\['u'\] must be an integer"):
+            RegularTimeSeries.from_gappy_timeseries(
+                ts, sampling_rate=10.0, gap_value={"u": 1.5}, raw=raw
+            )
+
+        # 'f' must be a number, not a bool.
+        with pytest.raises(ValueError, match=r"gap_value\['f'\] must be a number"):
+            RegularTimeSeries.from_gappy_timeseries(
+                ts, sampling_rate=10.0, gap_value={"f": True}, raw=raw
+            )
+
+        # Numpy scalars should be accepted.
+        rts = RegularTimeSeries.from_gappy_timeseries(
+            ts,
+            sampling_rate=10.0,
+            gap_value={"i": np.int32(-7), "f": np.float64(-1.5)},
+            i=np.array([1, 2, 3], dtype=np.int32),
+            f=np.array([1.0, 2.0, 3.0], dtype=np.float64),
+        )
+        np.testing.assert_array_equal(rts.i, [1, 2, -7, 3])
+        np.testing.assert_array_equal(rts.f, [1.0, 2.0, -1.5, 3.0])
+
     def test_lazy_raises(self):
         with pytest.raises(NotImplementedError, match="not available"):
             LazyRegularTimeSeries.from_gappy_timeseries(

@@ -10,12 +10,39 @@ from .arraydict import ArrayDict
 from .interval import Interval
 from .irregular_ts import IrregularTimeSeries
 
+_NP_DTYPE_KINDS = {"b", "i", "u", "f", "c", "m", "M", "O", "S", "U", "V"}
+# ^ From https://numpy.org/doc/2.2/reference/generated/numpy.dtype.kind.html
+
 _DEFAULT_GAP_VALUE = {
     "b": False,
     "i": -1,
     "u": 0,
     "f": np.nan,
 }
+
+
+def _validate_gap_value_dict(gap_value):
+    for k, v in gap_value.items():
+        if k not in _NP_DTYPE_KINDS:
+            raise ValueError(
+                f"gap_value dict has unsupported key {k!r}; valid keys "
+                f"are {sorted(_NP_DTYPE_KINDS)} "
+            )
+        # bool is a subclass of int in Python, so check it explicitly first.
+        is_bool = isinstance(v, (bool, np.bool_))
+        is_int = isinstance(v, (int, np.integer)) and not is_bool
+        is_float = isinstance(v, (float, np.floating))
+        if k == "b" and not is_bool:
+            raise ValueError(f"gap_value['b'] must be a bool, got {v!r}")
+        if k == "i" and not is_int:
+            raise ValueError(f"gap_value['i'] must be an integer, got {v!r}")
+        if k == "u":
+            if not is_int:
+                raise ValueError(f"gap_value['u'] must be an integer, got {v!r}")
+            if v < 0:
+                raise ValueError(f"gap_value['u'] must be non-negative, got {v}")
+        if k == "f" and not (is_int or is_float):
+            raise ValueError(f"gap_value['f'] must be a number, got {v!r}")
 
 
 class RegularTimeSeries(ArrayDict):
@@ -339,6 +366,9 @@ class RegularTimeSeries(ArrayDict):
             )
         if not (np.diff(timestamps) > 0).all():
             raise ValueError("timestamps must be strictly increasing")
+
+        if isinstance(gap_value, dict):
+            _validate_gap_value_dict(gap_value)
 
         start_time = float(timestamps[0])
         rel_idx = (timestamps - start_time) * sampling_rate
