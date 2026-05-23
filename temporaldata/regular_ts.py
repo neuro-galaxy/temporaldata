@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from typing import Literal
+from typing import Literal, Any
 
 import h5py
 import numpy as np
@@ -9,6 +9,13 @@ import numpy as np
 from .arraydict import ArrayDict
 from .interval import Interval
 from .irregular_ts import IrregularTimeSeries
+
+_DEFAULT_GAP_VALUE = {
+    "b": False,
+    "i": -1,
+    "u": 0,
+    "f": np.nan,
+}
 
 
 class RegularTimeSeries(ArrayDict):
@@ -261,7 +268,7 @@ class RegularTimeSeries(ArrayDict):
     def from_gappy_timeseries(
         timestamps: np.ndarray,
         sampling_rate: float,
-        gap_value: int | float = np.nan,
+        gap_value: Any | dict[str, Any] | None = None,
         rtol: float = 1e-3,
         **kwargs: np.ndarray,
     ) -> RegularTimeSeries:
@@ -282,8 +289,19 @@ class RegularTimeSeries(ArrayDict):
                 entry must lie within :obj:`rtol` samples of a regular grid
                 at :obj:`sampling_rate`, anchored at :obj:`timestamps[0]`.
             sampling_rate: Sampling rate in Hz.
-            gap_value: Value used to fill missing samples. Defaults to
-                :obj:`numpy.nan`.
+            gap_value: Value used to fill missing samples. May be:
+
+                * A scalar (``int``, ``float``, or ``bool``) — used for every
+                  kwarg array regardless of dtype.
+                * A ``dict`` mapping :obj:`numpy.dtype.kind` codes to fill
+                  values. Recognized kinds: ``'b'`` (bool), ``'i'`` (signed
+                  int), ``'u'`` (unsigned int), ``'f'`` (float). Example:
+                  ``{'i': -1, 'u': 0, 'f': np.nan}``. Raises :obj:`KeyError`
+                  if a kwarg's dtype kind is not in the dict.
+                * :obj:`None` (default) — uses per-kind defaults: ``-1`` for
+                  signed integers, ``0`` for unsigned integers,
+                  :obj:`numpy.nan` for floats, ``False`` for bools. Note that
+                  these defaults can collide with valid data.`
             rtol: Maximum allowed deviation, in samples, of any input timestamp
                 from the regular grid.
             **kwargs: Named value arrays whose first dimension equals
@@ -352,8 +370,9 @@ class RegularTimeSeries(ArrayDict):
 
         num_timesteps = int(grid_idx[-1]) + 1
 
-        gap_is_nan = bool(np.isnan(gap_value))
-        gap_dtype = np.asarray(gap_value).dtype
+        if gap_value is None:
+            gap_value = _DEFAULT_GAP_VALUE
+
         filled: dict[str, np.ndarray] = {}
         for key, arr in kwargs.items():
             if not isinstance(arr, np.ndarray):
@@ -365,14 +384,19 @@ class RegularTimeSeries(ArrayDict):
                     f"{key!r} has length {len(arr)}, expected "
                     f"{len(timestamps)} to match timestamps"
                 )
-            if gap_is_nan and np.issubdtype(arr.dtype, np.integer):
-                raise ValueError(
-                    f"{key!r} is an integer array (dtype={arr.dtype}); "
-                    f"gap_value=NaN requires a float array. Pass an integer "
-                    f"gap_value (e.g. -1) instead."
-                )
-            out_dtype = np.result_type(arr.dtype, gap_dtype)
-            out = np.full((num_timesteps, *arr.shape[1:]), gap_value, dtype=out_dtype)
+
+            if isinstance(gap_value, dict):
+                kind = arr.dtype.kind
+                if kind not in gap_value:
+                    raise KeyError(
+                        f"{key!r} has dtype {arr.dtype} (kind {kind!r}) which is "
+                        f"not in gap_value dict (keys: {list(gap_value)})"
+                    )
+                _gap_value = gap_value[kind]
+            else:
+                _gap_value = gap_value
+
+            out = np.full((num_timesteps, *arr.shape[1:]), _gap_value, dtype=arr.dtype)
             out[grid_idx] = arr
             filled[key] = out
 

@@ -396,7 +396,7 @@ class TestFromGappyTimeseries:
             ts, sampling_rate=10.0, gap_value=-1, raw=vals
         )
 
-        assert rts.raw.dtype == np.int64
+        assert rts.raw.dtype == np.int32
         np.testing.assert_array_equal(rts.raw, [7, 8, -1, 9])
 
     def test_validation(self):
@@ -458,12 +458,4 @@ class TestFromGappyTimeseries:
                 np.array([0.0, 0.1, 0.2, 0.3]),
                 sampling_rate=20.0,
                 raw=np.array([1.0, 2.0, 3.0, 4.0]),
-            )
-
-        # int array with default NaN gap_value: cannot store NaN in int dtype.
-        with pytest.raises(ValueError, match="integer array"):
-            RegularTimeSeries.from_gappy_timeseries(
-                np.array([0.0, 0.1, 0.3]),
-                sampling_rate=10.0,
-                raw=np.array([1, 2, 3], dtype=np.int32),
             )
