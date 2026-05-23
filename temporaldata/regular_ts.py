@@ -93,6 +93,7 @@ class RegularTimeSeries(ArrayDict):
             NotImplementedError: Always, because this method cannot
                 be implemented for this class.
         """
+        # TODO: Implement once we support "gappy" regular timeseries
         raise NotImplementedError("Not implemented for RegularTimeSeries.")
 
     def _time_to_idx(
