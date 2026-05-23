@@ -517,7 +517,7 @@ class TestFromGappyTimeseries:
                 raw=np.array([1.0, 2.0, 3.0], dtype=np.float64),
             )
 
-    def test_default_gap_value_passess_validation(self):
+    def test_default_gap_value_passes_validation(self):
         from temporaldata.regular_ts import _DEFAULT_GAP_VALUE, _validate_gap_value_dict
 
         _validate_gap_value_dict(_DEFAULT_GAP_VALUE)
