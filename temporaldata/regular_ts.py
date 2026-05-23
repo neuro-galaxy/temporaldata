@@ -281,8 +281,7 @@ class RegularTimeSeries(ArrayDict):
                 at :obj:`sampling_rate`, anchored at :obj:`timestamps[0]`.
             sampling_rate: Sampling rate in Hz.
             gap_value: Value used to fill missing samples. Defaults to
-                :obj:`numpy.nan`; integer arrays passed with the default get
-                promoted to float in the output.
+                :obj:`numpy.nan`.
             rtol: Maximum allowed deviation, in samples, of any input timestamp
                 from the regular grid.
             **kwargs: Named value arrays whose first dimension equals
@@ -345,6 +344,7 @@ class RegularTimeSeries(ArrayDict):
 
         num_timesteps = int(grid_idx[-1]) + 1
 
+        gap_is_nan = isinstance(gap_value, float) and math.isnan(gap_value)
         gap_dtype = np.asarray(gap_value).dtype
         filled: dict[str, np.ndarray] = {}
         for key, arr in kwargs.items():
@@ -356,6 +356,12 @@ class RegularTimeSeries(ArrayDict):
                 raise ValueError(
                     f"{key!r} has length {len(arr)}, expected "
                     f"{len(timestamps)} to match timestamps"
+                )
+            if gap_is_nan and np.issubdtype(arr.dtype, np.integer):
+                raise ValueError(
+                    f"{key!r} is an integer array (dtype={arr.dtype}); "
+                    f"gap_value=NaN requires a float array. Pass an integer "
+                    f"gap_value (e.g. -1) instead."
                 )
             out_dtype = np.result_type(arr.dtype, gap_dtype)
             out = np.full((num_timesteps, *arr.shape[1:]), gap_value, dtype=out_dtype)
