@@ -136,41 +136,38 @@ class TestSlicing:
         assert np.allclose(data_slice.timestamps, data.timestamps)
 
 
-def test_regular_ts_2(test_filepath):
-    data = RegularTimeSeries(
-        lfp=np.random.random((100, 48)),
-        sampling_rate=10,
-        domain="auto",
-        domain_start=1.0,
-    )
+class TestSliceWithDomainStart:
 
-    def _test_regulartimeseries_with_domain_start(data):
+    @pytest.fixture(params=["RegularTimeSeries", "LazyRegularTimeSeries"])
+    def data(self, request, test_filepath):
+        name = request.param
+        # 100 points at 10Hz => 10s duration
+        data = RegularTimeSeries(
+            lfp=np.random.random((100, 48)),
+            sampling_rate=10,
+            domain="auto",
+            domain_start=1.0,
+        )
+        if name == "RegularTimeSeries":
+            yield data
+        elif name == "LazyRegularTimeSeries":
+            with _make_lazy(data, test_filepath) as data:
+                yield data
+
+    def test_data_domain(self, data):
         assert len(data) == 100
-
         assert data.domain.start[0] == 1.0
         assert data.domain.end[0] == 11.0
 
+    def test_aligned_slice(self, data):
         data_slice = data.slice(3.0, 9.0)
+        assert np.allclose(data_slice.timestamps, np.arange(0, 6.0, 0.1))
         assert np.allclose(data_slice.lfp, data.lfp[20:80])
 
-        # try slicing with skewed start and end
-        # the sampling frequency is 10
-        data_slice = data.slice(3.03, 9.09)
+    def test_misaligned_slice(self, data):
+        data_slice = data.slice(3.02, 9.08)
+        assert np.allclose(data_slice.timestamps, np.arange(0.08, 6.08, 0.1))
         assert np.allclose(data_slice.lfp, data.lfp[21:81])
-
-        data_slice = data.slice(5.051, 13.0)
-        assert np.allclose(data_slice.lfp, data.lfp[41:])
-
-    _test_regulartimeseries_with_domain_start(data)
-
-    with h5py.File(test_filepath, "w") as f:
-        data.to_hdf5(f)
-
-    del data
-
-    with h5py.File(test_filepath, "r") as f:
-        data = LazyRegularTimeSeries.from_hdf5(f)
-        _test_regulartimeseries_with_domain_start(data)
 
 
 def test_lazy_regular_timeseries(test_filepath):
