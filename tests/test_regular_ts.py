@@ -459,3 +459,60 @@ class TestFromGappyTimeseries:
                 sampling_rate=20.0,
                 raw=np.array([1.0, 2.0, 3.0, 4.0]),
             )
+
+    def test_default_gap_value_per_kind(self):
+        # ts has one gap (at the 0.2s grid point).
+        ts = np.array([0.0, 0.1, 0.3])
+
+        rts = RegularTimeSeries.from_gappy_timeseries(
+            ts,
+            sampling_rate=10.0,
+            f=np.array([1.0, 2.0, 3.0], dtype=np.float64),
+            i=np.array([1, 2, 3], dtype=np.int32),
+            u=np.array([1, 2, 3], dtype=np.uint8),
+            b=np.array([True, False, True], dtype=np.bool_),
+        )
+
+        # float default: nan
+        assert rts.f.dtype == np.float64
+        np.testing.assert_array_equal(np.isnan(rts.f), [False, False, True, False])
+        np.testing.assert_array_equal(rts.f[[0, 1, 3]], [1.0, 2.0, 3.0])
+
+        # signed int default: -1
+        assert rts.i.dtype == np.int32
+        np.testing.assert_array_equal(rts.i, [1, 2, -1, 3])
+
+        # unsigned int default: 0
+        assert rts.u.dtype == np.uint8
+        np.testing.assert_array_equal(rts.u, [1, 2, 0, 3])
+
+        # bool default: False
+        assert rts.b.dtype == np.bool_
+        np.testing.assert_array_equal(rts.b, [True, False, False, True])
+
+    def test_gap_value_dict_by_kind(self):
+        ts = np.array([0.0, 0.1, 0.3])
+
+        # Per-kind sentinels: signed -> -99, unsigned -> 255, float -> -1.0.
+        rts = RegularTimeSeries.from_gappy_timeseries(
+            ts,
+            sampling_rate=10.0,
+            gap_value={"i": -99, "u": 255, "f": -1.0},
+            i=np.array([1, 2, 3], dtype=np.int32),
+            u=np.array([1, 2, 3], dtype=np.uint8),
+            f=np.array([1.0, 2.0, 3.0], dtype=np.float64),
+        )
+
+        np.testing.assert_array_equal(rts.i, [1, 2, -99, 3])
+        np.testing.assert_array_equal(rts.u, [1, 2, 255, 3])
+        np.testing.assert_array_equal(rts.f, [1.0, 2.0, -1.0, 3.0])
+
+    def test_gap_value_dict_missing_kind_raises(self):
+        # Float array given, but dict only has signed/unsigned kinds.
+        with pytest.raises(KeyError, match="kind 'f'"):
+            RegularTimeSeries.from_gappy_timeseries(
+                np.array([0.0, 0.1, 0.3]),
+                sampling_rate=10.0,
+                gap_value={"i": -1, "u": 0},
+                raw=np.array([1.0, 2.0, 3.0], dtype=np.float64),
+            )
