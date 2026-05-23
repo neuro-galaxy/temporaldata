@@ -369,8 +369,8 @@ class TestFromGappyTimeseries:
             np.isnan(rts.raw), [False, False, True, False, False]
         )
         np.testing.assert_array_equal(rts.raw[~np.isnan(rts.raw)], raw)
-        np.testing.assert_allclose(rts.domain.start, [0.0, 0.03])
-        np.testing.assert_allclose(rts.domain.end, [0.02, 0.05])
+        assert rts.domain.start[0] == 0.0
+        assert rts.domain.end[0] == pytest.approx(0.05)
 
     def test_multiple_arrays_and_multidim(self):
         ts = np.array([10.0, 10.5, 11.5])  # missing 11.0 at sr=2Hz
@@ -384,9 +384,9 @@ class TestFromGappyTimeseries:
         assert rts.b.shape == (4, 4)
         assert np.isnan(rts.b[2]).all()
         np.testing.assert_array_equal(rts.b[[0, 1, 3]], b)
-        # Domain has one segment per contiguous run of present samples.
-        np.testing.assert_allclose(rts.domain.start, [10.0, 11.5])
-        np.testing.assert_allclose(rts.domain.end, [11.0, 12.0])
+        # Domain starts at timestamps[0].
+        assert rts.domain.start[0] == 10.0
+        assert rts.domain.end[0] == pytest.approx(10.0 + 4 / 2.0)
 
     def test_integer_gap_preserves_dtype(self):
         ts = np.array([0.0, 0.1, 0.3])  # missing 0.2 at sr=10Hz
