@@ -309,6 +309,10 @@ class RegularTimeSeries(ArrayDict):
             >>> rts.raw
             array([ 1.,  2., nan,  3.,  4.])
         """
+        if not isinstance(timestamps, np.ndarray):
+            raise ValueError(
+                f"timestamps must be a numpy array, got {type(timestamps)}"
+            )
         if timestamps.ndim != 1:
             raise ValueError(f"timestamps must be 1-D, got shape {timestamps.shape}")
         if len(timestamps) < 2:

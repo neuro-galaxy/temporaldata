@@ -403,6 +403,13 @@ class TestFromGappyTimeseries:
         ts = np.array([0.0, 0.1, 0.2])
         raw = np.array([1.0, 2.0, 3.0])
 
+        with pytest.raises(ValueError, match="numpy array"):
+            RegularTimeSeries.from_gappy_timeseries(
+                [0, 1, 2],  # ty:ignore[invalid-argument-type]
+                sampling_rate=10.0,
+                raw=raw,
+            )
+
         with pytest.raises(ValueError, match="1-D"):
             RegularTimeSeries.from_gappy_timeseries(
                 ts.reshape(-1, 1), sampling_rate=10.0, raw=raw
