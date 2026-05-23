@@ -516,3 +516,11 @@ class TestFromGappyTimeseries:
                 gap_value={"i": -1, "u": 0},
                 raw=np.array([1.0, 2.0, 3.0], dtype=np.float64),
             )
+
+    def test_lazy_raises(self):
+        with pytest.raises(NotImplementedError, match="not available"):
+            LazyRegularTimeSeries.from_gappy_timeseries(
+                np.array([0.0, 0.1, 0.3]),
+                sampling_rate=10.0,
+                raw=np.array([1.0, 2.0, 3.0]),
+            )
