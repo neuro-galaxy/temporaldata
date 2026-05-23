@@ -292,6 +292,9 @@ class RegularTimeSeries(ArrayDict):
             sampling_rate: Sampling rate in Hz.
             gap_value: Value used to fill missing samples. May be:
 
+                * :obj:`None` (default) — uses per-kind defaults: ``-1`` for
+                  signed integers, ``0`` for unsigned integers,
+                  :obj:`numpy.nan` for floats, ``False`` for bools.
                 * A scalar (``int``, ``float``, or ``bool``) — used for every
                   kwarg array regardless of dtype.
                 * A ``dict`` mapping :obj:`numpy.dtype.kind` codes to fill
@@ -299,10 +302,6 @@ class RegularTimeSeries(ArrayDict):
                   int), ``'u'`` (unsigned int), ``'f'`` (float). Example:
                   ``{'i': -1, 'u': 0, 'f': np.nan}``. Raises :obj:`KeyError`
                   if a kwarg's dtype kind is not in the dict.
-                * :obj:`None` (default) — uses per-kind defaults: ``-1`` for
-                  signed integers, ``0`` for unsigned integers,
-                  :obj:`numpy.nan` for floats, ``False`` for bools. Note that
-                  these defaults can collide with valid data.`
             rtol: Maximum allowed deviation, in samples, of any input timestamp
                 from the regular grid.
             **kwargs: Named value arrays whose first dimension equals
