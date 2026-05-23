@@ -264,8 +264,9 @@ class RegularTimeSeries(ArrayDict):
 
         return obj
 
-    @staticmethod
+    @classmethod
     def from_gappy_timeseries(
+        cls,
         timestamps: np.ndarray,
         sampling_rate: float,
         gap_value: Any | dict[str, Any] | None = None,
@@ -400,7 +401,7 @@ class RegularTimeSeries(ArrayDict):
             out[grid_idx] = arr
             filled[key] = out
 
-        return RegularTimeSeries(
+        return cls(
             sampling_rate=sampling_rate,
             domain="auto",
             domain_start=start_time,
