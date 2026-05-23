@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 from typing import Literal, Any
+import warnings
 
 import h5py
 import numpy as np
@@ -43,6 +44,37 @@ def _validate_gap_value_dict(gap_value):
                 raise ValueError(f"gap_value['u'] must be non-negative, got {v}")
         if k == "f" and not (is_int or is_float):
             raise ValueError(f"gap_value['f'] must be a number, got {v!r}")
+
+
+def _validate_gap_value_matches_array_dtype(v, array: np.ndarray, name: str):
+    """Validate that `v` is legal to be used with all input array dtypes
+
+    Logic: cast gap value into target dtype. If:
+        1. cast changes the value, we raise
+        2. the cast emits a warning, we raise
+    """
+
+    src = np.array(v)
+
+    # doing the cast here:
+    # Numpy sometimes emits RuntmeWarning when doing a risky cast
+    # and we want to catch that
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+
+        try:
+            dst = src.astype(array.dtype)
+        except RuntimeWarning as _:
+            raise ValueError(
+                f"gap_value={v} cannot be losslessly stored in {name!r}; "
+                f"{src.dtype!r} cannot cast into {array.dtype!r}"
+            )
+
+    if not np.array_equal(src, dst, equal_nan=True):
+        raise ValueError(
+            f"gap_value={v} cannot be losslessly stored in {name!r}; "
+            f"numpy would silently cast it from {src.item()!r} to {dst.item()!r}"
+        )
 
 
 class RegularTimeSeries(ArrayDict):
@@ -425,6 +457,8 @@ class RegularTimeSeries(ArrayDict):
                 _gap_value = gap_value[kind]
             else:
                 _gap_value = gap_value
+
+            _validate_gap_value_matches_array_dtype(_gap_value, array=arr, name=key)
 
             out = np.full((num_timesteps, *arr.shape[1:]), _gap_value, dtype=arr.dtype)
             out[grid_idx] = arr

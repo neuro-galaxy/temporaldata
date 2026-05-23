@@ -522,6 +522,25 @@ class TestFromGappyTimeseries:
 
         _validate_gap_value_dict(_DEFAULT_GAP_VALUE)
 
+    def test_single_gap_value_validation(self):
+        ts = np.array([0.0, 0.1, 0.3])
+
+        with pytest.raises(ValueError, match="cannot be losslessly stored"):
+            RegularTimeSeries.from_gappy_timeseries(
+                ts,
+                sampling_rate=10.0,
+                gap_value=np.nan,
+                raw=np.array([1, 2, 3], dtype=int),
+            )
+
+        with pytest.raises(ValueError, match="cannot be losslessly stored"):
+            RegularTimeSeries.from_gappy_timeseries(
+                ts,
+                sampling_rate=10.0,
+                gap_value=3,
+                raw=np.array([True, False, True]),
+            )
+
     def test_gap_value_dict_validation(self):
         ts = np.array([0.0, 0.1, 0.3])
         raw = np.array([1.0, 2.0, 3.0])
