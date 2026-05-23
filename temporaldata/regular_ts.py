@@ -292,7 +292,9 @@ class RegularTimeSeries(ArrayDict):
         Returns:
             RegularTimeSeries: A regular time series with the same named
             arrays, gaps filled with :obj:`gap_value`.
-
+        
+        Raises:
+            ValueError: If timestamps deviate from the regular grid by more than :obj:`rtol`
         Example ::
 
             >>> import numpy as np
