@@ -940,8 +940,13 @@ class LazyInterval(Interval):
             elif isinstance(value, h5py.Dataset):
                 # mask will be applied lazily on attribute access via _lazy_ops
                 out.__dict__[key] = value
-            else:
+            elif isinstance(value, np.ndarray):
                 out.__dict__[key] = value[mask].copy()
+            else:
+                raise RuntimeError(  # pragma: no cover
+                    "Unknown state! Object has a non-private attribute that is neither "
+                    "a np.ndarray, nor an h5py.Dataset"
+                )
 
         # combine mask with any pre-existing lazy mask
         if "mask" not in out._lazy_ops:
