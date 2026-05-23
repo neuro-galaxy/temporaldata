@@ -14,10 +14,10 @@ _NP_DTYPE_KINDS = {"b", "i", "u", "f", "c", "m", "M", "O", "S", "U", "V"}
 # ^ From https://numpy.org/doc/2.2/reference/generated/numpy.dtype.kind.html
 
 _DEFAULT_GAP_VALUE = {
-    "b": False,
-    "i": -1,
-    "u": 0,
-    "f": np.nan,
+    "b": False,  # boolean
+    "i": -1,  # signed integers
+    "u": 0,  # unsigned integers
+    "f": np.nan,  # floating
 }
 
 
