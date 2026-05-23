@@ -367,6 +367,9 @@ class RegularTimeSeries(ArrayDict):
         if not (np.diff(timestamps) > 0).all():
             raise ValueError("timestamps must be strictly increasing")
 
+        if gap_value is None:
+            gap_value = _DEFAULT_GAP_VALUE
+
         if isinstance(gap_value, dict):
             _validate_gap_value_dict(gap_value)
 
@@ -399,9 +402,6 @@ class RegularTimeSeries(ArrayDict):
             )
 
         num_timesteps = int(grid_idx[-1]) + 1
-
-        if gap_value is None:
-            gap_value = _DEFAULT_GAP_VALUE
 
         filled: dict[str, np.ndarray] = {}
         for key, arr in kwargs.items():
