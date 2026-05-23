@@ -260,7 +260,6 @@ class RegularTimeSeries(ArrayDict):
     @staticmethod
     def from_gappy_timeseries(
         timestamps: np.ndarray,
-        *,
         sampling_rate: float,
         gap_value: int | float = np.nan,
         rtol: float = 1e-3,
