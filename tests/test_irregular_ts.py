@@ -345,7 +345,6 @@ def test_irregular_select_by_mask_preserves_private_attrs():
 def test_lazy_irregular_select_by_mask_preserves_private_attrs(test_filepath):
     # `select_by_mask` on a Lazy object must auto-propagate private attrs set
     # by from_hdf5 (e.g. `_sorted`), not just the hand-listed ones.
-    domain = Interval(start=np.array([0.0]), end=np.array([1.0]))
     data = IrregularTimeSeries(
         unit_index=np.array([0, 0, 1, 0, 1, 2]),
         timestamps=np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6]),
