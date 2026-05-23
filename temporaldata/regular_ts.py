@@ -344,7 +344,7 @@ class RegularTimeSeries(ArrayDict):
 
         num_timesteps = int(grid_idx[-1]) + 1
 
-        gap_is_nan = isinstance(gap_value, float) and math.isnan(gap_value)
+        gap_is_nan = bool(np.isnan(gap_value))
         gap_dtype = np.asarray(gap_value).dtype
         filled: dict[str, np.ndarray] = {}
         for key, arr in kwargs.items():
