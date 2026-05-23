@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## [Unreleased]
 
 ### Added
+- Added `RegularTimeSeries.from_gappy_timeseries()` method to construct a regular time series from approximately-regular but gappy timestamps, snapping samples to a regular grid and filling missing samples with a configurable `gap_value`. ([#122](https://github.com/neuro-galaxy/temporaldata/pull/122))
 
 ### Fixed
 - Fixed `RegularTimeSeries.slice` and `LazyRegularTimeSeries.slice` returning incorrect domain when slicing entirely outside the data domain. With `reset_origin=False`, the returned empty slice now has its domain clamped to the nearest boundary of the original domain (i.e., `[domain.start, domain.start]` when slicing before the data, or `[domain.end, domain.end]` when slicing after). With `reset_origin=True`, the domain is shifted relative to the slice start, yielding `[0, 0]` in both cases.
