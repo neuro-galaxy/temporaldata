@@ -67,7 +67,7 @@ def _validate_gap_value_matches_array_dtype(v, array: np.ndarray, name: str):
         except RuntimeWarning as _:
             raise ValueError(
                 f"gap_value={v} cannot be losslessly stored in {name!r}; "
-                f"{src.dtype!r} cannot cast into {array.dtype!r}"
+                f"cannot cast {src.dtype!r} into {array.dtype!r}"
             )
 
     if not np.array_equal(src, dst, equal_nan=True):
