@@ -640,7 +640,7 @@ class TestSliceGappy:
     def test_slice_inside_gap_is_empty(self):
         rts = self._make().slice(0.022, 0.028, reset_origin=False)
         assert len(rts) == 0
-        assert rts.domain.start[0] == rts.domain.end[-1]
+        assert rts.domain.start[0] == rts.domain.end[-1] == 0.03
 
     def test_slice_reset_origin(self):
         rts = self._make().slice(0.018, 0.05, reset_origin=True)
