@@ -271,8 +271,8 @@ class RegularTimeSeries(ArrayDict):
         end_id -= trailing_trim
 
         if reset_origin:
-            new_domain.start = new_domain.start - out_start
-            new_domain.end = new_domain.end - out_start
+            new_domain.start = new_domain.start - start
+            new_domain.end = new_domain.end - start
 
         out._domain = new_domain
 
@@ -660,8 +660,8 @@ class LazyRegularTimeSeries(RegularTimeSeries):
         end_id -= trailing_trim
 
         if reset_origin:
-            new_domain.start = new_domain.start - out_start
-            new_domain.end = new_domain.end - out_start
+            new_domain.start = new_domain.start - start
+            new_domain.end = new_domain.end - start
 
         out._domain = new_domain
 
