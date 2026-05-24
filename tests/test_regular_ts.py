@@ -660,3 +660,36 @@ class TestSliceGappy:
         rts = self._make().slice(1.0, 2.0, reset_origin=True)
         assert len(rts) == 0
         assert rts.domain.start[0] == rts.domain.end[-1] == 0.0
+
+    def test_lazy_slice_round_trip(self, test_filepath):
+        with h5py.File(test_filepath, "w") as f:
+            self._make().to_hdf5(f)
+
+        # Trim leading gap (window starts inside gap).
+        with h5py.File(test_filepath, "r") as f:
+            rts = LazyRegularTimeSeries.from_hdf5(f).slice(
+                0.018, 0.05, reset_origin=False
+            )
+            np.testing.assert_array_equal(rts.raw, [3.0, 4.0])
+            np.testing.assert_allclose(rts.domain.start, [0.03])
+            np.testing.assert_allclose(rts.domain.end, [0.05])
+
+        # Span the gap; internal nan is preserved.
+        with h5py.File(test_filepath, "r") as f:
+            rts = LazyRegularTimeSeries.from_hdf5(f).slice(
+                0.0, 0.05, reset_origin=False
+            )
+            np.testing.assert_array_equal(
+                np.isnan(rts.raw), [False, False, True, False, False]
+            )
+            np.testing.assert_allclose(rts.domain.start, [0.0, 0.03])
+            np.testing.assert_allclose(rts.domain.end, [0.02, 0.05])
+
+        # Nested slice: outer trims trailing gap, inner trims leading gap.
+        with h5py.File(test_filepath, "r") as f:
+            rts = (
+                LazyRegularTimeSeries.from_hdf5(f)
+                .slice(0.0, 0.05, reset_origin=False)
+                .slice(0.018, 0.05, reset_origin=False)
+            )
+            np.testing.assert_array_equal(rts.raw, [3.0, 4.0])
