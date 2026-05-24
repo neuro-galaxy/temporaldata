@@ -244,8 +244,7 @@ class RegularTimeSeries(ArrayDict):
         end_id, out_end = self._time_to_idx(end, eps=eps)
 
         # Intersect with the (possibly multi-interval) domain
-        window = Interval(start=np.array([out_start]), end=np.array([out_end]))
-        new_domain = self.domain & window
+        new_domain = self.domain & Interval(out_start, out_end)
 
         out = self.__class__.__new__(self.__class__)
         out._sampling_rate = self.sampling_rate
@@ -627,8 +626,7 @@ class LazyRegularTimeSeries(RegularTimeSeries):
         end_id, out_end = self._time_to_idx(end, eps=eps)
 
         # Intersect with the (possibly multi-interval) domain
-        window = Interval(start=np.array([out_start]), end=np.array([out_end]))
-        new_domain = self.domain & window
+        new_domain = self.domain & Interval(out_start, out_end)
 
         out = self.__class__.__new__(self.__class__)
         out._sampling_rate = self.sampling_rate
