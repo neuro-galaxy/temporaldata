@@ -181,9 +181,10 @@ class RegularTimeSeries(ArrayDict):
                   to the selected **index** (i.e. the actual time of the sample).
         """
         domain_start = self.domain.start[0]
-        domain_end = self.domain.end[0]
+        domain_end = self.domain.end[-1]
 
-        # Clamp to domain bounds
+        # Clamp to the overall grid span (first start to last end, ignoring
+        # any internal gaps -- those are handled in slice()).
         if time <= domain_start:
             return 0, domain_start
 
@@ -233,20 +234,43 @@ class RegularTimeSeries(ArrayDict):
         start_id, out_start = self._time_to_idx(start, eps=eps)
         end_id, out_end = self._time_to_idx(end, eps=eps)
 
+        # Intersect with the (possibly multi-interval) domain so gap regions
+        # are excluded from the output.
+        window = Interval(start=np.array([out_start]), end=np.array([out_end]))
+        new_domain = self.domain & window
+
         out = self.__class__.__new__(self.__class__)
         out._sampling_rate = self.sampling_rate
 
-        out._domain = Interval(start=out_start, end=out_end)
+        # No real samples: window fell entirely outside the domain or inside
+        # a gap. Collapse to a zero-width domain matching the legacy
+        # outside-domain convention.
+        is_empty = len(new_domain) == 0 or new_domain.start[0] == new_domain.end[-1]
+        if is_empty:
+            out._domain = (
+                Interval(start=0.0, end=0.0)
+                if reset_origin
+                else Interval(start=out_start, end=out_start)
+            )
+            for key in self.keys():
+                out.__dict__[key] = self.__dict__[key][0:0].copy()
+            return out
+
+        # Trim leading/trailing gap samples so data[0] aligns with
+        # new_domain.start[0] and data[-1] with new_domain.end[-1] - 1/sr.
+        # Internal gaps stay in the array as gap-filled values.
+        leading_trim = int(
+            round((new_domain.start[0] - out_start) * self.sampling_rate)
+        )
+        trailing_trim = int(round((out_end - new_domain.end[-1]) * self.sampling_rate))
+        start_id += leading_trim
+        end_id -= trailing_trim
 
         if reset_origin:
-            outside_domain = end <= self.domain.start[0] or start >= self.domain.end[0]
-            if outside_domain:
-                out._domain.start = out._domain.start - out_start
-                out._domain.end = out._domain.end - out_end
+            new_domain.start = new_domain.start - start
+            new_domain.end = new_domain.end - start
 
-            else:
-                out._domain.start = out._domain.start - start
-                out._domain.end = out._domain.end - start
+        out._domain = new_domain
 
         for key in self.keys():
             out.__dict__[key] = self.__dict__[key][start_id:end_id].copy()
