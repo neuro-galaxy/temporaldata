@@ -183,8 +183,7 @@ class RegularTimeSeries(ArrayDict):
         domain_start = self.domain.start[0]
         domain_end = self.domain.end[-1]
 
-        # Clamp to the overall grid span (first start to last end, ignoring
-        # any internal gaps -- those are handled in slice()).
+        # Clamp to domain bounds
         if time <= domain_start:
             return 0, domain_start
 
@@ -234,8 +233,7 @@ class RegularTimeSeries(ArrayDict):
         start_id, out_start = self._time_to_idx(start, eps=eps)
         end_id, out_end = self._time_to_idx(end, eps=eps)
 
-        # Intersect with the (possibly multi-interval) domain so gap regions
-        # are excluded from the output.
+        # Intersect with the (possibly multi-interval) domain
         window = Interval(start=np.array([out_start]), end=np.array([out_end]))
         new_domain = self.domain & window
 
@@ -608,8 +606,7 @@ class LazyRegularTimeSeries(RegularTimeSeries):
         start_id, out_start = self._time_to_idx(start, eps=eps)
         end_id, out_end = self._time_to_idx(end, eps=eps)
 
-        # Intersect with the (possibly multi-interval) domain so gap regions
-        # are excluded from the output.
+        # Intersect with the (possibly multi-interval) domain
         window = Interval(start=np.array([out_start]), end=np.array([out_end]))
         new_domain = self.domain & window
 
