@@ -43,18 +43,18 @@ def test_regulartimeseries(test_filepath):
         assert np.allclose(data_slice.timestamps, np.arange(0.0, 6.0, 0.1))
 
         # try slicing with skewed start and end
-        # the sampling frequency is 10
+        # the sampling frequency is 10; reset_origin snaps the new origin to out_start
         data_slice = data.slice(2.03, 8.09, reset_origin=True)
         assert np.allclose(data_slice.lfp, data.lfp[21:81])
-        assert np.allclose(data_slice.domain.start, np.array([0.07]))
-        assert np.allclose(data_slice.domain.end, np.array([6.07]))
-        assert np.allclose(data_slice.timestamps, np.arange(0.07, 5.98, 0.1))
+        assert np.allclose(data_slice.domain.start, np.array([0.0]))
+        assert np.allclose(data_slice.domain.end, np.array([6.0]))
+        assert np.allclose(data_slice.timestamps, np.arange(0.0, 6.0, 0.1))
 
         data_slice = data.slice(4.051, 12.0, reset_origin=True)
         assert np.allclose(data_slice.lfp, data.lfp[41:])
-        assert np.allclose(data_slice.domain.start, np.array([0.049]))
-        assert np.allclose(data_slice.domain.end, np.array([5.949]))
-        assert np.allclose(data_slice.timestamps, np.arange(0.049, 5.88, 0.1))
+        assert np.allclose(data_slice.domain.start, np.array([0.0]))
+        assert np.allclose(data_slice.domain.end, np.array([5.9]))
+        assert np.allclose(data_slice.timestamps, np.arange(0.0, 5.9, 0.1))
 
         data_slice = data.slice(4.051, 12.0, reset_origin=False)
         assert np.allclose(data_slice.lfp, data.lfp[41:])
@@ -645,10 +645,11 @@ class TestSliceGappy:
     def test_slice_reset_origin(self):
         rts = self._make().slice(0.018, 0.05, reset_origin=True)
         np.testing.assert_array_equal(rts.raw, [3.0, 4.0])
-        # data[0] (= 3) was at t=0.03; after reset by start=0.018, t=0.012.
-        np.testing.assert_allclose(rts.timestamps, [0.012, 0.022])
-        np.testing.assert_allclose(rts.domain.start, [0.012])
-        np.testing.assert_allclose(rts.domain.end, [0.032])
+        # start=0.018 snaps to out_start=0.02; rebasing by out_start keeps the
+        # domain on the grid. Sample data[0] (= 3) was at t=0.03 → rebased 0.01.
+        np.testing.assert_allclose(rts.timestamps, [0.01, 0.02])
+        np.testing.assert_allclose(rts.domain.start, [0.01])
+        np.testing.assert_allclose(rts.domain.end, [0.03])
 
     def test_slice_spans_full_range_reset_origin(self):
         rts = self._make().slice(0.0, 0.05, reset_origin=True)
