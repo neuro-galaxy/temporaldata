@@ -240,19 +240,30 @@ class RegularTimeSeries(ArrayDict):
             containing a subset of the data. The new object will have a modified
             :obj:`Interval` domain reflecting the actual sampled boundaries.
         """
-        start_id, out_start = self._time_to_idx(start, eps=eps)
-        end_id, out_end = self._time_to_idx(end, eps=eps)
-
-        # Intersect with the (possibly multi-interval) domain
-        window = Interval(start=np.array([out_start]), end=np.array([out_end]))
-        new_domain = self.domain & window
+        out_start_id, out_start = self._time_to_idx(start, eps=eps)
+        out_end_id, _ = self._time_to_idx(end, eps=eps)
 
         out = self.__class__.__new__(self.__class__)
         out._sampling_rate = self.sampling_rate
 
-        # No real samples
-        is_empty = len(new_domain) == 0 or new_domain.start[0] == new_domain.end[-1]
-        if is_empty:
+        sr = self.sampling_rate
+        domain_origin = self.domain.start[0]
+
+        # Cross to idx space: express each domain sub-interval as absolute
+        # integer grid indices, then do intersection/trim/rebase as int math.
+        sub_start_ids = np.round((self.domain.start - domain_origin) * sr).astype(
+            np.int64
+        )
+        sub_end_ids = np.round((self.domain.end - domain_origin) * sr).astype(np.int64)
+
+        # Intersect with [out_start_id, out_end_id) in idx space.
+        clipped_starts = np.maximum(sub_start_ids, out_start_id)
+        clipped_ends = np.minimum(sub_end_ids, out_end_id)
+        keep = clipped_starts < clipped_ends
+        new_sub_starts = clipped_starts[keep]
+        new_sub_ends = clipped_ends[keep]
+
+        if len(new_sub_starts) == 0:
             out._domain = (
                 Interval(start=0.0, end=0.0)
                 if reset_origin
@@ -262,22 +273,24 @@ class RegularTimeSeries(ArrayDict):
                 out.__dict__[key] = self.__dict__[key][0:0].copy()
             return out
 
-        # Trim leading/trailing gap samples, Internal gaps stay in the array as gap-filled values.
-        leading_trim = int(
-            round((new_domain.start[0] - out_start) * self.sampling_rate)
-        )
-        trailing_trim = int(round((out_end - new_domain.end[-1]) * self.sampling_rate))
-        start_id += leading_trim
-        end_id -= trailing_trim
+        trim_start_id = int(new_sub_starts[0])
+        trim_end_id = int(new_sub_ends[-1])
 
+        # Convert back to time only when building the result domain.
         if reset_origin:
-            new_domain.start = new_domain.start - out_start
-            new_domain.end = new_domain.end - out_start
-
+            new_domain = Interval(
+                start=(new_sub_starts - out_start_id) / sr,
+                end=(new_sub_ends - out_start_id) / sr,
+            )
+        else:
+            new_domain = Interval(
+                start=new_sub_starts / sr + domain_origin,
+                end=new_sub_ends / sr + domain_origin,
+            )
         out._domain = new_domain
 
         for key in self.keys():
-            out.__dict__[key] = self.__dict__[key][start_id:end_id].copy()
+            out.__dict__[key] = self.__dict__[key][trim_start_id:trim_end_id].copy()
 
         return out
 
@@ -623,12 +636,8 @@ class LazyRegularTimeSeries(RegularTimeSeries):
             containing a subset of the data. The new object will have a modified
             :obj:`Interval` domain reflecting the actual sampled boundaries.
         """
-        start_id, out_start = self._time_to_idx(start, eps=eps)
-        end_id, out_end = self._time_to_idx(end, eps=eps)
-
-        # Intersect with the (possibly multi-interval) domain
-        window = Interval(start=np.array([out_start]), end=np.array([out_end]))
-        new_domain = self.domain & window
+        out_start_id, out_start = self._time_to_idx(start, eps=eps)
+        out_end_id, _ = self._time_to_idx(end, eps=eps)
 
         out = self.__class__.__new__(self.__class__)
         out._sampling_rate = self.sampling_rate
@@ -636,8 +645,23 @@ class LazyRegularTimeSeries(RegularTimeSeries):
 
         parent_offset = self._lazy_ops["slice"][0] if "slice" in self._lazy_ops else 0
 
-        is_empty = len(new_domain) == 0 or new_domain.start[0] == new_domain.end[-1]
-        if is_empty:
+        sr = self.sampling_rate
+        domain_origin = self.domain.start[0]
+
+        # Cross to idx space: express each domain sub-interval as absolute
+        # integer grid indices, then do intersection/trim/rebase as int math.
+        sub_start_ids = np.round((self.domain.start - domain_origin) * sr).astype(
+            np.int64
+        )
+        sub_end_ids = np.round((self.domain.end - domain_origin) * sr).astype(np.int64)
+
+        clipped_starts = np.maximum(sub_start_ids, out_start_id)
+        clipped_ends = np.minimum(sub_end_ids, out_end_id)
+        keep = clipped_starts < clipped_ends
+        new_sub_starts = clipped_starts[keep]
+        new_sub_ends = clipped_ends[keep]
+
+        if len(new_sub_starts) == 0:
             out._domain = (
                 Interval(start=0.0, end=0.0)
                 if reset_origin
@@ -651,29 +675,31 @@ class LazyRegularTimeSeries(RegularTimeSeries):
             out._lazy_ops["slice"] = (parent_offset, parent_offset)
             return out
 
-        # Trim leading/trailing gap samples
-        leading_trim = int(
-            round((new_domain.start[0] - out_start) * self.sampling_rate)
-        )
-        trailing_trim = int(round((out_end - new_domain.end[-1]) * self.sampling_rate))
-        start_id += leading_trim
-        end_id -= trailing_trim
+        trim_start_id = int(new_sub_starts[0])
+        trim_end_id = int(new_sub_ends[-1])
 
+        # Convert back to time only when building the result domain.
         if reset_origin:
-            new_domain.start = new_domain.start - out_start
-            new_domain.end = new_domain.end - out_start
-
+            new_domain = Interval(
+                start=(new_sub_starts - out_start_id) / sr,
+                end=(new_sub_ends - out_start_id) / sr,
+            )
+        else:
+            new_domain = Interval(
+                start=new_sub_starts / sr + domain_origin,
+                end=new_sub_ends / sr + domain_origin,
+            )
         out._domain = new_domain
 
         for key in self.keys():
             if isinstance(self.__dict__[key], h5py.Dataset):
                 out.__dict__[key] = self.__dict__[key]
             else:
-                out.__dict__[key] = self.__dict__[key][start_id:end_id].copy()
+                out.__dict__[key] = self.__dict__[key][trim_start_id:trim_end_id].copy()
 
         out._lazy_ops["slice"] = (
-            parent_offset + start_id,
-            parent_offset + end_id,
+            parent_offset + trim_start_id,
+            parent_offset + trim_end_id,
         )
 
         return out
