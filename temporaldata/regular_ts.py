@@ -242,9 +242,7 @@ class RegularTimeSeries(ArrayDict):
         out = self.__class__.__new__(self.__class__)
         out._sampling_rate = self.sampling_rate
 
-        # No real samples: window fell entirely outside the domain or inside
-        # a gap. Collapse to a zero-width domain matching the legacy
-        # outside-domain convention.
+        # No real samples
         is_empty = len(new_domain) == 0 or new_domain.start[0] == new_domain.end[-1]
         if is_empty:
             out._domain = (
@@ -256,9 +254,7 @@ class RegularTimeSeries(ArrayDict):
                 out.__dict__[key] = self.__dict__[key][0:0].copy()
             return out
 
-        # Trim leading/trailing gap samples so data[0] aligns with
-        # new_domain.start[0] and data[-1] with new_domain.end[-1] - 1/sr.
-        # Internal gaps stay in the array as gap-filled values.
+        # Trim leading/trailing gap samples, Internal gaps stay in the array as gap-filled values.
         leading_trim = int(
             round((new_domain.start[0] - out_start) * self.sampling_rate)
         )
@@ -472,8 +468,7 @@ class RegularTimeSeries(ArrayDict):
 
         num_timesteps = int(grid_idx[-1]) + 1
 
-        # Build a multi-interval domain that excludes gaps: each maximal run
-        # of contiguous grid indices becomes one (start, end) row.
+        # Build a multi-interval domain that excludes gaps
         gap_after = idx_diffs > 1
         is_run_start = np.concatenate([[True], gap_after])
         is_run_end = np.concatenate([gap_after, [True]])
@@ -639,8 +634,7 @@ class LazyRegularTimeSeries(RegularTimeSeries):
             out._lazy_ops["slice"] = (parent_offset, parent_offset)
             return out
 
-        # Trim leading/trailing gap samples so data[0] aligns with
-        # new_domain.start[0] and data[-1] with new_domain.end[-1] - 1/sr.
+        # Trim leading/trailing gap samples
         leading_trim = int(
             round((new_domain.start[0] - out_start) * self.sampling_rate)
         )
