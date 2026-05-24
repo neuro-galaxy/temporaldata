@@ -613,19 +613,46 @@ class LazyRegularTimeSeries(RegularTimeSeries):
         start_id, out_start = self._time_to_idx(start, eps=eps)
         end_id, out_end = self._time_to_idx(end, eps=eps)
 
+        # Intersect with the (possibly multi-interval) domain so gap regions
+        # are excluded from the output.
+        window = Interval(start=np.array([out_start]), end=np.array([out_end]))
+        new_domain = self.domain & window
+
         out = self.__class__.__new__(self.__class__)
         out._sampling_rate = self.sampling_rate
+        out._lazy_ops = {}
 
-        out._domain = Interval(start=out_start, end=out_end)
+        parent_offset = self._lazy_ops["slice"][0] if "slice" in self._lazy_ops else 0
+
+        is_empty = len(new_domain) == 0 or new_domain.start[0] == new_domain.end[-1]
+        if is_empty:
+            out._domain = (
+                Interval(start=0.0, end=0.0)
+                if reset_origin
+                else Interval(start=out_start, end=out_start)
+            )
+            for key in self.keys():
+                if isinstance(self.__dict__[key], h5py.Dataset):
+                    out.__dict__[key] = self.__dict__[key]
+                else:
+                    out.__dict__[key] = self.__dict__[key][0:0].copy()
+            out._lazy_ops["slice"] = (parent_offset, parent_offset)
+            return out
+
+        # Trim leading/trailing gap samples so data[0] aligns with
+        # new_domain.start[0] and data[-1] with new_domain.end[-1] - 1/sr.
+        leading_trim = int(
+            round((new_domain.start[0] - out_start) * self.sampling_rate)
+        )
+        trailing_trim = int(round((out_end - new_domain.end[-1]) * self.sampling_rate))
+        start_id += leading_trim
+        end_id -= trailing_trim
 
         if reset_origin:
-            outside_domain = end <= self.domain.start[0] or start >= self.domain.end[0]
-            if outside_domain:
-                out._domain.start = out._domain.start - out_start
-                out._domain.end = out._domain.end - out_end
-            else:
-                out._domain.start = out._domain.start - start
-                out._domain.end = out._domain.end - start
+            new_domain.start = new_domain.start - start
+            new_domain.end = new_domain.end - start
+
+        out._domain = new_domain
 
         for key in self.keys():
             if isinstance(self.__dict__[key], h5py.Dataset):
@@ -633,15 +660,10 @@ class LazyRegularTimeSeries(RegularTimeSeries):
             else:
                 out.__dict__[key] = self.__dict__[key][start_id:end_id].copy()
 
-        out._lazy_ops = {}
-
-        if "slice" not in self._lazy_ops:
-            out._lazy_ops["slice"] = (start_id, end_id)
-        else:
-            out._lazy_ops["slice"] = (
-                self._lazy_ops["slice"][0] + start_id,
-                self._lazy_ops["slice"][0] + end_id,
-            )
+        out._lazy_ops["slice"] = (
+            parent_offset + start_id,
+            parent_offset + end_id,
+        )
 
         return out
 
