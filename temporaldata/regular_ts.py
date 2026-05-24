@@ -224,8 +224,7 @@ class RegularTimeSeries(ArrayDict):
         - sub-intervals straddling the boundary are clipped to it,
         - leading/trailing samples that fall in a gap are trimmed from the
           raw array,
-        - internal gap-filled samples are preserved, so the array stays
-          contiguous and :obj:`timestamps` keeps its arithmetic-progression form.
+        - internal gap-filled samples are preserved
 
         Args:
             start: Start time.
@@ -609,8 +608,7 @@ class LazyRegularTimeSeries(RegularTimeSeries):
         - sub-intervals straddling the boundary are clipped to it,
         - leading/trailing samples that fall in a gap are trimmed from the
           raw array,
-        - internal gap-filled samples are preserved, so the array stays
-          contiguous and :obj:`timestamps` keeps its arithmetic-progression form.
+        - internal gap-filled samples are preserved
 
         Args:
             start: Start time.
