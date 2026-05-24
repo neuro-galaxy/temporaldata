@@ -599,3 +599,64 @@ class TestFromGappyTimeseries:
                 sampling_rate=10.0,
                 raw=np.array([1.0, 2.0, 3.0]),
             )
+
+
+class TestSliceGappy:
+    """Slicing must trim leading/trailing gap samples and preserve internal ones.
+
+    Fixture: 5 grid samples at 100Hz, idx 2 (time 0.02) missing.
+        data:   [1, 2, nan, 3, 4]
+        domain: [0.0, 0.02) U [0.03, 0.05)
+    """
+
+    def _make(self):
+        ts = np.array([0.0, 0.01, 0.03, 0.04])
+        raw = np.array([1.0, 2.0, 3.0, 4.0])
+        return RegularTimeSeries.from_gappy_timeseries(ts, sampling_rate=100.0, raw=raw)
+
+    def test_slice_trims_leading_gap(self):
+        # Window starts inside the gap, so data[0] would otherwise be nan.
+        rts = self._make().slice(0.018, 0.05, reset_origin=False)
+        np.testing.assert_array_equal(rts.raw, [3.0, 4.0])
+        np.testing.assert_allclose(rts.domain.start, [0.03])
+        np.testing.assert_allclose(rts.domain.end, [0.05])
+
+    def test_slice_trims_trailing_gap(self):
+        # Window ends inside the gap, so data[-1] would otherwise be nan.
+        rts = self._make().slice(0.0, 0.03, reset_origin=False)
+        np.testing.assert_array_equal(rts.raw, [1.0, 2.0])
+        np.testing.assert_allclose(rts.domain.start, [0.0])
+        np.testing.assert_allclose(rts.domain.end, [0.02])
+
+    def test_slice_preserves_internal_gap(self):
+        # Window spans the gap; the interior nan must be kept.
+        rts = self._make().slice(0.0, 0.05, reset_origin=False)
+        np.testing.assert_array_equal(
+            np.isnan(rts.raw), [False, False, True, False, False]
+        )
+        np.testing.assert_allclose(rts.domain.start, [0.0, 0.03])
+        np.testing.assert_allclose(rts.domain.end, [0.02, 0.05])
+
+    def test_slice_inside_gap_is_empty(self):
+        rts = self._make().slice(0.022, 0.028, reset_origin=False)
+        assert len(rts) == 0
+        assert rts.domain.start[0] == rts.domain.end[-1]
+
+    def test_slice_reset_origin(self):
+        rts = self._make().slice(0.018, 0.05, reset_origin=True)
+        np.testing.assert_array_equal(rts.raw, [3.0, 4.0])
+        # data[0] (= 3) was at t=0.03; after reset by start=0.018, t=0.012.
+        np.testing.assert_allclose(rts.timestamps, [0.012, 0.022])
+        np.testing.assert_allclose(rts.domain.start, [0.012])
+        np.testing.assert_allclose(rts.domain.end, [0.032])
+
+    def test_slice_spans_full_range_reset_origin(self):
+        rts = self._make().slice(0.0, 0.05, reset_origin=True)
+        np.testing.assert_allclose(rts.domain.start, [0.0, 0.03])
+        np.testing.assert_allclose(rts.domain.end, [0.02, 0.05])
+        np.testing.assert_allclose(rts.timestamps, [0.0, 0.01, 0.02, 0.03, 0.04])
+
+    def test_slice_outside_domain(self):
+        rts = self._make().slice(1.0, 2.0, reset_origin=True)
+        assert len(rts) == 0
+        assert rts.domain.start[0] == rts.domain.end[-1] == 0.0
