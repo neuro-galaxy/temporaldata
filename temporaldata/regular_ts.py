@@ -216,6 +216,17 @@ class RegularTimeSeries(ArrayDict):
         r"""Returns a new :obj:`RegularTimeSeries` object that contains the data between
         the start (inclusive) and end (exclusive) times (i.e., [start, end)]).
 
+        :obj:`start` and :obj:`end` are snapped up to the next grid point (the next
+        multiple of ``1/sampling_rate``). The returned domain is the intersection
+        of the current domain with the snapped window:
+
+        - sub-intervals fully outside the window are dropped,
+        - sub-intervals straddling the boundary are clipped to it,
+        - leading/trailing samples that fall in a gap are trimmed from the
+          raw array,
+        - internal gap-filled samples are preserved, so the array stays
+          contiguous and :obj:`timestamps` keeps its arithmetic-progression form.
+
         Args:
             start: Start time.
             end: End time.
@@ -588,7 +599,18 @@ class LazyRegularTimeSeries(RegularTimeSeries):
         eps: float = 1e-9,
     ):
         r"""Returns a new :obj:`RegularTimeSeries` object that contains the data between
-        the start and end times.
+        the start (inclusive) and end (exclusive) times (i.e., [start, end)]).
+
+        :obj:`start` and :obj:`end` are snapped up to the next grid point (the next
+        multiple of ``1/sampling_rate``). The returned domain is the intersection
+        of the current domain with the snapped window:
+
+        - sub-intervals fully outside the window are dropped,
+        - sub-intervals straddling the boundary are clipped to it,
+        - leading/trailing samples that fall in a gap are trimmed from the
+          raw array,
+        - internal gap-filled samples are preserved, so the array stays
+          contiguous and :obj:`timestamps` keeps its arithmetic-progression form.
 
         Args:
             start: Start time.
