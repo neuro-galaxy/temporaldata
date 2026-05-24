@@ -393,6 +393,10 @@ class RegularTimeSeries(ArrayDict):
             ... )
             >>> rts.raw
             array([ 1.,  2., nan,  3.,  4.])
+            >>> rts.domain.start
+            array([0.  , 0.03])
+            >>> rts.domain.end
+            array([0.02, 0.05])
         """
         if not isinstance(timestamps, np.ndarray):
             raise ValueError(
@@ -427,7 +431,8 @@ class RegularTimeSeries(ArrayDict):
                 f"is inherently irregular."
             )
 
-        min_idx_gap = int(np.min(np.diff(grid_idx)))
+        idx_diffs = np.diff(grid_idx)
+        min_idx_gap = int(idx_diffs.min())
         if min_idx_gap < 1:
             raise ValueError(
                 f"timestamps contain duplicate or sub-sample-spaced entries "
@@ -442,6 +447,16 @@ class RegularTimeSeries(ArrayDict):
             )
 
         num_timesteps = int(grid_idx[-1]) + 1
+
+        # Build a multi-interval domain that excludes gaps: each maximal run
+        # of contiguous grid indices becomes one (start, end) row.
+        gap_after = idx_diffs > 1
+        is_run_start = np.concatenate([[True], gap_after])
+        is_run_end = np.concatenate([gap_after, [True]])
+        domain = Interval(
+            start=start_time + grid_idx[is_run_start] / sampling_rate,
+            end=start_time + (grid_idx[is_run_end] + 1) / sampling_rate,
+        )
 
         filled: dict[str, np.ndarray] = {}
         for key, arr in kwargs.items():
@@ -474,8 +489,7 @@ class RegularTimeSeries(ArrayDict):
 
         return cls(
             sampling_rate=sampling_rate,
-            domain="auto",
-            domain_start=start_time,
+            domain=domain,
             **filled,
         )
 
