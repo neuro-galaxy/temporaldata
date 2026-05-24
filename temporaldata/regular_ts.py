@@ -217,14 +217,14 @@ class RegularTimeSeries(ArrayDict):
         the start (inclusive) and end (exclusive) times (i.e., [start, end)]).
 
         :obj:`start` and :obj:`end` are snapped up to the next grid point (the next
-        multiple of ``1/sampling_rate``). The returned domain is the intersection
-        of the current domain with the snapped window:
+        multiple of ``1/sampling_rate``).
 
-        - sub-intervals fully outside the window are dropped,
-        - sub-intervals straddling the boundary are clipped to it,
-        - leading/trailing samples that fall in a gap are trimmed from the
-          raw array,
-        - internal gap-filled samples are preserved
+        - Gap-filled samples at the start or end of the result are trimmed, so
+          returned data always begins and ends on real samples.
+        - Gaps in the middle of the window are preserved as-is and remain filled
+          with the gap value.
+        - Slices that fall fully outside the domain or entirely within a gap
+          return empty data.
 
         Args:
             start: Start time.
@@ -601,14 +601,14 @@ class LazyRegularTimeSeries(RegularTimeSeries):
         the start (inclusive) and end (exclusive) times (i.e., [start, end)]).
 
         :obj:`start` and :obj:`end` are snapped up to the next grid point (the next
-        multiple of ``1/sampling_rate``). The returned domain is the intersection
-        of the current domain with the snapped window:
+        multiple of ``1/sampling_rate``).
 
-        - sub-intervals fully outside the window are dropped,
-        - sub-intervals straddling the boundary are clipped to it,
-        - leading/trailing samples that fall in a gap are trimmed from the
-          raw array,
-        - internal gap-filled samples are preserved
+        - Gap-filled samples at the start or end of the result are trimmed, so
+          returned data always begins and ends on real samples.
+        - Gaps in the middle of the window are preserved as-is and remain filled
+          with the gap value.
+        - Slices that fall fully outside the domain or entirely within a gap
+          return empty data.
 
         Args:
             start: Start time.
