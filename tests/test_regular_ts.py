@@ -855,8 +855,10 @@ class TestToIrregular:
     def test_gappy(self, gappy_rts):
         irts = gappy_rts.to_irregular()
         mask = gappy_rts.index_mask()
-        np.testing.assert_array_equal(irts.timestamps, gappy_rts.timestamps[mask])
-        np.testing.assert_array_equal(irts.raw, gappy_rts.raw[mask])
+        np.testing.assert_array_equal(
+            irts.timestamps, [0.0, 0.01, 0.03, 0.04, 0.07, 0.09]
+        )
+        np.testing.assert_array_equal(irts.raw, [0, 1, 2, 3, 4, 5])
         # ensure things are copies and not views
         assert not np.shares_memory(irts.timestamps, gappy_rts.timestamps)
         assert not np.shares_memory(irts.raw, gappy_rts.raw)
