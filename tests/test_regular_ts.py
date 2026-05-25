@@ -770,6 +770,14 @@ class TestIndexMask:
         expected = [True, True]
         np.testing.assert_array_equal(mask, expected)
 
+    def test_empty_slice(self, rts):
+        sliced = rts.slice(4.0, 4.1)
+        assert len(sliced) == 0
+        mask = sliced.index_mask()
+        assert mask.dtype == bool
+        expected = []
+        np.testing.assert_array_equal(mask, expected)
+
     @pytest.fixture(params=["regular", "lazy"])
     def gappy_rts(self, request, test_filepath):
         ts = np.array([0.0, 0.01, 0.03, 0.04, 0.07, 0.09])
@@ -805,3 +813,11 @@ class TestIndexMask:
         assert len(sliced) == 2
         mask = sliced.index_mask()
         np.testing.assert_array_equal(mask, [True, True])
+
+    def test_gappy_empty_slice(self, gappy_rts):
+        sliced = gappy_rts.slice(0.02, 0.03)
+        assert len(sliced) == 0
+        mask = sliced.index_mask()
+        assert mask.dtype == bool
+        expected = []
+        np.testing.assert_array_equal(mask, expected)
