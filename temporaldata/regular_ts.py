@@ -144,7 +144,7 @@ class RegularTimeSeries(ArrayDict):
 
     @property
     def sampling_rate(self) -> float:
-        """Sampling rate in Hz"""
+        r"""Sampling rate in Hz"""
         return self._sampling_rate
 
     @property
@@ -161,35 +161,74 @@ class RegularTimeSeries(ArrayDict):
         return self._domain
 
     def index_mask(self) -> np.ndarray:
-        r"""Returns a boolean mask indicating valid entries in this time series.
+        r"""Boolean mask marking which samples fall inside :attr:`domain`.
 
-        True indicates that the entry is valid
+        For a gappy :obj:`RegularTimeSeries` (one whose :attr:`domain` consists
+        of more than one interval), some positions along the time axis are
+        fill values rather than real observations. This method returns a
+        1-D boolean array of length ``len(self)`` where ``True`` marks a real
+        sample and ``False`` marks a gap (fill).
+
+        For a contiguous :obj:`RegularTimeSeries` (single-interval domain) the
+        result is all ``True``.
+
+        Returns:
+            np.ndarray: 1-D boolean array of shape ``(len(self),)``.
+
+        Example ::
+
+            >>> import numpy as np
+            >>> from temporaldata import RegularTimeSeries
+
+            >>> # Contiguous (non-gappy) series: every sample is real.
+            >>> rts = RegularTimeSeries(
+            ...     raw=np.arange(4), sampling_rate=100.0,
+            ... )
+            >>> rts.index_mask()
+            array([ True,  True,  True,  True])
+
+            >>> # Gappy series: 0.02s and 0.05s samples are missing.
+            >>> ts = [0.0, 0.01, 0.03, 0.04, 0.06]
+            >>> raw = [1, 2, 3, 4, 5]
+            >>> rts = RegularTimeSeries.from_gappy_timeseries(
+            ...     ts, sampling_rate=100.0, raw=raw,
+            ... )
+            >>> rts.index_mask()
+            array([ True,  True, False,  True,  True, False,  True])
+            >>> rts.raw  # contains fill values
+            array([ 1,  2, -1,  3,  4, -1,  5])
+            >>> rts.raw[rts.index_mask()]
+            array([1, 2, 3, 4, 5])
         """
         n = len(self)
+        domain = self.domain
 
-        if len(self.domain) == 1:
+        if len(domain) == 1:
             return np.full(n, True, dtype=bool)
 
-        starts, ends = self._domain.start, self._domain.end
+        sampling_rate = self.sampling_rate
+        start_ts, end_ts = domain.start, domain.end
+        start_id = np.round((start_ts - start_ts[0]) * sampling_rate).astype(int)
+        end_id = np.round((end_ts - start_ts[0]) * sampling_rate).astype(int)
 
-        start_idx = np.round((starts - starts[0]) * self.sampling_rate).astype(int)
-        end_idx = np.round((ends - starts[0]) * self.sampling_rate).astype(int)
-
-        if end_idx[-1] != n:
-            raise RuntimeError(
-                f"This is should never happen. Debug info:\n"
+        if end_id[-1] != n:
+            raise RuntimeError(  # pragma: no cover
+                f"This should never happen. Debug info:\n"
                 f"{n=}\n"
-                f"{start_idx=}\n"
-                f"{end_idx=}\n"
+                f"{start_id=}\n"
+                f"{end_id=}\n"
             )
 
+        # Create an array that marks start of a True run by +1
+        # and start of a False run by -1
         diff = np.zeros(n + 1, dtype=np.int8)
-        diff[start_idx] = 1
-        diff[end_idx] = -1
-        return diff.cumsum()[:n].astype(bool)
-        ans = np.full(n, False, dtype=bool)
-        for s, e in zip(start_idx, end_idx):
-            ans[s:e] = True
+        diff[start_id] = 1
+        diff[end_id] = -1
+        # Cumsum would convert it to runs of ones and zeros corresponding
+        # to valid and invalid timestamps
+        ans = diff.cumsum()[:n].astype(bool)
+        # Why this way? to avoid python for-loops; numpy vector ops should be faster
+
         return ans
 
     def select_by_mask(self, mask: np.ndarray):
