@@ -375,6 +375,33 @@ class RegularTimeSeries(ArrayDict):
 
         Returns:
             :obj:`IrregularTimeSeries` with timestamps and all attributes copied.
+
+        Example ::
+
+            >>> import numpy as np
+            >>> from temporaldata import RegularTimeSeries
+
+            >>> # Contiguous (non-gappy) series: every sample is kept.
+            >>> rts = RegularTimeSeries(raw=np.arange(4), sampling_rate=10.0)
+            >>> irts = rts.to_irregular()
+            >>> irts.timestamps
+            array([0. , 0.1, 0.2, 0.3])
+            >>> irts.raw
+            array([0, 1, 2, 3])
+
+            >>> # Gappy series: gap-fill samples are dropped.
+            >>> ts = [0.0, 0.01, 0.03, 0.04, 0.06]
+            >>> raw = [1, 2, 3, 4, 5]
+            >>> rts = RegularTimeSeries.from_gappy_timeseries(
+            ...     ts, sampling_rate=100.0, raw=raw,
+            ... )
+            >>> rts.raw  # contains fill values
+            array([ 1,  2, -1,  3,  4, -1,  5])
+            >>> irts = rts.to_irregular()
+            >>> irts.timestamps
+            array([0.  , 0.01, 0.03, 0.04, 0.06])
+            >>> irts.raw
+            array([1, 2, 3, 4, 5])
         """
         mask = self.index_mask()
 
