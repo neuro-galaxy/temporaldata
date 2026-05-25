@@ -157,7 +157,7 @@ class RegularTimeSeries(ArrayDict):
 
     @property
     def domain(self) -> Interval:
-        r"""Domain of the time series as an :obj:`Interval`"""
+        r"""Domain of this time series"""
         return self._domain
 
     def index_mask(self) -> np.ndarray:
