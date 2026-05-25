@@ -530,6 +530,11 @@ class RegularTimeSeries(ArrayDict):
 
         Raises:
             ValueError: If timestamps deviate from the regular grid by more than :obj:`rtol`
+
+        See Also:
+            * :meth:`is_gappy` to check whether a series has gaps.
+            * :meth:`index_mask` for a boolean mask of real vs. gap-fill samples.
+
         Example ::
 
             >>> import numpy as np

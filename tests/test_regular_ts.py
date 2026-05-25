@@ -862,3 +862,12 @@ class TestToIrregular:
         # ensure things are copies and not views
         assert not np.shares_memory(irts.timestamps, gappy_rts.timestamps)
         assert not np.shares_memory(irts.raw, gappy_rts.raw)
+
+    def test_empty(self, test_filepath):
+        empty_rts = RegularTimeSeries(sampling_rate=10, raw=[])
+        irts = empty_rts.to_irregular()
+        assert len(irts) == 0
+
+        with _make_lazy(empty_rts, RegularTimeSeries, test_filepath) as rts:
+            irts = rts.to_irregular()
+            assert len(irts) == 0
