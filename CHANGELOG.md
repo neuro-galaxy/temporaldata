@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 - `ArrayDict`, `Interval`, `IrregularTimeSeries`, and `RegularTimeSeries` constructors now accept any array-like input (`list`, `tuple`, or any object implementing `__array__` such as `torch.Tensor` or `pandas.Series`) in addition to `np.ndarray`. Inputs are automatically coerced to `np.ndarray` via `np.asarray()`. Parameter types are annotated with a custom `ArrayLike` type alias. ([#123](https://github.com/neuro-galaxy/temporaldata/pull/123))
+- `RegularTimeSeries.from_gappy_timeseries()` now also accepts `ArrayLike` inputs for `timestamps` and value kwargs, coercing them via `np.asarray()`. ([#132](https://github.com/neuro-galaxy/temporaldata/pull/132))
 - Added `RegularTimeSeries.from_gappy_timeseries()` method to construct a regular time series from approximately-regular but gappy timestamps, snapping samples to a regular grid and filling missing samples with a configurable `gap_value`. ([#122](https://github.com/neuro-galaxy/temporaldata/pull/122))
 - Gap-aware slicing for `RegularTimeSeries` and `LazyRegularTimeSeries`. ([#129](https://github.com/neuro-galaxy/temporaldata/pull/129))
   - `from_gappy_timeseries` now builds a multi-interval domain that excludes gaps (previously a single contiguous interval spanning the full grid).
