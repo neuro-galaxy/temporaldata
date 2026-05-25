@@ -3,7 +3,6 @@ from __future__ import annotations
 import math
 from typing import Literal, Any
 import warnings
-import copy
 
 import h5py
 import numpy as np
@@ -370,14 +369,12 @@ class RegularTimeSeries(ArrayDict):
         return out
 
     def to_irregular(self):
-        r"""Converts the time series to an :obj:`IrregularTimeSeries` object.
+        r"""Converts the :obj:`RegularTimeSeries` object to an :obj:`IrregularTimeSeries` object.
 
-        Resulting object will not include gap-fill timestamps
-        (as indicated by :meth:`index_mask`).
+        Gap-fill samples (where :meth:`index_mask` is :obj:`False`) are dropped.
 
         Returns:
-            :obj:`IrregularTimeSeries` with timestamps and all the attributes
-            copied.
+            :obj:`IrregularTimeSeries` with timestamps and all attributes copied.
         """
         mask = self.index_mask()
 
