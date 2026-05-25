@@ -497,6 +497,8 @@ class RegularTimeSeries(ArrayDict):
             array([0.  , 0.03])
             >>> rts.domain.end
             array([0.02, 0.05])
+            >>> rts.index_mask()  # indicates valid and filled-in timestamps
+            array([ True,  True, False,  True,  True])
         """
         timestamps = np.asarray(timestamps)
         if timestamps.ndim != 1:
