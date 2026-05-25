@@ -84,7 +84,12 @@ class RegularTimeSeries(ArrayDict):
     and meaningful Fourier operations. The first dimension of all attributes must be
     the time dimension.
 
-    .. note:: If you have a matrix of shape (N, T), where N is the number of channels and T is the number of time points, you should transpose it to (T, N) before passing it to the constructor, since the first dimension should always be time.
+    .. note::
+
+        If you have a matrix of shape :math:`(N, T)`, where :math:`N` is the number of
+        channels and :math:`T` is the number of time points, you should transpose it to
+        :math:`(T, N)` before passing it to the constructor, since the first dimension
+        should always be time.
 
     Args:
         sampling_rate: Sampling rate in Hz.
@@ -93,6 +98,9 @@ class RegularTimeSeries(ArrayDict):
         **kwargs: Arbitrary keyword arguments where the values are arbitrary
             multi-dimensional (2d, 3d, ..., nd) arrays with shape (N, \*).
 
+    See Also:
+        :meth:`from_gappy_timeseries` to construct from regular timeseries that has
+        gaps or missing values.
 
     Example ::
 
