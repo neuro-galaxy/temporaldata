@@ -403,8 +403,15 @@ class RegularTimeSeries(ArrayDict):
             >>> irts.raw
             array([1, 2, 3, 4, 5])
         """
-        mask = self.index_mask()
+        if not self.is_gappy():
+            # Every sample is real, skip the mask.
+            return IrregularTimeSeries(
+                timestamps=self.timestamps,
+                **{k: getattr(self, k).copy() for k in self.keys()},
+                domain=self.domain,
+            )
 
+        mask = self.index_mask()
         return IrregularTimeSeries(
             timestamps=self.timestamps[mask],
             **{k: getattr(self, k)[mask] for k in self.keys()},
@@ -630,6 +637,37 @@ class RegularTimeSeries(ArrayDict):
             domain=domain,
             **filled,
         )
+
+    def is_gappy(self) -> bool:
+        r"""Returns :obj:`True` if this :obj:`RegularTimeSeries` has gaps.
+
+        A series is *gappy* when its :attr:`domain` is made up of more than one
+        interval; positions inside the gaps are filled with the configured
+        gap value (see :meth:`from_gappy_timeseries`). A contiguous series
+        (single-interval domain) returns :obj:`False`.
+
+        Returns:
+            bool: :obj:`True` if the domain has more than one interval.
+
+        See Also:
+            :meth:`index_mask` for a boolean mask of real vs. gap-fill samples.
+
+        Example ::
+
+            >>> import numpy as np
+            >>> from temporaldata import RegularTimeSeries
+
+            >>> rts = RegularTimeSeries(raw=np.arange(4), sampling_rate=100.0)
+            >>> rts.is_gappy()
+            False
+
+            >>> rts = RegularTimeSeries.from_gappy_timeseries(
+            ...     [0.0, 0.01, 0.03], sampling_rate=100.0, raw=[1, 2, 3],
+            ... )
+            >>> rts.is_gappy()
+            True
+        """
+        return len(self.domain) > 1
 
 
 class LazyRegularTimeSeries(RegularTimeSeries):
