@@ -248,15 +248,6 @@ def test_lazy_regular_timeseries(test_filepath):
         assert np.allclose(data.timestamps, np.arange(1.0, 3.0, 1 / 250.0))
 
 
-def test_regular_to_irregular_timeseries():
-    a = RegularTimeSeries(
-        lfp=np.random.random((100, 48)), sampling_rate=10, domain="auto"
-    )
-    b = a.to_irregular()
-    assert np.allclose(b.timestamps, np.arange(0, 10, 0.1))
-    assert np.allclose(b.lfp, a.lfp)
-
-
 def test_slice_numerical_instability():
     ts = RegularTimeSeries(value=np.zeros((40)), sampling_rate=4, domain="auto")
     # Expected timestamps: [0.0, 0.25, 0.5, 0.75, 1.0, 1.25, ...]
@@ -821,3 +812,51 @@ class TestIndexMask:
         assert mask.dtype == bool
         expected = []
         np.testing.assert_array_equal(mask, expected)
+
+
+class TestToIrregular:
+
+    @pytest.fixture(params=["regular", "lazy"])
+    def rts(self, request, test_filepath):
+        rts = RegularTimeSeries(
+            raw=[0, 1, 2, 3],
+            sampling_rate=10,
+            domain="auto",
+        )
+        if request.param == "regular":
+            yield rts
+        else:
+            with _make_lazy(rts, LazyRegularTimeSeries, test_filepath) as data:
+                yield data
+
+    def test_basic(self, rts):
+        irts = rts.to_irregular()
+        np.testing.assert_array_equal(irts.timestamps, [0.0, 0.1, 0.2, 0.3])
+        np.testing.assert_array_equal(irts.raw, rts.raw)
+        # ensure things are copies and not views
+        assert not np.shares_memory(irts.timestamps, rts.timestamps)
+        assert not np.shares_memory(irts.raw, rts.raw)
+
+    @pytest.fixture(params=["regular", "lazy"])
+    def gappy_rts(self, request, test_filepath):
+        ts = np.array([0.0, 0.01, 0.03, 0.04, 0.07, 0.09])
+        raw = np.arange(len(ts))
+        rts = RegularTimeSeries.from_gappy_timeseries(
+            timestamps=ts,
+            raw=raw,
+            sampling_rate=100.0,
+        )
+        if request.param == "regular":
+            yield rts
+        else:
+            with _make_lazy(rts, LazyRegularTimeSeries, test_filepath) as data:
+                yield data
+
+    def test_gappy(self, gappy_rts):
+        irts = gappy_rts.to_irregular()
+        mask = gappy_rts.index_mask()
+        np.testing.assert_array_equal(irts.timestamps, gappy_rts.timestamps[mask])
+        np.testing.assert_array_equal(irts.raw, gappy_rts.raw[mask])
+        # ensure things are copies and not views
+        assert not np.shares_memory(irts.timestamps, gappy_rts.timestamps)
+        assert not np.shares_memory(irts.raw, gappy_rts.raw)
