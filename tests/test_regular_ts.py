@@ -894,6 +894,9 @@ class TestToIrregular:
         # ensure things are copies and not views
         assert not np.shares_memory(irts.timestamps, rts.timestamps)
         assert not np.shares_memory(irts.raw, rts.raw)
+        assert id(irts.domain) != id(rts.domain)
+        assert not np.shares_memory(irts.domain.start, rts.domain.start)
+        assert not np.shares_memory(irts.domain.end, rts.domain.start)
 
     @pytest.fixture(params=["regular", "lazy"])
     def gappy_rts(self, request, test_filepath):
@@ -920,12 +923,26 @@ class TestToIrregular:
         # ensure things are copies and not views
         assert not np.shares_memory(irts.timestamps, gappy_rts.timestamps)
         assert not np.shares_memory(irts.raw, gappy_rts.raw)
+        assert id(irts.domain) != id(gappy_rts.domain)
+        assert not np.shares_memory(irts.domain.start, gappy_rts.domain.start)
+        assert not np.shares_memory(irts.domain.end, gappy_rts.domain.start)
 
     def test_empty(self, test_filepath):
-        empty_rts = RegularTimeSeries(sampling_rate=10, raw=[])
-        irts = empty_rts.to_irregular()
+        rts = RegularTimeSeries(sampling_rate=10, raw=[])
+        irts = rts.to_irregular()
         assert len(irts) == 0
+        # ensure things are copies and not views
+        assert not np.shares_memory(irts.timestamps, rts.timestamps)
+        assert not np.shares_memory(irts.raw, rts.raw)
+        assert id(irts.domain) != id(rts.domain)
+        assert not np.shares_memory(irts.domain.start, rts.domain.start)
+        assert not np.shares_memory(irts.domain.end, rts.domain.start)
 
-        with _make_lazy(empty_rts, RegularTimeSeries, test_filepath) as rts:
-            irts = rts.to_irregular()
+        with _make_lazy(rts, LazyRegularTimeSeries, test_filepath) as lazy_rts:
+            irts = lazy_rts.to_irregular()
             assert len(irts) == 0
+            assert not np.shares_memory(irts.timestamps, lazy_rts.timestamps)
+            assert not np.shares_memory(irts.raw, lazy_rts.raw)
+            assert id(irts.domain) != id(lazy_rts.domain)
+            assert not np.shares_memory(irts.domain.start, lazy_rts.domain.start)
+            assert not np.shares_memory(irts.domain.end, lazy_rts.domain.start)

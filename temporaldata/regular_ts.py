@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 from typing import Literal, Any
 import warnings
+import copy
 
 import h5py
 import numpy as np
@@ -408,14 +409,14 @@ class RegularTimeSeries(ArrayDict):
             return IrregularTimeSeries(
                 timestamps=self.timestamps,
                 **{k: getattr(self, k).copy() for k in self.keys()},
-                domain=self.domain,
+                domain=copy.deepcopy(self.domain),
             )
 
         mask = self.index_mask()
         return IrregularTimeSeries(
             timestamps=self.timestamps[mask],
             **{k: getattr(self, k)[mask] for k in self.keys()},
-            domain=self.domain,
+            domain=copy.deepcopy(self.domain),
         )
 
     def to_hdf5(self, file):

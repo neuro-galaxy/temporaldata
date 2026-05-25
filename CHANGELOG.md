@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 - `select_by_mask()` now raises `ValueError` instead of `AssertionError` on invalid mask shape/dtype/length ([#121](https://github.com/neuro-galaxy/temporaldata/pull/121))
+- `RegularTimeSeries.to_irregular()` now returns copies of the underlying arrays instead of views ([#136](https://github.com/neuro-galaxy/temporaldata/pull/136))
 
 ### Removed
 - `ArrayDict.select_by_mask()`: removed `**kwargs` input parameter (was meant for internal use) ([#121](https://github.com/neuro-galaxy/temporaldata/pull/121))
