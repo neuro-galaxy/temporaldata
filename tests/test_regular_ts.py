@@ -738,3 +738,34 @@ class TestRegularTimeSeriesCoercion:
         )
         assert isinstance(data.raw, np.ndarray)
         assert data.raw.shape == (100, 4)
+
+
+class TestIndexMask:
+
+    def test_non_gappy(self):
+        rts = RegularTimeSeries(
+            raw=[0, 1, 2, 3],
+            sampling_rate=10,
+            domain="auto",
+        )
+        mask = rts.index_mask()
+        assert mask.dtype.kind == "b"
+
+        expected = [True, True, True, True]
+        np.testing.assert_array_equal(mask, expected)
+
+    def test_gappy(self):
+        ts = np.array([0.0, 0.01, 0.03, 0.04, 0.07, 0.09])
+        raw = np.arange(len(ts))
+        rts = RegularTimeSeries.from_gappy_timeseries(
+            timestamps=ts,
+            raw=raw,
+            sampling_rate=100.0,
+        )
+        assert len(rts) == 10
+
+        mask = rts.index_mask()
+        assert mask.dtype.kind == "b"
+
+        expected = [True, True, False, True, True, False, False, True, False, True]
+        np.testing.assert_array_equal(mask, expected)

@@ -144,13 +144,53 @@ class RegularTimeSeries(ArrayDict):
 
     @property
     def sampling_rate(self) -> float:
-        r"""Returns the sampling rate in Hz."""
+        """Sampling rate in Hz"""
         return self._sampling_rate
 
     @property
+    def timestamps(self) -> np.ndarray:
+        r"""Sample timestamps"""
+        return (
+            self.domain.start[0]
+            + np.arange(len(self), dtype=np.float64) / self.sampling_rate
+        )
+
+    @property
     def domain(self) -> Interval:
-        r"""Returns the domain of the time series."""
+        r"""Domain of the time series as an :obj:`Interval`"""
         return self._domain
+
+    def index_mask(self) -> np.ndarray:
+        r"""Returns a boolean mask indicating valid entries in this time series.
+
+        True indicates that the entry is valid
+        """
+        n = len(self)
+
+        if len(self.domain) == 1:
+            return np.full(n, True, dtype=bool)
+
+        starts, ends = self._domain.start, self._domain.end
+
+        start_idx = np.round((starts - starts[0]) * self.sampling_rate).astype(int)
+        end_idx = np.round((ends - starts[0]) * self.sampling_rate).astype(int)
+
+        if end_idx[-1] != n:
+            raise RuntimeError(
+                f"This is should never happen. Debug info:\n"
+                f"{n=}\n"
+                f"{start_idx=}\n"
+                f"{end_idx=}\n"
+            )
+
+        diff = np.zeros(n + 1, dtype=np.int8)
+        diff[start_idx] = 1
+        diff[end_idx] = -1
+        return diff.cumsum()[:n].astype(bool)
+        ans = np.full(n, False, dtype=bool)
+        for s, e in zip(start_idx, end_idx):
+            ans[s:e] = True
+        return ans
 
     def select_by_mask(self, mask: np.ndarray):
         """Raises a NotImplementedError as this method is not supported
@@ -287,14 +327,6 @@ class RegularTimeSeries(ArrayDict):
             timestamps=self.timestamps,
             **{k: getattr(self, k) for k in self.keys()},
             domain=self.domain,
-        )
-
-    @property
-    def timestamps(self):
-        r"""Returns the timestamps of the time series."""
-        return (
-            self.domain.start[0]
-            + np.arange(len(self), dtype=np.float64) / self.sampling_rate
         )
 
     def to_hdf5(self, file):
