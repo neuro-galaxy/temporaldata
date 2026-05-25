@@ -214,7 +214,7 @@ class RegularTimeSeries(ArrayDict):
         eps: float = 1e-9,
     ):
         r"""Returns a new :obj:`RegularTimeSeries` object that contains the data between
-        the start (inclusive) and end (exclusive) times (i.e., [start, end)]).
+        the start (inclusive) and end (exclusive) times (i.e., [start, end)).
 
         :obj:`start` and :obj:`end` are snapped up to the next grid point (the next
         multiple of ``1/sampling_rate``).
@@ -597,7 +597,7 @@ class LazyRegularTimeSeries(RegularTimeSeries):
         eps: float = 1e-9,
     ):
         r"""Returns a new :obj:`RegularTimeSeries` object that contains the data between
-        the start (inclusive) and end (exclusive) times (i.e., [start, end)]).
+        the start (inclusive) and end (exclusive) times (i.e., [start, end)).
 
         :obj:`start` and :obj:`end` are snapped up to the next grid point (the next
         multiple of ``1/sampling_rate``).
