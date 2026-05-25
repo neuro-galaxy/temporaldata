@@ -4,6 +4,7 @@ from contextlib import contextmanager
 
 import h5py
 import numpy as np
+import pandas as pd
 import pytest
 
 from temporaldata import Interval, LazyRegularTimeSeries, RegularTimeSeries
@@ -689,3 +690,34 @@ class TestSliceGappy:
                 0.018, 0.05, reset_origin=False
             )
             np.testing.assert_array_equal(s.raw, [3.0, 4.0])
+
+
+class TestRegularTimeSeriesCoercion:
+    def test_list(self):
+        data = RegularTimeSeries(
+            raw=[[float(i)] * 4 for i in range(10)],
+            sampling_rate=10.0,
+            domain=Interval(0.0, 1.0),
+        )
+        assert isinstance(data.raw, np.ndarray)
+        assert data.raw.shape == (10, 4)
+        assert len(data) == 10
+
+    def test_tuple(self):
+        data = RegularTimeSeries(
+            raw=tuple([float(i)] * 4 for i in range(10)),
+            sampling_rate=10.0,
+            domain=Interval(0.0, 1.0),
+        )
+        assert isinstance(data.raw, np.ndarray)
+        assert data.raw.shape == (10, 4)
+
+    def test_pandas_dataframe(self):
+        df = pd.DataFrame(np.zeros((100, 4)))
+        data = RegularTimeSeries(
+            raw=df,
+            sampling_rate=10.0,
+            domain=Interval(0.0, 10.0),
+        )
+        assert isinstance(data.raw, np.ndarray)
+        assert data.raw.shape == (100, 4)
