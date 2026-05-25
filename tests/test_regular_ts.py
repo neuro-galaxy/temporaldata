@@ -814,6 +814,54 @@ class TestIndexMask:
         np.testing.assert_array_equal(mask, expected)
 
 
+class TestIsGappy:
+
+    @pytest.fixture(params=["regular", "lazy"])
+    def rts(self, request, test_filepath):
+        rts = RegularTimeSeries(
+            raw=[0, 1, 2, 3],
+            sampling_rate=10,
+            domain="auto",
+        )
+        if request.param == "regular":
+            yield rts
+        else:
+            with _make_lazy(rts, LazyRegularTimeSeries, test_filepath) as data:
+                yield data
+
+    def test_basic(self, rts):
+        assert rts.is_gappy() is False
+
+    @pytest.fixture(params=["regular", "lazy"])
+    def gappy_rts(self, request, test_filepath):
+        ts = np.array([0.0, 0.01, 0.03, 0.04, 0.07, 0.09])
+        raw = np.arange(len(ts))
+        rts = RegularTimeSeries.from_gappy_timeseries(
+            timestamps=ts,
+            raw=raw,
+            sampling_rate=100.0,
+        )
+        if request.param == "regular":
+            yield rts
+        else:
+            with _make_lazy(rts, LazyRegularTimeSeries, test_filepath) as data:
+                yield data
+
+    def test_gappy(self, gappy_rts):
+        assert gappy_rts.is_gappy() is True
+
+    def test_gappy_slice_collapses_to_single_interval(self, gappy_rts):
+        sliced = gappy_rts.slice(0.0, 0.02)
+        assert sliced.is_gappy() is False
+
+    def test_empty(self, test_filepath):
+        empty_rts = RegularTimeSeries(sampling_rate=10, raw=[])
+        assert empty_rts.is_gappy() is False
+
+        with _make_lazy(empty_rts, LazyRegularTimeSeries, test_filepath) as rts:
+            assert rts.is_gappy() is False
+
+
 class TestToIrregular:
 
     @pytest.fixture(params=["regular", "lazy"])
