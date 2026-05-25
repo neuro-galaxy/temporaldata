@@ -605,46 +605,25 @@ class TestFromGappyTimeseries:
             )
 
 
+class _SupportsArrayWrapper:
+    def __init__(self, values):
+        self._data = np.asarray(values)
+
+    def __array__(self, dtype=None, copy=None):
+        return self._data if dtype is None else self._data.astype(dtype)
+
+
 class TestFromGappyTimeseriesCoercion:
-    def test_list(self):
+    @pytest.mark.parametrize(
+        "wrap",
+        [list, tuple, pd.Series, _SupportsArrayWrapper],
+        ids=["list", "tuple", "pd.Series", "SupportsArray"],
+    )
+    def test_coercion(self, wrap):
         rts = RegularTimeSeries.from_gappy_timeseries(
-            [0.0, 0.01, 0.03, 0.04],
+            wrap([0.0, 0.01, 0.03, 0.04]),
             sampling_rate=100.0,
-            raw=[1.0, 2.0, 3.0, 4.0],
-        )
-        assert isinstance(rts.raw, np.ndarray)
-        np.testing.assert_array_equal(rts.raw, [1.0, 2.0, np.nan, 3.0, 4.0])
-
-    def test_tuple(self):
-        rts = RegularTimeSeries.from_gappy_timeseries(
-            (0.0, 0.01, 0.03, 0.04),
-            sampling_rate=100.0,
-            raw=(1.0, 2.0, 3.0, 4.0),
-        )
-        assert isinstance(rts.raw, np.ndarray)
-        np.testing.assert_array_equal(rts.raw, [1.0, 2.0, np.nan, 3.0, 4.0])
-
-    def test_pandas_series(self):
-        rts = RegularTimeSeries.from_gappy_timeseries(
-            pd.Series([0.0, 0.01, 0.03, 0.04]),
-            sampling_rate=100.0,
-            raw=pd.Series([1.0, 2.0, 3.0, 4.0]),
-        )
-        assert isinstance(rts.raw, np.ndarray)
-        np.testing.assert_array_equal(rts.raw, [1.0, 2.0, np.nan, 3.0, 4.0])
-
-    def test_supports_array(self):
-        class MyArray:
-            def __init__(self, values):
-                self._data = np.asarray(values)
-
-            def __array__(self, dtype=None, copy=None):
-                return self._data if dtype is None else self._data.astype(dtype)
-
-        rts = RegularTimeSeries.from_gappy_timeseries(
-            MyArray([0.0, 0.01, 0.03, 0.04]),
-            sampling_rate=100.0,
-            raw=MyArray([1.0, 2.0, 3.0, 4.0]),
+            raw=wrap([1.0, 2.0, 3.0, 4.0]),
         )
         assert isinstance(rts.raw, np.ndarray)
         np.testing.assert_array_equal(rts.raw, [1.0, 2.0, np.nan, 3.0, 4.0])
