@@ -1,11 +1,21 @@
 import os
 import tempfile
+from contextlib import contextmanager
 
 import h5py
 import numpy as np
 import pytest
 
 from temporaldata import Interval, LazyRegularTimeSeries, RegularTimeSeries
+
+
+@contextmanager
+def _make_lazy(non_lazy, lazy_cls, test_filepath):
+    with h5py.File(test_filepath, "w") as f:
+        non_lazy.to_hdf5(f)
+    f = h5py.File(test_filepath, "r")
+    yield lazy_cls.from_hdf5(f)
+    f.close()
 
 
 @pytest.fixture
@@ -609,87 +619,73 @@ class TestSliceGappy:
         domain: [0.0, 0.02) U [0.03, 0.05)
     """
 
-    def _make(self):
+    @staticmethod
+    def _build():
         ts = np.array([0.0, 0.01, 0.03, 0.04])
         raw = np.array([1.0, 2.0, 3.0, 4.0])
         return RegularTimeSeries.from_gappy_timeseries(ts, sampling_rate=100.0, raw=raw)
 
-    def test_slice_trims_leading_gap(self):
+    @pytest.fixture(params=["regular", "lazy"])
+    def rts(self, request, test_filepath):
+        if request.param == "regular":
+            yield self._build()
+        else:
+            with _make_lazy(
+                self._build(), LazyRegularTimeSeries, test_filepath
+            ) as data:
+                yield data
+
+    def test_slice_trims_leading_gap(self, rts):
         # Window starts inside the gap, so data[0] would otherwise be nan.
-        rts = self._make().slice(0.018, 0.05, reset_origin=False)
-        np.testing.assert_array_equal(rts.raw, [3.0, 4.0])
-        np.testing.assert_allclose(rts.domain.start, [0.03])
-        np.testing.assert_allclose(rts.domain.end, [0.05])
+        s = rts.slice(0.018, 0.05, reset_origin=False)
+        np.testing.assert_array_equal(s.raw, [3.0, 4.0])
+        np.testing.assert_allclose(s.domain.start, [0.03])
+        np.testing.assert_allclose(s.domain.end, [0.05])
 
-    def test_slice_trims_trailing_gap(self):
+    def test_slice_trims_trailing_gap(self, rts):
         # Window ends inside the gap, so data[-1] would otherwise be nan.
-        rts = self._make().slice(0.0, 0.03, reset_origin=False)
-        np.testing.assert_array_equal(rts.raw, [1.0, 2.0])
-        np.testing.assert_allclose(rts.domain.start, [0.0])
-        np.testing.assert_allclose(rts.domain.end, [0.02])
+        s = rts.slice(0.0, 0.03, reset_origin=False)
+        np.testing.assert_array_equal(s.raw, [1.0, 2.0])
+        np.testing.assert_allclose(s.domain.start, [0.0])
+        np.testing.assert_allclose(s.domain.end, [0.02])
 
-    def test_slice_preserves_internal_gap(self):
+    def test_slice_preserves_internal_gap(self, rts):
         # Window spans the gap; the interior nan must be kept.
-        rts = self._make().slice(0.0, 0.05, reset_origin=False)
+        s = rts.slice(0.0, 0.05, reset_origin=False)
         np.testing.assert_array_equal(
-            np.isnan(rts.raw), [False, False, True, False, False]
+            np.isnan(s.raw), [False, False, True, False, False]
         )
-        np.testing.assert_allclose(rts.domain.start, [0.0, 0.03])
-        np.testing.assert_allclose(rts.domain.end, [0.02, 0.05])
+        np.testing.assert_allclose(s.domain.start, [0.0, 0.03])
+        np.testing.assert_allclose(s.domain.end, [0.02, 0.05])
 
-    def test_slice_inside_gap_is_empty(self):
-        rts = self._make().slice(0.022, 0.028, reset_origin=False)
-        assert len(rts) == 0
-        assert rts.domain.start[0] == rts.domain.end[-1] == 0.03
+    def test_slice_inside_gap_is_empty(self, rts):
+        s = rts.slice(0.022, 0.028, reset_origin=False)
+        assert len(s) == 0
+        assert s.domain.start[0] == s.domain.end[-1] == 0.03
 
-    def test_slice_reset_origin(self):
-        rts = self._make().slice(0.018, 0.05, reset_origin=True)
-        np.testing.assert_array_equal(rts.raw, [3.0, 4.0])
+    def test_slice_reset_origin(self, rts):
+        s = rts.slice(0.018, 0.05, reset_origin=True)
+        np.testing.assert_array_equal(s.raw, [3.0, 4.0])
         # data[0] (= 3) was at t=0.03; after reset by start=0.018, t=0.012.
-        np.testing.assert_allclose(rts.timestamps, [0.012, 0.022])
-        np.testing.assert_allclose(rts.domain.start, [0.012])
-        np.testing.assert_allclose(rts.domain.end, [0.032])
+        np.testing.assert_allclose(s.timestamps, [0.012, 0.022])
+        np.testing.assert_allclose(s.domain.start, [0.012])
+        np.testing.assert_allclose(s.domain.end, [0.032])
 
-    def test_slice_spans_full_range_reset_origin(self):
-        rts = self._make().slice(0.0, 0.05, reset_origin=True)
-        np.testing.assert_allclose(rts.domain.start, [0.0, 0.03])
-        np.testing.assert_allclose(rts.domain.end, [0.02, 0.05])
-        np.testing.assert_allclose(rts.timestamps, [0.0, 0.01, 0.02, 0.03, 0.04])
+    def test_slice_spans_full_range_reset_origin(self, rts):
+        s = rts.slice(0.0, 0.05, reset_origin=True)
+        np.testing.assert_allclose(s.domain.start, [0.0, 0.03])
+        np.testing.assert_allclose(s.domain.end, [0.02, 0.05])
+        np.testing.assert_allclose(s.timestamps, [0.0, 0.01, 0.02, 0.03, 0.04])
 
-    def test_slice_outside_domain(self):
-        rts = self._make().slice(1.0, 2.0, reset_origin=True)
-        assert len(rts) == 0
-        assert rts.domain.start[0] == rts.domain.end[-1] == 0.0
+    def test_slice_outside_domain(self, rts):
+        s = rts.slice(1.0, 2.0, reset_origin=True)
+        assert len(s) == 0
+        assert s.domain.start[0] == s.domain.end[-1] == 0.0
 
-    def test_lazy_slice_round_trip(self, test_filepath):
-        with h5py.File(test_filepath, "w") as f:
-            self._make().to_hdf5(f)
-
-        # Trim leading gap (window starts inside gap).
-        with h5py.File(test_filepath, "r") as f:
-            rts = LazyRegularTimeSeries.from_hdf5(f).slice(
+    def test_lazy_consecutive_slices(self, test_filepath):
+        # Nested slice: outer trims trailing gap, inner trims leading gap.
+        with _make_lazy(self._build(), LazyRegularTimeSeries, test_filepath) as lazy:
+            s = lazy.slice(0.0, 0.05, reset_origin=False).slice(
                 0.018, 0.05, reset_origin=False
             )
-            np.testing.assert_array_equal(rts.raw, [3.0, 4.0])
-            np.testing.assert_allclose(rts.domain.start, [0.03])
-            np.testing.assert_allclose(rts.domain.end, [0.05])
-
-        # Span the gap; internal nan is preserved.
-        with h5py.File(test_filepath, "r") as f:
-            rts = LazyRegularTimeSeries.from_hdf5(f).slice(
-                0.0, 0.05, reset_origin=False
-            )
-            np.testing.assert_array_equal(
-                np.isnan(rts.raw), [False, False, True, False, False]
-            )
-            np.testing.assert_allclose(rts.domain.start, [0.0, 0.03])
-            np.testing.assert_allclose(rts.domain.end, [0.02, 0.05])
-
-        # Nested slice: outer trims trailing gap, inner trims leading gap.
-        with h5py.File(test_filepath, "r") as f:
-            rts = (
-                LazyRegularTimeSeries.from_hdf5(f)
-                .slice(0.0, 0.05, reset_origin=False)
-                .slice(0.018, 0.05, reset_origin=False)
-            )
-            np.testing.assert_array_equal(rts.raw, [3.0, 4.0])
+            np.testing.assert_array_equal(s.raw, [3.0, 4.0])
