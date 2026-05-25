@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Updated slicing to work with gaps ([#129](https://github.com/neuro-galaxy/temporaldata/pull/129))
   - `RegularTimeSeries.from_gappy_timeseries()` now also accepts `ArrayLike` inputs ([#132](https://github.com/neuro-galaxy/temporaldata/pull/132))
   - Added `RegularTimeSeries.index_mask()` returning a boolean mask marking which samples fall inside `domain` (`True`) vs. gap fills (`False`) ([#133](https://github.com/neuro-galaxy/temporaldata/pull/133))
+  - Added `RegularTimeSeries.is_gappy()` returning whether the series has gaps (multi-interval domain) ([#136](https://github.com/neuro-galaxy/temporaldata/pull/136))
   - `RegularTimeSeries.to_irregular()` now drops gap-fill samples (where `index_mask()` is `False`) from the resulting `IrregularTimeSeries` ([#136](https://github.com/neuro-galaxy/temporaldata/pull/136))
 
 
