@@ -915,7 +915,6 @@ class TestToIrregular:
 
     def test_gappy(self, gappy_rts):
         irts = gappy_rts.to_irregular()
-        mask = gappy_rts.index_mask()
         np.testing.assert_array_equal(
             irts.timestamps, [0.0, 0.01, 0.03, 0.04, 0.07, 0.09]
         )
