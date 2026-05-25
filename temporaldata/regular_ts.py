@@ -628,26 +628,25 @@ class LazyRegularTimeSeries(RegularTimeSeries):
         # Intersect with the (possibly multi-interval) domain
         new_domain = self.domain & Interval(out_start, out_end)
 
-        out = self.__class__.__new__(self.__class__)
-        out._sampling_rate = self.sampling_rate
-        out._lazy_ops = {}
-
-        parent_offset = self._lazy_ops["slice"][0] if "slice" in self._lazy_ops else 0
-
         is_empty = len(new_domain) == 0 or new_domain.start[0] == new_domain.end[-1]
         if is_empty:
+            # No data to defer-load; return an eager RegularTimeSeries.
+            out = RegularTimeSeries.__new__(RegularTimeSeries)
+            out._sampling_rate = self.sampling_rate
             out._domain = (
                 Interval(start=0.0, end=0.0)
                 if reset_origin
                 else Interval(start=out_start, end=out_start)
             )
             for key in self.keys():
-                if isinstance(self.__dict__[key], h5py.Dataset):
-                    out.__dict__[key] = self.__dict__[key]
-                else:
-                    out.__dict__[key] = self.__dict__[key][0:0].copy()
-            out._lazy_ops["slice"] = (parent_offset, parent_offset)
+                out.__dict__[key] = self.__dict__[key][0:0]
             return out
+
+        out = self.__class__.__new__(self.__class__)
+        out._sampling_rate = self.sampling_rate
+        out._lazy_ops = {}
+
+        parent_offset = self._lazy_ops["slice"][0] if "slice" in self._lazy_ops else 0
 
         # Trim leading/trailing gap samples
         leading_trim = int(
