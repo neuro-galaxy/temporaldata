@@ -34,12 +34,43 @@ def test_filepath(request):
     return filepath
 
 
-def test_regulartimeseries(test_filepath):
-    def _test_regulartimeseries(data):
-        assert len(data) == 100
+@contextmanager
+def _make_lazy(non_lazy, test_filepath):
+    with h5py.File(test_filepath, "w") as f:
+        non_lazy.to_hdf5(f)
+    f = h5py.File(test_filepath, "r")
+    yield RegularTimeSeries.from_hdf5(f)
+    f.close()
 
+
+class TestSlicing:
+
+    @pytest.fixture(params=["RegularTimeSeries", "LazyRegularTimeSeries"])
+    def data(self, request, test_filepath):
+        name = request.param
+        # 100 points at 10Hz => 10s duration
+        data = RegularTimeSeries(
+            lfp=np.random.random((100, 48)),
+            sampling_rate=10,
+            domain="auto",
+        )
+        if name == "RegularTimeSeries":
+            yield data
+        elif name == "LazyRegularTimeSeries":
+            with _make_lazy(data, test_filepath) as data:
+                yield data
+
+    def test_data_domain(self, data):
+        assert len(data) == 100
         assert data.domain.start[0] == 0.0
         assert data.domain.end[0] == 10.0
+
+    def test_aligned_slice(self, data):
+        data_slice = data.slice(2.0, 8.0)
+        assert np.allclose(data_slice.lfp, data.lfp[20:80])
+        assert data_slice.domain.start[0] == 0.0
+        assert data_slice.domain.end[0] == 6.0
+        assert np.allclose(data_slice.timestamps, np.arange(0.0, 6.0, 0.1))
 
         data_slice = data.slice(2.0, 8.0, reset_origin=False)
         assert np.allclose(data_slice.lfp, data.lfp[20:80])
@@ -47,21 +78,21 @@ def test_regulartimeseries(test_filepath):
         assert data_slice.domain.end[0] == 8.0
         assert np.allclose(data_slice.timestamps, np.arange(2.0, 8.0, 0.1))
 
-        data_slice = data.slice(2.0, 8.0, reset_origin=True)
-        assert np.allclose(data_slice.lfp, data.lfp[20:80])
-        assert data_slice.domain.start[0] == 0.0
-        assert data_slice.domain.end[0] == 6.0
-        assert np.allclose(data_slice.timestamps, np.arange(0.0, 6.0, 0.1))
-
-        # try slicing with skewed start and end
-        # the sampling frequency is 10
-        data_slice = data.slice(2.03, 8.09, reset_origin=True)
+    def test_misaligned_slice(self, data):
+        data_slice = data.slice(2.03, 8.09)
         assert np.allclose(data_slice.lfp, data.lfp[21:81])
         assert np.allclose(data_slice.domain.start, np.array([0.07]))
         assert np.allclose(data_slice.domain.end, np.array([6.07]))
         assert np.allclose(data_slice.timestamps, np.arange(0.07, 5.98, 0.1))
 
-        data_slice = data.slice(4.051, 12.0, reset_origin=True)
+        data_slice = data.slice(2.03, 8.09, reset_origin=False)
+        assert np.allclose(data_slice.lfp, data.lfp[21:81])
+        assert np.allclose(data_slice.domain.start, np.array([2.1]))
+        assert np.allclose(data_slice.domain.end, np.array([8.1]))
+        assert np.allclose(data_slice.timestamps, np.arange(2.1, 8.1, 0.1))
+
+    def test_partially_out_of_domain_slice_right(self, data):
+        data_slice = data.slice(4.051, 12.0)
         assert np.allclose(data_slice.lfp, data.lfp[41:])
         assert np.allclose(data_slice.domain.start, np.array([0.049]))
         assert np.allclose(data_slice.domain.end, np.array([5.949]))
@@ -73,69 +104,80 @@ def test_regulartimeseries(test_filepath):
         assert np.allclose(data_slice.domain.end, np.array([10.0]))
         assert np.allclose(data_slice.timestamps, np.arange(4.1, 10.0, 0.1))
 
+    def test_partially_out_of_domain_slice_left(self, data):
+        data_slice = data.slice(-1, 2.02)
+        assert np.allclose(data_slice.lfp, data.lfp[:21])
+        assert np.allclose(data_slice.domain.start, np.array([1.0]))
+        assert np.allclose(data_slice.domain.end, np.array([3.1]))
+        assert np.allclose(data_slice.timestamps, np.arange(1.0, 3.1, 0.1))
+
+        data_slice = data.slice(-1, 2.02, reset_origin=False)
+        assert np.allclose(data_slice.lfp, data.lfp[:21])
+        assert np.allclose(data_slice.domain.start, np.array([0.0]))
+        assert np.allclose(data_slice.domain.end, np.array([2.1]))
+        assert np.allclose(data_slice.timestamps, np.arange(0.0, 2.1, 0.1))
+
+    def test_partially_out_of_domain_slice_both(self, data):
+        data_slice = data.slice(-10, 20)
+        assert np.allclose(data_slice.lfp, data.lfp)
+        assert np.allclose(data_slice.domain.start, data.domain.start + 10.0)
+        assert np.allclose(data_slice.domain.end, data.domain.end + 10.0)
+        assert np.allclose(data_slice.timestamps, data.timestamps + 10.0)
+
         data_slice = data.slice(-10, 20, reset_origin=False)
         assert np.allclose(data_slice.lfp, data.lfp)
         assert np.allclose(data_slice.domain.start, data.domain.start)
         assert np.allclose(data_slice.domain.end, data.domain.end)
         assert np.allclose(data_slice.timestamps, data.timestamps)
 
+    def test_slice_exactly_at_domain_edges(self, data):
         domain_start, domain_end = data.domain.start[0], data.domain.end[-1]
+
+        data_slice = data.slice(domain_start, domain_end)
+        assert np.allclose(data_slice.lfp, data.lfp)
+        assert np.allclose(data_slice.domain.start, 0)
+        assert np.allclose(data_slice.domain.end, domain_end - domain_start)
+        assert np.allclose(data_slice.timestamps, data.timestamps - domain_start)
+
         data_slice = data.slice(domain_start, domain_end, reset_origin=False)
         assert np.allclose(data_slice.lfp, data.lfp)
         assert np.allclose(data_slice.domain.start, data.domain.start)
         assert np.allclose(data_slice.domain.end, data.domain.end)
         assert np.allclose(data_slice.timestamps, data.timestamps)
 
-    data = RegularTimeSeries(
-        lfp=np.random.random((100, 48)), sampling_rate=10, domain="auto"
-    )
 
-    _test_regulartimeseries(data)
+class TestSliceWithDomainStart:
 
-    with h5py.File(test_filepath, "w") as f:
-        data.to_hdf5(f)
+    @pytest.fixture(params=["RegularTimeSeries", "LazyRegularTimeSeries"])
+    def data(self, request, test_filepath):
+        name = request.param
+        # 100 points at 10Hz => 10s duration
+        data = RegularTimeSeries(
+            lfp=np.random.random((100, 48)),
+            sampling_rate=10,
+            domain="auto",
+            domain_start=1.0,
+        )
+        if name == "RegularTimeSeries":
+            yield data
+        elif name == "LazyRegularTimeSeries":
+            with _make_lazy(data, test_filepath) as data:
+                yield data
 
-    del data
-
-    with h5py.File(test_filepath, "r") as f:
-        data = LazyRegularTimeSeries.from_hdf5(f)
-
-        _test_regulartimeseries(data)
-
-    data = RegularTimeSeries(
-        lfp=np.random.random((100, 48)),
-        sampling_rate=10,
-        domain="auto",
-        domain_start=1.0,
-    )
-
-    def _test_regulartimeseries_with_domain_start(data):
+    def test_data_domain(self, data):
         assert len(data) == 100
-
         assert data.domain.start[0] == 1.0
         assert data.domain.end[0] == 11.0
 
+    def test_aligned_slice(self, data):
         data_slice = data.slice(3.0, 9.0)
+        assert np.allclose(data_slice.timestamps, np.arange(0, 6.0, 0.1))
         assert np.allclose(data_slice.lfp, data.lfp[20:80])
 
-        # try slicing with skewed start and end
-        # the sampling frequency is 10
-        data_slice = data.slice(3.03, 9.09)
+    def test_misaligned_slice(self, data):
+        data_slice = data.slice(3.02, 9.08)
+        assert np.allclose(data_slice.timestamps, np.arange(0.08, 6.08, 0.1))
         assert np.allclose(data_slice.lfp, data.lfp[21:81])
-
-        data_slice = data.slice(5.051, 13.0)
-        assert np.allclose(data_slice.lfp, data.lfp[41:])
-
-    _test_regulartimeseries_with_domain_start(data)
-
-    with h5py.File(test_filepath, "w") as f:
-        data.to_hdf5(f)
-
-    del data
-
-    with h5py.File(test_filepath, "r") as f:
-        data = LazyRegularTimeSeries.from_hdf5(f)
-        _test_regulartimeseries_with_domain_start(data)
 
 
 def test_lazy_regular_timeseries(test_filepath):
