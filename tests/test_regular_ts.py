@@ -364,6 +364,7 @@ class TestFromGappyTimeseries:
 
         rts = RegularTimeSeries.from_gappy_timeseries(ts, sampling_rate=100.0, raw=raw)
 
+        assert rts.is_gappy()
         assert isinstance(rts, RegularTimeSeries)
         assert rts.sampling_rate == 100.0
         assert len(rts) == 5
@@ -381,6 +382,7 @@ class TestFromGappyTimeseries:
 
         rts = RegularTimeSeries.from_gappy_timeseries(ts, sampling_rate=2.0, a=a, b=b)
 
+        assert rts.is_gappy()
         assert len(rts) == 4
         np.testing.assert_array_equal(np.isnan(rts.a), [False, False, True, False])
         assert rts.b.shape == (4, 4)
@@ -647,6 +649,7 @@ class TestSliceGappy:
     def test_slice_trims_leading_gap(self, rts):
         # Window starts inside the gap, so data[0] would otherwise be nan.
         s = rts.slice(0.018, 0.05, reset_origin=False)
+        assert not s.is_gappy()
         np.testing.assert_array_equal(s.raw, [3.0, 4.0])
         np.testing.assert_allclose(s.domain.start, [0.03])
         np.testing.assert_allclose(s.domain.end, [0.05])
@@ -654,6 +657,7 @@ class TestSliceGappy:
     def test_slice_trims_trailing_gap(self, rts):
         # Window ends inside the gap, so data[-1] would otherwise be nan.
         s = rts.slice(0.0, 0.03, reset_origin=False)
+        assert not s.is_gappy()
         np.testing.assert_array_equal(s.raw, [1.0, 2.0])
         np.testing.assert_allclose(s.domain.start, [0.0])
         np.testing.assert_allclose(s.domain.end, [0.02])
@@ -661,6 +665,7 @@ class TestSliceGappy:
     def test_slice_preserves_internal_gap(self, rts):
         # Window spans the gap; the interior nan must be kept.
         s = rts.slice(0.0, 0.05, reset_origin=False)
+        assert s.is_gappy()
         np.testing.assert_array_equal(
             np.isnan(s.raw), [False, False, True, False, False]
         )
@@ -669,11 +674,13 @@ class TestSliceGappy:
 
     def test_slice_inside_gap_is_empty(self, rts):
         s = rts.slice(0.022, 0.028, reset_origin=False)
+        assert not s.is_gappy()
         assert len(s) == 0
         assert s.domain.start[0] == s.domain.end[-1] == 0.03
 
     def test_slice_reset_origin(self, rts):
         s = rts.slice(0.018, 0.05, reset_origin=True)
+        assert not s.is_gappy()
         np.testing.assert_array_equal(s.raw, [3.0, 4.0])
         # data[0] (= 3) was at t=0.03; after reset by start=0.018, t=0.012.
         np.testing.assert_allclose(s.timestamps, [0.012, 0.022])
@@ -682,12 +689,14 @@ class TestSliceGappy:
 
     def test_slice_spans_full_range_reset_origin(self, rts):
         s = rts.slice(0.0, 0.05, reset_origin=True)
+        assert s.is_gappy()
         np.testing.assert_allclose(s.domain.start, [0.0, 0.03])
         np.testing.assert_allclose(s.domain.end, [0.02, 0.05])
         np.testing.assert_allclose(s.timestamps, [0.0, 0.01, 0.02, 0.03, 0.04])
 
     def test_slice_outside_domain(self, rts):
         s = rts.slice(1.0, 2.0, reset_origin=True)
+        assert not s.is_gappy()
         assert len(s) == 0
         assert s.domain.start[0] == s.domain.end[-1] == 0.0
 
@@ -697,6 +706,7 @@ class TestSliceGappy:
             s = lazy.slice(0.0, 0.05, reset_origin=False).slice(
                 0.018, 0.05, reset_origin=False
             )
+            assert not s.is_gappy()
             np.testing.assert_array_equal(s.raw, [3.0, 4.0])
 
 
