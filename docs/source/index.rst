@@ -38,31 +38,11 @@ If you encounter any bugs or have feature requests, please submit them to our
 
 
 .. toctree::
-   :maxdepth: 1
-   :caption: Get Started
+   :maxdepth: 2
 
-   concepts/installation
-   concepts/getting_started
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Tutorials
-   
-   concepts/creating_objects
-   concepts/data_manipulation
-   concepts/interval_operations
-   concepts/io
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Advanced Concepts
-   
-   concepts/lazy_loading
-   concepts/advanced_interval_operations
+   guides/index
 
 .. toctree::
    :maxdepth: 2
-   :caption: Package Reference
 
-   package/classes/index
-   package/functions/index
+   generated/api/index
