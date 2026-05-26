@@ -47,6 +47,11 @@ html_theme_options = {
             "icon": "fa-brands fa-github",
         },
         {
+            "name": "Discord",
+            "url": "https://discord.gg/kQNKA6B8ZC",
+            "icon": "fa-brands fa-discord",
+        },
+        {
             "name": "PyPI",
             "url": "https://pypi.org/project/temporaldata/",
             "icon": "fa-brands fa-python",
