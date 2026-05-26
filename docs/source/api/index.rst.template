@@ -8,7 +8,7 @@ Look through specific module or search through
 the entire list of APIs.
 
 .. toctree::
-  :maxdepth: 1
+  :maxdepth: 2
 
 {% for module, _ in API_REFERENCE %}
   {{ module }}
