@@ -13,6 +13,21 @@ from .typing import ArrayLike
 from .interval import Interval
 from .utils import _validate_select_by_mask_input
 
+__all__ = [
+    "IrregularTimeSeries",
+    "LazyIrregularTimeSeries",
+]
+
+# Drives the generated API reference; see docs/source/api_reference.py.
+__api_ref__ = {
+    "description": None,
+    "sections": [
+        {
+            "autosummary": __all__,
+        },
+    ],
+}
+
 
 class IrregularTimeSeries(ArrayDict):
     r"""An irregular time series is defined by a set of timestamps and a set of

@@ -3,6 +3,20 @@ import numpy as np
 
 from .irregular_ts import IrregularTimeSeries
 
+__all__ = [
+    "concat",
+]
+
+# Drives the generated API reference; see docs/source/api_reference.py.
+__api_ref__ = {
+    "description": None,
+    "sections": [
+        {
+            "autosummary": __all__,
+        },
+    ],
+}
+
 
 def concat(objs, sort=True):
     """Concatenates multiple time series objects into a single object.

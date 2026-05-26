@@ -13,6 +13,21 @@ from .typing import ArrayLike
 from .interval import Interval
 from .irregular_ts import IrregularTimeSeries
 
+__all__ = [
+    "RegularTimeSeries",
+    "LazyRegularTimeSeries",
+]
+
+# Drives the generated API reference; see docs/source/api_reference.py.
+__api_ref__ = {
+    "description": None,
+    "sections": [
+        {
+            "autosummary": __all__,
+        },
+    ],
+}
+
 _NP_DTYPE_KINDS = {"b", "i", "u", "f", "c", "m", "M", "O", "S", "U", "V"}
 # ^ From https://numpy.org/doc/2.2/reference/generated/numpy.dtype.kind.html
 

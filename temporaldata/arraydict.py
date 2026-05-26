@@ -11,6 +11,21 @@ import pandas as pd
 from .typing import ArrayLike
 from .utils import _size_repr, _validate_select_by_mask_input
 
+__all__ = [
+    "ArrayDict",
+    "LazyArrayDict",
+]
+
+# Drives the generated API reference; see docs/source/api_reference.py.
+__api_ref__ = {
+    "description": None,
+    "sections": [
+        {
+            "autosummary": __all__,
+        },
+    ],
+}
+
 
 class ArrayDict(object):
     r"""A dictionary of arrays that share the same first dimension. The number of
