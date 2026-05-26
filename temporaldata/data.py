@@ -15,20 +15,6 @@ from .regular_ts import RegularTimeSeries, LazyRegularTimeSeries
 from .interval import Interval, LazyInterval
 from .utils import _size_repr
 
-__all__ = [
-    "Data",
-]
-
-# Drives the generated API reference; see docs/source/api_reference.py.
-__api_ref__ = {
-    "description": None,
-    "sections": [
-        {
-            "autosummary": __all__,
-        },
-    ],
-}
-
 
 class Data(object):
     r"""A flexible container for other data objects such as

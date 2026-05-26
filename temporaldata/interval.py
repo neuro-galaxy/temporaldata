@@ -12,21 +12,6 @@ from .arraydict import ArrayDict
 from .utils import _validate_select_by_mask_input
 from .typing import ArrayLike
 
-__all__ = [
-    "Interval",
-    "LazyInterval",
-]
-
-# Drives the generated API reference; see docs/source/api_reference.py.
-__api_ref__ = {
-    "description": None,
-    "sections": [
-        {
-            "autosummary": __all__,
-        },
-    ],
-}
-
 
 class Interval(ArrayDict):
     r"""An interval object is a set of time intervals each defined by a start time and

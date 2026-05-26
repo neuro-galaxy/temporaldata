@@ -3,12 +3,6 @@ from pathlib import Path
 import jinja2
 
 import temporaldata
-import temporaldata.arraydict
-import temporaldata.irregular_ts
-import temporaldata.regular_ts
-import temporaldata.interval
-import temporaldata.data
-import temporaldata.concat
 
 """
 CONFIGURING API_REFERENCE
@@ -62,12 +56,7 @@ particular submodule does the hook become useful.
 
 # Modules to include in API reference.
 API_MODS = [
-    "temporaldata.arraydict",
-    "temporaldata.irregular_ts",
-    "temporaldata.regular_ts",
-    "temporaldata.interval",
-    "temporaldata.data",
-    "temporaldata.concat",
+    "temporaldata",
 ]
 
 API_REFERENCE = {m: import_module(m).__api_ref__ for m in API_MODS}
