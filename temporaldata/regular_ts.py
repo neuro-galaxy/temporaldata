@@ -135,7 +135,7 @@ class RegularTimeSeries(ArrayDict):
     ):
         if "domain" in kwargs:
             raise ValueError(
-                "RegularTimeSeries does not accept a `domain` argument; the domain "
+                "Manually setting the domain of RegularTimeSeries is deprecated; the domain "
                 "is always computed automatically as "
                 "[domain_start, domain_start + len(self) / sampling_rate] so that "
                 "its boundaries stay aligned to the sample grid. Use `domain_start` "
