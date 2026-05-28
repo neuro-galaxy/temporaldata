@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from typing import Literal, Any
+from typing import Any
 import warnings
 import copy
 
@@ -94,8 +94,7 @@ class RegularTimeSeries(ArrayDict):
 
     Args:
         sampling_rate: Sampling rate in Hz.
-        domain: :obj:`"auto"` or an :obj:`Interval` object that defines the domain over which the
-            timeseries is defined.
+        domain_start: Start time (in seconds) of the domain. Defaults to :obj:`0.0`.
         **kwargs: Arbitrary keyword arguments where the values are arbitrary
             multi-dimensional (2d, 3d, ..., nd) arrays with shape (N, \*).
 
@@ -111,7 +110,6 @@ class RegularTimeSeries(ArrayDict):
         >>> lfp = RegularTimeSeries(
         ...     raw=np.zeros((1000, 128)),
         ...     sampling_rate=250.,
-        ...     domain=Interval(0., 4.),
         ... )
 
         >>> lfp.slice(0, 1)
@@ -132,24 +130,51 @@ class RegularTimeSeries(ArrayDict):
         self,
         *,
         sampling_rate: float,  # in Hz
-        domain: Interval | Literal["auto"] = "auto",
-        domain_start=0.0,
+        domain_start: float = 0.0,
         **kwargs: ArrayLike,
     ):
+        if "domain" in kwargs:
+            raise ValueError(
+                "RegularTimeSeries does not accept a `domain` argument; the domain "
+                "is always computed automatically as "
+                "[domain_start, domain_start + len(self) / sampling_rate] so that "
+                "its boundaries stay aligned to the sample grid. Use `domain_start` "
+                "to set the start time."
+            )
+
         super().__init__(**kwargs)
 
         self._sampling_rate = sampling_rate
 
-        if domain == "auto":
-            if not isinstance(domain_start, (int, float)):
-                raise ValueError(
-                    f"domain_start must be a number, got {type(domain_start)}."
-                )
-            domain = Interval(
-                start=np.array([domain_start]),
-                end=np.array([domain_start + len(self) / sampling_rate]),
+        if not isinstance(domain_start, (int, float)):
+            raise ValueError(
+                f"domain_start must be a number, got {type(domain_start)}."
             )
-        self._domain = domain
+
+        self._domain = Interval(
+            start=np.array([domain_start]),
+            end=np.array([domain_start + len(self) / sampling_rate]),
+        )
+
+    @classmethod
+    def _from_domain(
+        cls,
+        *,
+        sampling_rate: float,
+        domain: Interval,
+        **kwargs: ArrayLike,
+    ) -> RegularTimeSeries:
+        r"""Internal constructor used when the (grid-aligned) domain is already known.
+
+        The public constructor always computes a single contiguous domain. This
+        bypass is used by :meth:`from_gappy_timeseries` (multi-interval domain) and
+        :meth:`from_hdf5` (domain restored from disk).
+        """
+        obj = cls.__new__(cls)
+        ArrayDict.__init__(obj, **kwargs)
+        obj._sampling_rate = sampling_rate
+        obj._domain = domain
+        return obj
 
     @property
     def sampling_rate(self) -> float:
@@ -436,7 +461,6 @@ class RegularTimeSeries(ArrayDict):
                 data = RegularTimeSeries(
                     raw=np.zeros((1000, 128)),
                     sampling_rate=250.,
-                    domain=Interval(0., 4.),
                 )
 
                 with h5py.File("data.h5", "w") as f:
@@ -480,7 +504,9 @@ class RegularTimeSeries(ArrayDict):
                 data[key] = value[:]
 
         domain = Interval.from_hdf5(file["domain"])
-        obj = cls(**data, sampling_rate=file.attrs["sampling_rate"], domain=domain)
+        obj = cls._from_domain(
+            **data, sampling_rate=file.attrs["sampling_rate"], domain=domain
+        )
 
         return obj
 
@@ -641,7 +667,7 @@ class RegularTimeSeries(ArrayDict):
             out[grid_idx] = arr
             filled[key] = out
 
-        return cls(
+        return cls._from_domain(
             sampling_rate=sampling_rate,
             domain=domain,
             **filled,
