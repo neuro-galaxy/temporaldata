@@ -128,7 +128,7 @@ additions specific to gappy series:
 - **Edge gaps are trimmed.** If a slice boundary falls inside a gap, the
   returned arrays will not begin or end with gap-fill samples. That is, slicing
   always returns data bracketed by real samples.
-- **Internal gaps are preserved.** Gap-fill samples in the middle of the
+- **Internal gaps are preserved if needed.** Gap-fill samples in the middle of the
   requested window remain in place; the returned object is itself gappy.
 
 .. code-block:: pycon
@@ -141,8 +141,28 @@ additions specific to gappy series:
     >>> sliced.domain.start, sliced.domain.end
     array([4., 8.]), array([6., 10.])
 
-A slice that falls entirely within a gap returns an empty series. Notice that
-the domain does *not* start at :math:`t = 3`.
+Notice that the domain does *not* start at :math:`t = 3`.
+
+A slice that is entirely within a contiguous section is no longer gappy:
+
+.. code-block:: pycon
+
+   >>> sliced = signal.slice(0.0, 2.0, reset_origin=False)
+   >>> sliced.timestamps
+   array([ 0.,  1.])
+   >>> sliced.is_gappy()
+   False
+
+A slice that falls entirely within a gap returns an empty series:
+
+.. code-block:: pycon
+
+   >>> empty = signal.slice(6.1, 7.9, reset_origin=False)
+   >>> empty.timestamps
+   array([])
+   >>> empty.values
+   array([])
+
 
 
 
