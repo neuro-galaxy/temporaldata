@@ -152,8 +152,8 @@ class RegularTimeSeries(ArrayDict):
             )
 
         self._domain = Interval(
-            start=np.array([domain_start]),
-            end=np.array([domain_start + len(self) / sampling_rate]),
+            start=domain_start,
+            end=domain_start + len(self) / sampling_rate,
         )
 
     @property
