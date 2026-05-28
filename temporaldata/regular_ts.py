@@ -156,26 +156,6 @@ class RegularTimeSeries(ArrayDict):
             end=np.array([domain_start + len(self) / sampling_rate]),
         )
 
-    @classmethod
-    def _from_domain(
-        cls,
-        *,
-        sampling_rate: float,
-        domain: Interval,
-        **kwargs: ArrayLike,
-    ) -> RegularTimeSeries:
-        r"""Internal constructor used when the (grid-aligned) domain is already known.
-
-        The public constructor always computes a single contiguous domain. This
-        bypass is used by :meth:`from_gappy_timeseries` (multi-interval domain) and
-        :meth:`from_hdf5` (domain restored from disk).
-        """
-        obj = cls.__new__(cls)
-        ArrayDict.__init__(obj, **kwargs)
-        obj._sampling_rate = sampling_rate
-        obj._domain = domain
-        return obj
-
     @property
     def sampling_rate(self) -> float:
         r"""Sampling rate in Hz"""
@@ -504,9 +484,8 @@ class RegularTimeSeries(ArrayDict):
                 data[key] = value[:]
 
         domain = Interval.from_hdf5(file["domain"])
-        obj = cls._from_domain(
-            **data, sampling_rate=file.attrs["sampling_rate"], domain=domain
-        )
+        obj = cls(**data, sampling_rate=file.attrs["sampling_rate"])
+        obj._domain = domain
 
         return obj
 
@@ -667,11 +646,9 @@ class RegularTimeSeries(ArrayDict):
             out[grid_idx] = arr
             filled[key] = out
 
-        return cls._from_domain(
-            sampling_rate=sampling_rate,
-            domain=domain,
-            **filled,
-        )
+        obj = cls(sampling_rate=sampling_rate, **filled)
+        obj._domain = domain
+        return obj
 
     def is_gappy(self) -> bool:
         r"""Returns :obj:`True` if this :obj:`RegularTimeSeries` has gaps.
