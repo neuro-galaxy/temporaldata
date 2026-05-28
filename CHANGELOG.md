@@ -24,7 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `RegularTimeSeries.to_irregular()` now returns copies of the underlying arrays instead of views ([#136](https://github.com/neuro-galaxy/temporaldata/pull/136))
 
 ### Deprecated
-- Deprecated the `domain` argument of `RegularTimeSeries`. Passing `domain="auto"` now emits a `DeprecationWarning` and will be removed in a future version; the domain is always computed automatically from `domain_start` and the sample grid. Passing a custom `Interval` raises `ValueError` — use `domain_start` to set the start time. ([#140](https://github.com/neuro-galaxy/temporaldata/pull/140))
+- Deprecated the `domain` argument in `RegularTimeSeries`. The domain is now always computed automatically from `domain_start` and the sample grid. Passing `domain="auto"` emits a `DeprecationWarning` and will stop working in a future release. Passing a custom `Interval` now raises `ValueError`; use `domain_start` to set the start time instead. ([#140](https://github.com/neuro-galaxy/temporaldata/pull/140))
 
 ### Removed
 - `ArrayDict.select_by_mask()`: removed `**kwargs` input parameter (was meant for internal use) ([#121](https://github.com/neuro-galaxy/temporaldata/pull/121))
