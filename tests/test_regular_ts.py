@@ -977,9 +977,7 @@ class TestDomainArg:
         # `_domain` after construction.
         ts = np.array([0.0, 0.01, 0.03, 0.04])
         raw = np.array([1.0, 2.0, 3.0, 4.0])
-        rts = RegularTimeSeries.from_gappy_timeseries(
-            ts, sampling_rate=100.0, raw=raw
-        )
+        rts = RegularTimeSeries.from_gappy_timeseries(ts, sampling_rate=100.0, raw=raw)
         assert rts.is_gappy()
 
         with h5py.File(test_filepath, "w") as f:
