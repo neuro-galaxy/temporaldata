@@ -943,7 +943,7 @@ class TestDomainArg:
             RegularTimeSeries(
                 raw=np.zeros((10, 4)),
                 sampling_rate=10.0,
-                domain=Interval(0.0, 1.0),
+                domain=Interval(0.0, 1.0),  # ty: ignore[invalid-argument-type]
             )
 
     def test_auto_string_domain_raises(self):
@@ -952,7 +952,7 @@ class TestDomainArg:
             RegularTimeSeries(
                 raw=np.zeros((10, 4)),
                 sampling_rate=10.0,
-                domain="auto",
+                domain="auto",  # ty: ignore[invalid-argument-type]
             )
 
     def test_auto_domain_is_grid_aligned(self):
