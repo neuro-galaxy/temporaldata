@@ -289,11 +289,18 @@ A :obj:`RegularTimeSeries <temporaldata.RegularTimeSeries>` represents uniformly
 
 Choosing ``domain``
 ^^^^^^^^^^^^^^^^^^^
-:obj:`RegularTimeSeries <temporaldata.RegularTimeSeries>` does not take a ``domain``
+:obj:`RegularTimeSeries <temporaldata.RegularTimeSeries>` does not need a ``domain``
 argument. The domain is always computed automatically as
-``[domain_start, domain_start + len / sampling_rate]`` so that its boundaries stay
+:math:`[t_0,\ t_0 + N / f_s)`, where :math:`t_0` is ``domain_start``, :math:`N` is the
+number of samples, and :math:`f_s` is ``sampling_rate``, so that its boundaries stay
 aligned to the sample grid. Use ``domain_start`` to set the start time, as in the
 examples above.
+
+.. note::
+
+    Passing ``domain="auto"`` is still accepted for backward compatibility but
+    emits a :class:`DeprecationWarning` and will be removed in a future version.
+    Passing a custom :obj:`Interval <temporaldata.Interval>` raises ``ValueError``.
 
 
 Converting to :obj:`IrregularTimeSeries <temporaldata.IrregularTimeSeries>`
