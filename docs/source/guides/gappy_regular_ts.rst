@@ -1,0 +1,158 @@
+.. currentmodule:: temporaldata
+
+Gappy RegularTimeSeries
+=======================
+
+Some signals are *almost* regular: they are sampled at a fixed rate, but have
+missing samples or chunks of samples. Behavioral streams in neuroscience
+experiments are a common example: a sensor briefly disconnects or a chunk of
+data is lost between recording segments.
+
+While such signals can be stored as :obj:`IrregularTimeSeries`, there is a
+certain benefit to storing signals as :obj:`RegularTimeSeries`: slicing
+precision. Slicing an :obj:`IrregularTimeSeries` close to real timestamps can
+return :math:`N` or :math:`N-1` points depending on floating-point rounding
+errors, and so windowed sampling becomes *effectively* non-deterministic in
+practice. A :obj:`RegularTimeSeries` slice always returns the same number of
+points for the same window width, regardless of where the slicing window
+starts.
+
+This motivated us to extend the interface of :obj:`RegularTimeSeries` to
+support *gappy* regular time series, which keeps that reliable slicing while
+allowing for missing time points. The main idea, simply, is to represent the
+missing timestamps with NaNs, while explicitly tracking which samples are real
+and which are gap-fill.
+
+
+Creating a gappy series
+-----------------------
+
+Use :meth:`RegularTimeSeries.from_gappy_timeseries` when you have
+regularly-sampled but gappy timestamps and value arrays. Each sample is snapped
+to a regular grid at :obj:`sampling_rate`, and missing samples are filled with
+a configurable gap value.
+
+.. code-block:: pycon
+
+    >>> import numpy as np
+    >>> from temporaldata import RegularTimeSeries
+
+    >>> # Signal sampled at 1 Hz but a few samples dropped: t = 3, 6, 7
+    >>> ts = [0., 1., 2., 4., 5., 8., 9.,]
+    >>> values = [0.1, 0.4, 0.2, 0.1, 0.0, 0.3, 0.5,]
+
+    >>> signal = RegularTimeSeries.from_gappy_timeseries(
+    ...     timestamps=ts,
+    ...     values=values,
+    ...     sampling_rate=1.0,
+    ... )
+
+    >>> len(signal)
+    10
+
+    >>> signal.timestamps
+    array([ 0.,  1.,  2.,  3.,  4.,  5.,  6.,  7.,  8.,  9.])
+
+    >>> signal.values
+    array([0.1, 0.4, 0.2, nan, 0.1, 0.0, nan, nan, 0.3, 0.5])
+
+The resulting object behaves like any other :obj:`RegularTimeSeries`, just with
+some gap-fill values.
+
+.. tip::
+
+    You can customize which gap-fill values to use for
+    different data types. To do this, see the ``gap_value`` parameter of
+    :meth:`~RegularTimeSeries.from_gappy_timeseries`.
+
+
+Domain
+------
+
+While a contiguous :obj:`RegularTimeSeries` has a contiguous
+:attr:`~RegularTimeSeries.domain`, a gappy series carries a non-contiguous
+domain that excludes the gap regions. For the example above:
+
+.. code-block:: pycon
+
+   >>> signal.domain
+   Interval(start=array([0., 4., 8.]), end=array([3., 6., 10.]))
+
+This is :math:`[0, 3) \cup [4, 6) \cup [8, 10)`.
+
+
+Identifying real vs. gap-fill samples
+-------------------------------------
+
+To help you decipher which samples are *real* and which are *gap-fills*, we
+provide the :meth:`~RegularTimeSeries.index_mask` method, which returns a
+boolean mask marking which positions hold real observations:
+
+.. code-block:: pycon
+
+   >>> signal.index_mask()
+   array([ True,  True,  True, False,  True,  True, False, False,  True,  True])
+
+   >>> # to get back "real" signal values:
+   >>> signal.values[signal.index_mask()]
+   array([0.1, 0.4, 0.2, 0.1, 0.0, 0.3, 0.5])
+
+For a contiguous series, :meth:`~RegularTimeSeries.index_mask` returns an
+all-``True`` array.
+
+
+:meth:`~RegularTimeSeries.is_gappy` is another convenient introspection method:
+
+.. code-block:: pycon
+
+   >>> signal.is_gappy()
+   True
+
+   >>> contiguous = RegularTimeSeries(values=np.array([0.1, 0.4, 0.2]), sampling_rate=1.0)
+   >>> contiguous.is_gappy()
+   False
+
+
+Slicing
+-------
+
+Slicing mostly follows the normal :obj:`RegularTimeSeries` semantics, with two
+additions specific to gappy series:
+
+- **Edge gaps are trimmed.** If a slice boundary falls inside a gap, the
+  returned arrays will not begin or end with gap-fill samples. That is, slicing
+  always returns data bracketed by real samples.
+- **Internal gaps are preserved.** Gap-fill samples in the middle of the
+  requested window remain in place; the returned object is itself gappy.
+
+.. code-block:: pycon
+
+    >>> sliced = signal.slice(3.0, 12.0, reset_origin=False)
+    >>> sliced.timestamps
+    array([ 4.,  5.,  6.,  7.,  8.,  9.])
+    >>> sliced.values
+    array([0.1, 0. , nan, nan, 0.3, 0.5])
+    >>> sliced.domain
+    Interval(start=array([4., 8.]), end=array([6., 10.]))
+
+A slice that falls entirely within a gap returns an empty series. Notice that
+the domain does *not* start at :math:`t = 3`.
+
+
+
+Conversion to IrregularTimeSeries
+---------------------------------
+
+:meth:`~RegularTimeSeries.to_irregular` drops gap-fill samples and returns an
+:obj:`IrregularTimeSeries` containing only real observations:
+
+.. code-block:: pycon
+
+    >>> irts = signal.to_irregular()
+    >>> irts.timestamps
+    array([0., 1., 2., 4., 5., 8., 9.])
+    >>> irts.values
+    array([0.1, 0.4, 0.2, 0.1, 0. , 0.3, 0.5])
+
+The resulting object's :attr:`domain` matches the original gappy series'
+multi-interval domain, so the gaps remain explicit even after conversion.
