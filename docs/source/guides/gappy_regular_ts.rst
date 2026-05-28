@@ -35,7 +35,7 @@ Creating a gappy series
 
 Use :meth:`RegularTimeSeries.from_gappy_timeseries` when you have
 regularly-sampled but gappy timestamps and value arrays. Each sample is snapped
-to a regular grid at :obj:`sampling_rate`, and missing samples are filled with
+to a regular grid at ``sampling_rate``, and missing samples are filled with
 a configurable gap value.
 
 .. code-block:: pycon
@@ -180,5 +180,5 @@ Conversion to IrregularTimeSeries
     >>> irts.values
     array([0.1, 0.4, 0.2, 0.1, 0. , 0.3, 0.5])
 
-The resulting object's :attr:`domain` matches the original gappy series'
+The resulting object's domain matches the original gappy series'
 multi-interval domain, so the gaps remain explicit even after conversion.
