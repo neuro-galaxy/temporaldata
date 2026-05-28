@@ -10,19 +10,25 @@ data is lost between recording segments.
 
 While such signals can be stored as :obj:`IrregularTimeSeries`, there is a
 certain benefit to storing signals as :obj:`RegularTimeSeries`: slicing
-precision. Slicing an :obj:`IrregularTimeSeries` close to real timestamps can
-return :math:`N` or :math:`N-1` points depending on floating-point rounding
-errors, and so windowed sampling becomes *effectively* non-deterministic in
-practice. A :obj:`RegularTimeSeries` slice always returns the same number of
-points for the same window width, regardless of where the slicing window
-starts.
+precision. A :obj:`RegularTimeSeries` slice always returns the same number of
+points for the same window width.
 
-This motivated us to extend the interface of :obj:`RegularTimeSeries` to
-support *gappy* regular time series, which keeps that reliable slicing while
-allowing for missing time points. The main idea, simply, is to represent the
-missing timestamps with NaNs, while explicitly tracking which samples are real
-and which are gap-fill.
+This motivated us to extend the interface of
+:obj:`RegularTimeSeries` to support *gappy* regular time series, which keeps
+that reliable slicing while allowing for missing time points. The main idea,
+simply, is to represent the missing timestamps with NaNs, while explicitly
+tracking which samples are real and which are gap-fill.
 
+.. dropdown:: More on slicing precision
+    :icon: light-bulb
+    :color: success
+
+    Slicing an :obj:`IrregularTimeSeries` close to real timestamps can
+    return :math:`N` or :math:`N-1` points depending on floating-point rounding
+    errors, and so windowed sampling becomes *effectively* non-deterministic in
+    practice. A :obj:`RegularTimeSeries` slice always returns the same number
+    of points for the same window width, regardless of where the slicing window
+    starts.
 
 Creating a gappy series
 -----------------------
