@@ -86,9 +86,7 @@ def test_regulartimeseries(test_filepath):
         assert np.allclose(data_slice.domain.end, data.domain.end)
         assert np.allclose(data_slice.timestamps, data.timestamps)
 
-    data = RegularTimeSeries(
-        lfp=np.random.random((100, 48)), sampling_rate=10, domain="auto"
-    )
+    data = RegularTimeSeries(lfp=np.random.random((100, 48)), sampling_rate=10)
 
     _test_regulartimeseries(data)
 
@@ -105,7 +103,6 @@ def test_regulartimeseries(test_filepath):
     data = RegularTimeSeries(
         lfp=np.random.random((100, 48)),
         sampling_rate=10,
-        domain="auto",
         domain_start=1.0,
     )
 
@@ -146,7 +143,6 @@ def test_lazy_regular_timeseries(test_filepath):
         raw=raw.copy(),
         gamma=gamma.copy(),
         sampling_rate=250.0,
-        domain="auto",
     )
 
     with h5py.File(test_filepath, "w") as f:
@@ -249,7 +245,7 @@ def test_lazy_regular_timeseries(test_filepath):
 
 
 def test_slice_numerical_instability():
-    ts = RegularTimeSeries(value=np.zeros((40)), sampling_rate=4, domain="auto")
+    ts = RegularTimeSeries(value=np.zeros((40)), sampling_rate=4)
     # Expected timestamps: [0.0, 0.25, 0.5, 0.75, 1.0, 1.25, ...]
 
     eps = 1e-14
@@ -307,7 +303,7 @@ def test_slice_numerical_instability():
     assert sliced_ts.domain.start[0] == 0.25
     assert sliced_ts.domain.end[-1] == 1.0
 
-    ts = RegularTimeSeries(value=np.zeros((40)), sampling_rate=10, domain="auto")
+    ts = RegularTimeSeries(value=np.zeros((40)), sampling_rate=10)
     # Expected timestamps: [0.0, 0.1, 0.2, ...]
 
     # Using math that natively generates known float anomalies.
@@ -321,9 +317,7 @@ def test_slice_numerical_instability():
 
 
 def test_slice_outside_domain(test_filepath):
-    ts = RegularTimeSeries(
-        value=np.zeros((100)), sampling_rate=10, domain="auto", domain_start=10.0
-    )
+    ts = RegularTimeSeries(value=np.zeros((100)), sampling_rate=10, domain_start=10.0)
 
     def _assert_slice_outside_domain(ts):
         sliced_ts = ts.slice(0, 5, reset_origin=False)
@@ -715,7 +709,6 @@ class TestRegularTimeSeriesCoercion:
         data = RegularTimeSeries(
             raw=[[float(i)] * 4 for i in range(10)],
             sampling_rate=10.0,
-            domain=Interval(0.0, 1.0),
         )
         assert isinstance(data.raw, np.ndarray)
         assert data.raw.shape == (10, 4)
@@ -725,7 +718,6 @@ class TestRegularTimeSeriesCoercion:
         data = RegularTimeSeries(
             raw=tuple([float(i)] * 4 for i in range(10)),
             sampling_rate=10.0,
-            domain=Interval(0.0, 1.0),
         )
         assert isinstance(data.raw, np.ndarray)
         assert data.raw.shape == (10, 4)
@@ -735,7 +727,6 @@ class TestRegularTimeSeriesCoercion:
         data = RegularTimeSeries(
             raw=df,
             sampling_rate=10.0,
-            domain=Interval(0.0, 10.0),
         )
         assert isinstance(data.raw, np.ndarray)
         assert data.raw.shape == (100, 4)
@@ -748,7 +739,6 @@ class TestIndexMask:
         rts = RegularTimeSeries(
             raw=[0, 1, 2, 3],
             sampling_rate=10,
-            domain="auto",
         )
         if request.param == "regular":
             yield rts
@@ -831,7 +821,6 @@ class TestIsGappy:
         rts = RegularTimeSeries(
             raw=[0, 1, 2, 3],
             sampling_rate=10,
-            domain="auto",
         )
         if request.param == "regular":
             yield rts
@@ -879,7 +868,6 @@ class TestToIrregular:
         rts = RegularTimeSeries(
             raw=[0, 1, 2, 3],
             sampling_rate=10,
-            domain="auto",
         )
         if request.param == "regular":
             yield rts
