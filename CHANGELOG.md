@@ -25,8 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Removed
 - `ArrayDict.select_by_mask()`: removed `**kwargs` input parameter (was meant for internal use) ([#121](https://github.com/neuro-galaxy/temporaldata/pull/121))
-- `RegularTimeSeries` no longer accepts a `domain` argument; it is always auto-computed to stay aligned to the sample grid. Use `domain_start` to set the start time. ([#140](https://github.com/neuro-galaxy/temporaldata/pull/140))
-
+- `RegularTimeSeries` no longer accepts a `domain` argument. The domain is now computed automatically to align with the sample grid. Use `domain_start` to specify the start time. ([#140](https://github.com/neuro-galaxy/temporaldata/pull/140))
 
 ## [0.1.5] - 2026-05-23
 
