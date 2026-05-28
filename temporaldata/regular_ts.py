@@ -134,13 +134,26 @@ class RegularTimeSeries(ArrayDict):
         **kwargs: ArrayLike,
     ):
         if "domain" in kwargs:
-            raise ValueError(
-                "Manually setting the domain of RegularTimeSeries is deprecated; the domain "
-                "is always computed automatically as "
-                "[domain_start, domain_start + len(self) / sampling_rate] so that "
-                "its boundaries stay aligned to the sample grid. Use `domain_start` "
-                "to set the start time."
-            )
+            domain = kwargs.pop("domain")
+            if domain == "auto":
+                warnings.warn(
+                    "The `domain` argument of `RegularTimeSeries` is deprecated "
+                    "and will be removed in a future version. The domain is "
+                    "always computed automatically as "
+                    "[domain_start, domain_start + len(self) / sampling_rate]; "
+                    'you can drop `domain="auto"` from your call.',
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+            else:
+                raise ValueError(
+                    "Manually setting the domain of `RegularTimeSeries` to a "
+                    "custom `Interval` is no longer supported; the domain is "
+                    "always computed automatically as "
+                    "[domain_start, domain_start + len(self) / sampling_rate] "
+                    "so that its boundaries stay aligned to the sample grid. "
+                    "Use `domain_start` to set the start time."
+                )
 
         super().__init__(**kwargs)
 

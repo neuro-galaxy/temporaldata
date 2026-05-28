@@ -936,24 +936,27 @@ class TestToIrregular:
 
 
 class TestDomainArg:
-    """The domain is always computed; it cannot be passed to the constructor."""
+    """The domain is always computed; the legacy `domain` kwarg is soft-deprecated."""
 
     def test_explicit_interval_domain_raises(self):
-        with pytest.raises(ValueError, match="Manually setting the domain"):
+        with pytest.raises(ValueError, match="no longer supported"):
             RegularTimeSeries(
                 raw=np.zeros((10, 4)),
                 sampling_rate=10.0,
                 domain=Interval(0.0, 1.0),  # ty: ignore[invalid-argument-type]
             )
 
-    def test_auto_string_domain_raises(self):
-        # "auto" used to be the accepted value; it is no longer a valid argument.
-        with pytest.raises(ValueError, match="Manually setting the domain"):
-            RegularTimeSeries(
+    def test_auto_string_domain_warns(self):
+        # `domain="auto"` is the legacy default; we keep accepting it but warn.
+        with pytest.warns(DeprecationWarning, match="deprecated"):
+            rts = RegularTimeSeries(
                 raw=np.zeros((10, 4)),
                 sampling_rate=10.0,
                 domain="auto",  # ty: ignore[invalid-argument-type]
             )
+        # Behaviour is still auto-compute: domain is grid-aligned to len/sampling_rate.
+        np.testing.assert_allclose(rts.domain.start, [0.0])
+        np.testing.assert_allclose(rts.domain.end, [1.0])
 
     def test_non_numeric_domain_start_raises(self):
         with pytest.raises(ValueError, match="domain_start must be a number"):
