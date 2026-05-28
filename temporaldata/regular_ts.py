@@ -140,7 +140,7 @@ class RegularTimeSeries(ArrayDict):
                     "The `domain` argument of `RegularTimeSeries` is deprecated "
                     "and will be removed in a future version. The domain is "
                     "always computed automatically as "
-                    "[domain_start, domain_start + len(self) / sampling_rate]; "
+                    "[domain_start, domain_start + len(self) / sampling_rate); "
                     'you can drop `domain="auto"` from your call.',
                     DeprecationWarning,
                     stacklevel=2,
@@ -150,7 +150,7 @@ class RegularTimeSeries(ArrayDict):
                     "Manually setting the domain of `RegularTimeSeries` to a "
                     "custom `Interval` is no longer supported; the domain is "
                     "always computed automatically as "
-                    "[domain_start, domain_start + len(self) / sampling_rate] "
+                    "[domain_start, domain_start + len(self) / sampling_rate) "
                     "so that its boundaries stay aligned to the sample grid. "
                     "Use `domain_start` to set the start time."
                 )
