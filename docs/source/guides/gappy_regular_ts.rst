@@ -81,8 +81,8 @@ domain that excludes the gap regions. For the example above:
 
 .. code-block:: pycon
 
-   >>> signal.domain
-   Interval(start=array([0., 4., 8.]), end=array([3., 6., 10.]))
+   >>> signal.domain.start, signal.domain.end
+   array([0., 4., 8.]), array([3., 6., 10.])
 
 This is :math:`[0, 3) \cup [4, 6) \cup [8, 10)`.
 
@@ -138,8 +138,8 @@ additions specific to gappy series:
     array([ 4.,  5.,  6.,  7.,  8.,  9.])
     >>> sliced.values
     array([0.1, 0. , nan, nan, 0.3, 0.5])
-    >>> sliced.domain
-    Interval(start=array([4., 8.]), end=array([6., 10.]))
+    >>> sliced.domain.start, sliced.domain.end
+    array([4., 8.]), array([6., 10.])
 
 A slice that falls entirely within a gap returns an empty series. Notice that
 the domain does *not* start at :math:`t = 3`.
