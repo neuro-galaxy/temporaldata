@@ -67,7 +67,7 @@ some gap-fill values.
 
 .. tip::
 
-    You can customize which gap-fill values to use for
+    You can customize which gap-fill values are used for
     different data types. To do this, see the ``gap_value`` parameter of
     :meth:`~RegularTimeSeries.from_gappy_timeseries`.
 
