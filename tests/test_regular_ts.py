@@ -945,3 +945,32 @@ class TestToIrregular:
             assert id(irts.domain) != id(lazy_rts.domain)
             assert not np.shares_memory(irts.domain.start, lazy_rts.domain.start)
             assert not np.shares_memory(irts.domain.end, lazy_rts.domain.end)
+
+
+class TestDomainArg:
+    """The domain is always computed; it cannot be passed to the constructor."""
+
+    def test_explicit_interval_domain_raises(self):
+        with pytest.raises(ValueError, match="does not accept a"):
+            RegularTimeSeries(
+                raw=np.zeros((10, 4)),
+                sampling_rate=10.0,
+                domain=Interval(0.0, 1.0),
+            )
+
+    def test_auto_string_domain_raises(self):
+        # "auto" used to be the accepted value; it is no longer a valid argument.
+        with pytest.raises(ValueError, match="does not accept a"):
+            RegularTimeSeries(
+                raw=np.zeros((10, 4)),
+                sampling_rate=10.0,
+                domain="auto",
+            )
+
+    def test_auto_domain_is_grid_aligned(self):
+        rts = RegularTimeSeries(
+            raw=np.zeros((10, 4)), sampling_rate=10.0, domain_start=2.5
+        )
+        np.testing.assert_allclose(rts.domain.start, [2.5])
+        np.testing.assert_allclose(rts.domain.end, [3.5])
+        assert not rts.is_gappy()
