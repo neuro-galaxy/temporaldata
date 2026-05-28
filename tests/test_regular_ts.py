@@ -939,7 +939,7 @@ class TestDomainArg:
     """The domain is always computed; it cannot be passed to the constructor."""
 
     def test_explicit_interval_domain_raises(self):
-        with pytest.raises(ValueError, match="does not accept a"):
+        with pytest.raises(ValueError, match="Manually setting the domain"):
             RegularTimeSeries(
                 raw=np.zeros((10, 4)),
                 sampling_rate=10.0,
@@ -948,11 +948,19 @@ class TestDomainArg:
 
     def test_auto_string_domain_raises(self):
         # "auto" used to be the accepted value; it is no longer a valid argument.
-        with pytest.raises(ValueError, match="does not accept a"):
+        with pytest.raises(ValueError, match="Manually setting the domain"):
             RegularTimeSeries(
                 raw=np.zeros((10, 4)),
                 sampling_rate=10.0,
                 domain="auto",  # ty: ignore[invalid-argument-type]
+            )
+
+    def test_non_numeric_domain_start_raises(self):
+        with pytest.raises(ValueError, match="domain_start must be a number"):
+            RegularTimeSeries(
+                raw=np.zeros((10, 4)),
+                sampling_rate=10.0,
+                domain_start="0.0",  # ty: ignore[invalid-argument-type]
             )
 
     def test_auto_domain_is_grid_aligned(self):
@@ -962,3 +970,27 @@ class TestDomainArg:
         np.testing.assert_allclose(rts.domain.start, [2.5])
         np.testing.assert_allclose(rts.domain.end, [3.5])
         assert not rts.is_gappy()
+
+    def test_gappy_domain_survives_hdf5_roundtrip(self, test_filepath):
+        # A gappy RTS has a multi-interval domain that `from_hdf5` cannot
+        # reconstruct from `domain_start` alone; it must restore the saved
+        # `_domain` after construction.
+        ts = np.array([0.0, 0.01, 0.03, 0.04])
+        raw = np.array([1.0, 2.0, 3.0, 4.0])
+        rts = RegularTimeSeries.from_gappy_timeseries(
+            ts, sampling_rate=100.0, raw=raw
+        )
+        assert rts.is_gappy()
+
+        with h5py.File(test_filepath, "w") as f:
+            rts.to_hdf5(f)
+        with h5py.File(test_filepath, "r") as f:
+            loaded = RegularTimeSeries.from_hdf5(f)
+
+        assert loaded.is_gappy()
+        np.testing.assert_allclose(loaded.domain.start, rts.domain.start)
+        np.testing.assert_allclose(loaded.domain.end, rts.domain.end)
+        np.testing.assert_array_equal(np.isnan(loaded.raw), np.isnan(rts.raw))
+        np.testing.assert_array_equal(
+            loaded.raw[~np.isnan(loaded.raw)], rts.raw[~np.isnan(rts.raw)]
+        )
