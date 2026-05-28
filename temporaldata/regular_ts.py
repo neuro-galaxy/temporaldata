@@ -489,9 +489,7 @@ class RegularTimeSeries(ArrayDict):
             sampling_rate=file.attrs["sampling_rate"],
             domain_start=float(domain.start[0]),
         )
-        if len(domain) > 1:
-            # Gappy: restore the multi-interval domain that the constructor can't compute
-            obj._domain = domain
+        obj._domain = domain
 
         return obj
 
