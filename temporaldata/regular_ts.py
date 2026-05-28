@@ -484,8 +484,14 @@ class RegularTimeSeries(ArrayDict):
                 data[key] = value[:]
 
         domain = Interval.from_hdf5(file["domain"])
-        obj = cls(**data, sampling_rate=file.attrs["sampling_rate"])
-        obj._domain = domain
+        obj = cls(
+            **data,
+            sampling_rate=file.attrs["sampling_rate"],
+            domain_start=float(domain.start[0]),
+        )
+        if len(domain) > 1:
+            # Gappy: restore the multi-interval domain that the constructor can't compute
+            obj._domain = domain
 
         return obj
 
@@ -646,8 +652,8 @@ class RegularTimeSeries(ArrayDict):
             out[grid_idx] = arr
             filled[key] = out
 
-        obj = cls(sampling_rate=sampling_rate, **filled)
-        obj._domain = domain
+        obj = cls(sampling_rate=sampling_rate, domain_start=start_time, **filled)
+        obj._domain = domain  # replace single-interval auto domain with gappy one
         return obj
 
     def is_gappy(self) -> bool:
