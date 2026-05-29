@@ -46,7 +46,6 @@ a configurable gap value.
 
 .. code-block:: pycon
 
-    >>> import numpy as np
     >>> from temporaldata import RegularTimeSeries
 
     >>> # Signal sampled at 1 Hz but a few samples dropped: t = 3, 6, 7
