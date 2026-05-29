@@ -163,7 +163,7 @@ A slice that falls entirely within a gap returns an empty series:
 
 .. code-block:: pycon
 
-   >>> empty = signal.slice(6.1, 7.9, reset_origin=False)
+   >>> empty = signal.slice(6.0, 8.0, reset_origin=False)
    >>> empty.timestamps
    array([])
    >>> empty.values
