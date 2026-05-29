@@ -150,7 +150,7 @@ Notice that the domain does *not* start at :math:`t = 3`, and
 the gap between :math:`t = 6` and :math:`t = 8` is preserved.
 
 .. figure:: ../_static/gappy-slice.png
-   :width: 80%
+   :width: 65%
    :align: center
 
    Slicing gappy RegularTimeSeries
