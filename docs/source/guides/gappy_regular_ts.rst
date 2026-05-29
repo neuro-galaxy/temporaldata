@@ -114,7 +114,7 @@ all-``True`` array.
    >>> signal.is_gappy()
    True
 
-   >>> contiguous = RegularTimeSeries(values=np.array([0.1, 0.4, 0.2]), sampling_rate=1.0)
+   >>> contiguous = RegularTimeSeries(values=[0.1, 0.4, 0.2], sampling_rate=1.0)
    >>> contiguous.is_gappy()
    False
 
