@@ -97,7 +97,7 @@ Identifying real vs. gap-fill samples
 -------------------------------------
 
 To help you decipher which samples are *real* and which are *gap-fills*, we
-provide the :meth:`~RegularTimeSeries.index_mask` method, which returns a
+provide the :meth:`~RegularTimeSeries.index_mask` method. It returns a
 boolean mask marking which positions hold real observations:
 
 .. code-block:: pycon
