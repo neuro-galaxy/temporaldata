@@ -174,11 +174,14 @@ Conversion to IrregularTimeSeries
 
 .. code-block:: pycon
 
-    >>> irts = signal.to_irregular()
-    >>> irts.timestamps
-    array([0., 1., 2., 4., 5., 8., 9.])
-    >>> irts.values
-    array([0.1, 0.4, 0.2, 0.1, 0. , 0.3, 0.5])
+   >>> irts = signal.to_irregular()
+   >>> irts.timestamps
+   array([0., 1., 2., 4., 5., 8., 9.])
+   >>> irts.values
+   array([0.1, 0.4, 0.2, 0.1, 0. , 0.3, 0.5])
+   >>> irts.domain.start, irts.domain.end
+   array([0., 4., 8.]), array([3., 6., 10.])
+
 
 The resulting object's domain matches the original gappy series'
 multi-interval domain, so the gaps remain explicit even after conversion.
