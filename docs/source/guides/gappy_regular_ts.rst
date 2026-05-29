@@ -149,6 +149,12 @@ additions specific to gappy series:
 Notice that the domain does *not* start at :math:`t = 3`, and
 the gap between :math:`t = 6` and :math:`t = 8` is preserved.
 
+.. figure:: ../_static/gappy-slice.png
+   :width: 80%
+   :align: center
+
+   Slicing gappy RegularTimeSeries
+
 A slice that is entirely within a contiguous section is no longer gappy:
 
 .. code-block:: pycon
