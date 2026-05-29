@@ -133,15 +133,16 @@ additions specific to gappy series:
 
 .. code-block:: pycon
 
-    >>> sliced = signal.slice(3.0, 12.0, reset_origin=False)
+    >>> sliced = signal.slice(3.0, 9.0, reset_origin=False)
     >>> sliced.timestamps
-    array([ 4.,  5.,  6.,  7.,  8.,  9.])
+    array([ 4.,  5.,  6.,  7.,  8.])
     >>> sliced.values
-    array([0.1, 0. , nan, nan, 0.3, 0.5])
+    array([0.1, 0. , nan, nan, 0.3])
     >>> sliced.domain.start, sliced.domain.end
-    array([4., 8.]), array([6., 10.])
+    array([4., 8.]), array([6., 9.])
 
-Notice that the domain does *not* start at :math:`t = 3`.
+Notice that the domain does *not* start at :math:`t = 3`, and
+the gap between :math:`[6, 8)` is preserved.
 
 A slice that is entirely within a contiguous section is no longer gappy:
 
