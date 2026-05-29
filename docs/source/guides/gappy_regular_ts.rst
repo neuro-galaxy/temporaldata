@@ -13,22 +13,28 @@ certain benefit to storing signals as :obj:`RegularTimeSeries`: slicing
 precision. A :obj:`RegularTimeSeries` slice always returns the same number of
 points for the same window width.
 
-This motivated us to extend the interface of
-:obj:`RegularTimeSeries` to support *gappy* regular time series, which keeps
-that reliable slicing while allowing for missing time points. The main idea,
-simply, is to represent the missing timestamps with NaNs, while explicitly
-tracking which samples are real and which are gap-fill.
+This motivated us to extend the interface of :obj:`RegularTimeSeries` to
+support *gappy* regular time series, which keeps that reliable slicing while
+allowing for missing time points. The main idea, simply, is to represent the
+missing timestamps with NaNs, while explicitly tracking which samples are real
+and which are gap-fill.
 
 .. dropdown:: More on slicing precision
     :icon: light-bulb
     :color: success
 
-    Slicing an :obj:`IrregularTimeSeries` close to real timestamps can
-    return :math:`N` or :math:`N-1` points depending on floating-point rounding
-    errors, and so windowed sampling becomes *effectively* non-deterministic in
-    practice. A :obj:`RegularTimeSeries` slice always returns the same number
-    of points for the same window width, regardless of where the slicing window
-    starts.
+    Slicing an :obj:`IrregularTimeSeries` close to real timestamps can return
+    :math:`N` or :math:`N-1` points depending on floating-point rounding
+    errors. So, in practice, windowed sampling, *effectively*, behaves
+    non-deterministically. More precisely, this happens because we store
+    timestamps of irregular time series in floating point format
+    (:obj:`numpy.float64`). Slicing involves a search in this floating point
+    space, and comparisons between floating numbers are notoriously unreliable.
+
+    A :obj:`RegularTimeSeries` internally represents time as *integer indices*,
+    where it is easier to control all the messy floating point numerics. As a
+    result, a slice always returns the same number of points for the same
+    window width.
 
 Creating a gappy series
 -----------------------
@@ -142,7 +148,7 @@ additions specific to gappy series:
     array([4., 8.]), array([6., 9.])
 
 Notice that the domain does *not* start at :math:`t = 3`, and
-the gap between :math:`[6, 8)` is preserved.
+the gap between :math:`t = 6` and :math:`t = 8` is preserved.
 
 A slice that is entirely within a contiguous section is no longer gappy:
 
